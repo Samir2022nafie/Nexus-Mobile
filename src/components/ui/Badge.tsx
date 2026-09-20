@@ -62,12 +62,12 @@ const styles = StyleSheet.create({
   sm: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.full,
   },
   md: {
     paddingHorizontal: Spacing.md,
     paddingVertical: 5,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
   },
   textSm: {
     ...Typography.captionSm,

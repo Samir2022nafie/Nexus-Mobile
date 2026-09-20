@@ -1,0 +1,259 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-surface-variant": "#514535", "surface-container-lowest": "#ffffff", "error": "#ba1a1a", "secondary-fixed-dim": "#adc8f3", "secondary": "#455f85", "primary": "#805600", "on-primary-container": "#5f3f00", "on-tertiary-fixed-variant": "#504539", "primary-container": "#e8a736", "secondary-container": "#b8d3ff", "surface-container": "#f0eded", "surface-container-high": "#eae7e7", "surface": "#fcf9f8", "surface-variant": "#e5e2e1", "on-error": "#ffffff", "outline-variant": "#d5c4af", "tertiary-fixed-dim": "#d5c4b4", "on-secondary-container": "#415b80", "inverse-on-surface": "#f3f0ef", "tertiary-container": "#c0b0a1", "on-error-container": "#93000a", "primary-fixed-dim": "#feba48", "on-tertiary": "#ffffff", "on-secondary": "#ffffff", "on-primary-fixed": "#281800", "surface-tint": "#805600", "error-container": "#ffdad6", "tertiary": "#695c50", "background": "#fcf9f8", "surface-dim": "#dcd9d9", "surface-container-low": "#f6f3f2", "secondary-fixed": "#d4e3ff", "on-surface": "#1c1b1b", "tertiary-fixed": "#f1dfcf", "inverse-primary": "#feba48", "on-background": "#1c1b1b", "outline": "#837563", "primary-fixed": "#ffddaf", "on-secondary-fixed-variant": "#2d486c", "on-primary": "#ffffff", "on-tertiary-fixed": "#231a10", "surface-bright": "#fcf9f8", "inverse-surface": "#313030", "surface-container-highest": "#e5e2e1", "on-primary-fixed-variant": "#614000", "on-secondary-fixed": "#001c3a", "on-tertiary-container": "#4f4337" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "space-xs": "0.25rem", "space-xl": "2rem", "space-lg": "1.5rem", "gutter": "1rem", "space-md": "1rem", "margin": "1rem" }, fontFamily: { "headline-lg": ["Inter"], "headline-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Inter"], "caption-md": ["Inter"], "headline-sm": ["Inter"], "caption-sm": ["Inter"], "body-md": ["Inter"], "label-lg": ["Inter"] }, fontSize: { "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-md": ["24px", { "lineHeight": "30px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "label-md": ["15px", { "lineHeight": "18px", "fontWeight": "600" }], "caption-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["20px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "caption-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-md": ["15px", { "lineHeight": "22px", "fontWeight": "400" }], "label-lg": ["16px", { "lineHeight": "20px", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="Nexus Emblem Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UsNCZ-hB5xNRmo9HAUADV23NrXRSncTzvyBrJ7154G-c2Qh0dtvpy2ULwTZmyx6ZWVnDK-r7nZPpvTJ0Nk3P7iocsPQvvKEwRW-D7a8Q63utH3AcHBeUVwJBaKzgWTl3lGImGXdB1Pmak4XkxzXeSRaT_LDMyrYEu1RbAKbIAUWpYirEiu212Kez3Zr5U9zHJqHewA1BjL5I4s3bXq9xFTaYiv7vB9rK_tgTVujkULQSq6xku1bMAEmpFM"><span class="font-headline-sm text-headline-sm text-primary-container tracking-tight">Nexus</span><span class="font-label-md text-label-md text-tertiary ml-space-xs">/ Home</span></div><div class="flex items-center gap-space-xs"><button aria-label="Notifications" class="relative w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><button aria-label="User Profile" class="w-11 h-11 flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfXYBlaF64aPAgVfjTzie9QhgRNMIlG4C30ri18-CQE__XVUWXHvLZ2vzZnhrScAm--ZTlW_D7Rk3o74LY1A13XJQNuoJQ6qqW1PSZfoA9WRzoOOg_Vrh12b-kfsZkebhS-Aa2yRk5wt8vrFWOrRQC93BkwGoP6QrHE04e_uT_Od5kIB_HE4ZhKS_dSWNxbdg3o_Fn1s2YD9Z3yi4Ansvvsc_VN4lR1wcYJpV87RlE5jI4KozUGy_nyA"></button></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-24 bg-surface"><div class="flex flex-col w-full">
+<!-- Interactive Header Bar & Hero Cover -->
+<div class="relative w-full rounded-2xl overflow-hidden shadow-sm bg-surface-container-low mb-space-md">
+<!-- Mountain Banner Cover -->
+<div class="w-full h-52 bg-cover bg-center relative" data-alt="Cinematic aerial panoramic view of lush volcanic mountain ridgeline, rolling misty hills kissed by early morning golden sunlight, earthy green and amber warm tones, soft ethereal mountain fog, high definition editorial outdoor photography" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBXfoLKjK9KY7fQUluQ3yrS-MyfgICGpUf4u_CBeotcms4n_htRYJszpyZqYH7t6qid3hfrx-y0PS8K1hv4OvGEAAsoGr4cEuu9vjqpjPJRb_75T337V39XwzrL6e1sW729gfc8y4qofks0_np5cvlK3DMYCpqym-50NW8BZA6tUcguYJO-0HsYPXr9oKRXXhwFjec7nqsFcxAas08fFioSbR2F5tp6yTlTCpGnH6KHbV5ikbYVDlyaAw')">
+<div class="absolute inset-0 bg-gradient-to-b from-on-surface/40 via-transparent to-surface-container-low/90"></div>
+<!-- Quick Action Buttons on Cover -->
+<div class="absolute top-space-sm left-space-sm right-space-sm flex items-center justify-between z-10">
+<button aria-label="Go back" class="w-11 h-11 rounded-full bg-surface/80 backdrop-blur-md text-on-surface flex items-center justify-center shadow-sm active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]">arrow_back</span>
+</button>
+<button aria-label="Share community" class="w-11 h-11 rounded-full bg-surface/80 backdrop-blur-md text-on-surface flex items-center justify-center shadow-sm active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[22px]">share</span>
+</button>
+</div>
+</div>
+<!-- Community Details Header Info -->
+<div class="px-space-md pb-space-md pt-0 relative flex flex-col">
+<!-- Avatar row with overlap -->
+<div class="flex items-end justify-between -mt-10 mb-space-sm">
+<div class="relative">
+<img alt="Trail Blazers Logo" class="w-16 h-16 rounded-full object-cover shadow-md bg-surface-container-lowest" data-alt="Outdoor adventurer community circular emblem featuring minimalist hand-drawn topography lines and stylized sun icon, warm golden and cedar color palette" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtdM-3XEUi_JOCaZPfW28Pl6_dZneGrBB4XFUYAhxo6JIdTOk7JIvZAu-gV7yllkNOK__q75Arrs2fZSWJixZ0tFsoDdqM-jUtlIkypORj6Daa-m7w_E-xRCfEFLEzTsT9ysWih4Omvad7n7LedlNfakv5mZX4_p_Z5h73nVVNmrRxIeeGHlyNJkKWsfTaaASyvxlY1ANvh8OyfnzLwaG1v4kcjKeBc_wubrPeu8Swq0U-A7EQcTMpog">
+<span class="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-600 ring-2 ring-surface flex items-center justify-center">
+<span class="w-1.5 h-1.5 rounded-full bg-surface"></span>
+</span>
+</div>
+<!-- Membership State Action (Joined ✓) -->
+<div class="flex items-center gap-space-xs">
+<button class="h-10 px-space-md rounded-full bg-emerald-50 text-emerald-800 font-label-md text-label-md flex items-center gap-space-xs shadow-sm active:scale-95 transition-all" id="joinBtn" type="button">
+<span class="material-symbols-outlined text-[18px] text-emerald-700 font-bold">check</span>
+<span class="">Joined</span>
+</button>
+</div>
+</div>
+<!-- Title and Badges -->
+<div class="flex flex-col gap-space-xs">
+<h1 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Trail Blazers</h1>
+<div class="flex items-center flex-wrap gap-space-xs my-0.5">
+<span class="font-caption-sm text-caption-sm px-2.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-semibold">
+            Outdoor
+          </span>
+<span class="font-caption-sm text-caption-sm px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+            Public
+          </span>
+<span class="font-caption-md text-caption-md text-tertiary ml-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">group</span>
+            247 members
+          </span>
+</div>
+<!-- Description -->
+<p class="font-caption-md text-caption-md text-tertiary line-clamp-2 mt-1 leading-relaxed">
+          Explore the great outdoors with like-minded adventurers. Weekly hikes, camping trips, and nature photography.
+          <button class="text-secondary font-label-md ml-1 hover:underline" type="button">Read more</button>
+</p>
+</div>
+</div>
+</div>
+<!-- Sticky Tab Bar Navigation -->
+<div class="sticky top-16 z-30 bg-surface/95 backdrop-blur-md pt-space-xs pb-space-sm mb-space-md">
+<div class="flex items-center justify-between relative">
+<button class="tab-btn flex-1 py-2 text-center font-label-md text-label-md text-primary-container relative active:scale-95 transition-colors" data-tab="discussions" type="button">
+<span class="">Discussions</span>
+<span class="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-primary-container rounded-full"></span>
+</button>
+<button class="tab-btn flex-1 py-2 text-center font-label-md text-label-md text-tertiary hover:text-on-surface active:scale-95 transition-colors" data-tab="events" type="button">
+<span class="">Events</span>
+</button>
+<button class="tab-btn flex-1 py-2 text-center font-label-md text-label-md text-tertiary hover:text-on-surface active:scale-95 transition-colors" data-tab="members" type="button">
+<span class="">Members</span>
+</button>
+<button class="tab-btn flex-1 py-2 text-center font-label-md text-label-md text-tertiary hover:text-on-surface active:scale-95 transition-colors" data-tab="about" type="button">
+<span class="">About</span>
+</button>
+</div>
+</div>
+<!-- New Post Trigger Card -->
+<div class="w-full bg-surface-container-low rounded-xl p-space-sm mb-space-md shadow-sm flex items-center gap-space-sm">
+<img alt="Your avatar" class="w-9 h-9 rounded-full object-cover flex-shrink-0" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfXYBlaF64aPAgVfjTzie9QhgRNMIlG4C30ri18-CQE__XVUWXHvLZ2vzZnhrScAm--ZTlW_D7Rk3o74LY1A13XJQNuoJQ6qqW1PSZfoA9WRzoOOg_Vrh12b-kfsZkebhS-Aa2yRk5wt8vrFWOrRQC93BkwGoP6QrHE04e_uT_Od5kIB_HE4ZhKS_dSWNxbdg3o_Fn1s2YD9Z3yi4Ansvvsc_VN4lR1wcYJpV87RlE5jI4KozUGy_nyA">
+<div class="flex-1 h-11 rounded-full bg-surface-container-lowest px-4 flex items-center justify-between text-tertiary cursor-pointer active:bg-surface-variant transition-colors shadow-sm" role="button" tabindex="0">
+<span class="font-body-md text-body-md text-tertiary select-none">What's on your mind?</span>
+<span class="material-symbols-outlined text-[20px] text-tertiary hover:text-primary-container transition-colors">add_photo_alternate</span>
+</div>
+</div>
+<!-- Feed Posts Section -->
+<div class="flex flex-col gap-space-md">
+<!-- Post 1 -->
+<article class="w-full bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm transition-shadow">
+<!-- Post Meta Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<img alt="Amara D." class="w-9 h-9 rounded-full object-cover bg-surface-container-high" data-alt="Portrait of young African woman hiker smiling with warm sunlight behind her, wearing cozy athletic outdoor gear, parchment warm lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVH7AYPFjzcI9zfU5sFRQT0FQAGXSyVuNwAQq1v40NEG4KfvGjRmskVJ70xQxAqOTAFy1bfAWqqwHbQbTgLQY5M-UNCkV23M_kN0iJUakUBZp3KTFmJz-lmQ5k-8vOBolnpWjkezwi3B8mdS9LaGQreEZwvrlwX2jgqycUb5ENHHO3yVW3-zK17r3QTd904gzr-tWmCQhclkkcruWvigIjgdFcJKxCI5DMMBhV97HFFNDfbpNsf7f4HA">
+<div class="flex items-baseline gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Amara D.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary">• 3h ago</span>
+</div>
+</div>
+<button aria-label="More options" class="w-8 h-8 rounded-full flex items-center justify-center text-tertiary hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<!-- Post Content -->
+<div class="flex flex-col gap-1">
+<h2 class="font-label-lg text-label-lg text-on-surface font-bold tracking-tight">
+          Best sunrise spots within 2 hours of the city
+        </h2>
+<p class="font-caption-md text-caption-md text-tertiary line-clamp-2 leading-relaxed">
+          I've been mapping out all the accessible peaks around Addis and wanted to share my top 5 with you all. Each has solid parking and stunning views...
+        </p>
+</div>
+<!-- Action Bar -->
+<div class="flex items-center justify-between pt-space-xs mt-1 text-tertiary">
+<div class="flex items-center gap-space-md">
+<!-- Heart filled goldenrod -->
+<button aria-label="Like post, 24 likes" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] text-primary-container active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-label-md text-label-md">24</span>
+</button>
+<!-- Comment button -->
+<button aria-label="Comments, 12 comments" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] hover:text-on-surface active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="font-label-md text-label-md">12</span>
+</button>
+</div>
+<!-- Bookmark outlined -->
+<button aria-label="Bookmark post" class="w-11 h-11 flex items-center justify-center hover:text-on-surface active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</article>
+<!-- Post 2 -->
+<article class="w-full bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm transition-shadow">
+<!-- Post Meta Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<img alt="Dawit A." class="w-9 h-9 rounded-full object-cover bg-surface-container-high" data-alt="Portrait of an enthusiastic male trail runner in breathable jacket, golden sunrise backdrop with mountain horizon, high realism warm tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0Cs5m4wT8Jl73hx_2JkKiutO67Ih1B8etX9UqcAF_nQpUR-X3w5y775aEBMoIusPczrXs3d624p6fBxfVo6k8ylW0YdlGJDtiim3cObcghIQsEmNNVAr6iHq_O-G6RDhN5JthFv2b6wBpW6kLg8E5c_8zX79ooYvAIEgcGga8a7ddKNcmy29YQy_pPwT4O1B3rJyStGiKQ6nKnZL1NYIqedXcRiD_Q0PQu4OCEZ3HL6uJZ4n0tPLbfQ">
+<div class="flex items-baseline gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Dawit A.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary">• 6h ago</span>
+</div>
+</div>
+<button aria-label="More options" class="w-8 h-8 rounded-full flex items-center justify-center text-tertiary hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<!-- Post Content -->
+<div class="flex flex-col gap-1">
+<h2 class="font-label-lg text-label-lg text-on-surface font-bold tracking-tight">
+          Trail running gear recommendations?
+        </h2>
+<p class="font-caption-md text-caption-md text-tertiary line-clamp-2 leading-relaxed">
+          Looking for lightweight hydration vests and shoes with good grip on loose volcanic rock. What are you guys using on Entoto?
+        </p>
+</div>
+<!-- Action Bar -->
+<div class="flex items-center justify-between pt-space-xs mt-1 text-tertiary">
+<div class="flex items-center gap-space-md">
+<!-- Heart outlined -->
+<button aria-label="Like post, 9 likes" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] hover:text-primary-container active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">favorite</span>
+<span class="font-label-md text-label-md">9</span>
+</button>
+<!-- Comment button -->
+<button aria-label="Comments, 15 comments" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] hover:text-on-surface active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="font-label-md text-label-md">15</span>
+</button>
+</div>
+<!-- Bookmark outlined -->
+<button aria-label="Bookmark post" class="w-11 h-11 flex items-center justify-center hover:text-on-surface active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</article>
+<!-- Post 3 -->
+<article class="w-full bg-surface-container-low rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm transition-shadow">
+<!-- Post Meta Header -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<img alt="Kai N." class="w-9 h-9 rounded-full object-cover bg-surface-container-high" data-alt="Warm portrait of smiling traveler wearing knitted wool beanie and green fleece, soft natural parchment lighting and bokeh background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAww9Hp1cGUMTA9iNvr_ZrVi67ddI5lTY9SH7rv59fS0tF6gRmrkb12BL3i8gDIeqdW_7tPQ6os-H9CvklRR3kTuQ2Wzvp2MyD_eFRyyrM6UncDr0jE4C0EUIy0xkhSrWaHJT_U5uD0cVkZafdoving-k1ZX8-rgOLjPrWy-bZRwlpzp-YjQm8V4R0q2NjFpizO-7fGdQJNXac6C5Y_QGFV5lgqKNrIBZRjyyWrKO0UXslUuSBlB1nHgw">
+<div class="flex items-baseline gap-1.5">
+<span class="font-label-md text-label-md text-on-surface">Kai N.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary">• 1d ago</span>
+</div>
+</div>
+<button aria-label="More options" class="w-8 h-8 rounded-full flex items-center justify-center text-tertiary hover:text-on-surface" type="button">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<!-- Post Content -->
+<div class="flex flex-col gap-space-sm">
+<h2 class="font-label-lg text-label-lg text-on-surface font-bold tracking-tight">
+          Photo dump from last weekend's Entoto hike
+        </h2>
+<!-- Media Thumbnail -->
+<div class="w-full h-36 rounded-lg overflow-hidden relative shadow-sm">
+<img alt="Scenic Entoto hike trail view" class="w-full h-full object-cover" data-alt="Scenic mountain trail view overlooking misty eucalyptus trees at sunrise with distant ridge lines bathed in warm golden ambient glow, high resolution landscape photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDGwewOvm5jlZcIfU--hl41_5QbtWcUWCtiQ43qtOLZ3qc4e6_7N_y1CQvcq1zBFT076SBieal5sx6RfD05hjC4hlZ4KZkYd_EZesl0YjEyLQiUKeNACk1T7s1L2ybFfcoiSUK1MM5Bfes9tuc6LR2lvkV9IDrwHxQKSQFKEKbSgbW0RUWMHh_I5dwW_zHA1HWx2ojF3g8n1CVYrlouzP1KRL2mjEfuOVyvDdJHfj7rfbvL1rtdTKZJA">
+<div class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-on-surface/60 backdrop-blur-sm text-surface font-caption-sm text-caption-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">photo_library</span>
+<span class="">1/6</span>
+</div>
+</div>
+</div>
+<!-- Action Bar -->
+<div class="flex items-center justify-between pt-space-xs mt-1 text-tertiary">
+<div class="flex items-center gap-space-md">
+<!-- Heart filled goldenrod -->
+<button aria-label="Like post, 37 likes" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] text-primary-container active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-label-md text-label-md">37</span>
+</button>
+<!-- Comment button -->
+<button aria-label="Comments, 8 comments" class="flex items-center gap-1.5 min-w-[44px] min-h-[44px] hover:text-on-surface active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">chat_bubble</span>
+<span class="font-label-md text-label-md">8</span>
+</button>
+</div>
+<!-- Bookmark filled goldenrod -->
+<button aria-label="Remove bookmark" class="w-11 h-11 flex items-center justify-center text-primary-container active:scale-110 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+</div>
+</article>
+</div>
+</div>
+<script>
+  // Micro-interaction for toggle states
+  document.querySelectorAll('article button').forEach(button => {
+    button.addEventListener('click', function(e) {
+      const icon = this.querySelector('.material-symbols-outlined');
+      if (icon && (icon.innerText === 'favorite' || icon.innerText === 'bookmark')) {
+        const isFilled = icon.style.fontVariationSettings && icon.style.fontVariationSettings.includes("'FILL' 1");
+        const countSpan = this.querySelector('span:not(.material-symbols-outlined)');
+        
+        if (isFilled) {
+          icon.style.fontVariationSettings = "'FILL' 0";
+          this.classList.remove('text-primary-container');
+          if (countSpan) {
+            countSpan.textContent = parseInt(countSpan.textContent) - 1;
+          }
+        } else {
+          icon.style.fontVariationSettings = "'FILL' 1";
+          this.classList.add('text-primary-container');
+          if (countSpan) {
+            countSpan.textContent = parseInt(countSpan.textContent) + 1;
+          }
+        }
+      }
+    });
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.05)]" data-active-classes="text-primary-container font-label-md"><div class="flex justify-around items-center h-16 px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] transition-colors text-primary-container font-label-md" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-caption-sm text-caption-sm">Home</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="explore" href="#"><span class="material-symbols-outlined text-[24px]">explore</span><span class="font-caption-sm text-caption-sm">Explore</span></a><button aria-label="Create Post" class="w-11 h-11 rounded-full bg-primary-container text-on-primary shadow-md flex items-center justify-center transition-transform active:scale-95 flex-shrink-0" type="button"><span class="material-symbols-outlined text-[24px]">add</span></button><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="hangouts" href="#"><span class="material-symbols-outlined text-[24px]">forum</span><span class="font-caption-sm text-caption-sm">Hangouts</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="font-caption-sm text-caption-sm">Profile</span></a></div></nav>
+
+</body></html>

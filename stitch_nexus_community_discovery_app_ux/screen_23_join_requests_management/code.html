@@ -1,0 +1,215 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-surface-variant": "#514535", "surface-container-lowest": "#ffffff", "error": "#ba1a1a", "secondary-fixed-dim": "#adc8f3", "secondary": "#455f85", "primary": "#805600", "on-primary-container": "#5f3f00", "on-tertiary-fixed-variant": "#504539", "primary-container": "#e8a736", "secondary-container": "#b8d3ff", "surface-container": "#f0eded", "surface-container-high": "#eae7e7", "surface": "#fcf9f8", "surface-variant": "#e5e2e1", "on-error": "#ffffff", "outline-variant": "#d5c4af", "tertiary-fixed-dim": "#d5c4b4", "on-secondary-container": "#415b80", "inverse-on-surface": "#f3f0ef", "tertiary-container": "#c0b0a1", "on-error-container": "#93000a", "primary-fixed-dim": "#feba48", "on-tertiary": "#ffffff", "on-secondary": "#ffffff", "on-primary-fixed": "#281800", "surface-tint": "#805600", "error-container": "#ffdad6", "tertiary": "#695c50", "background": "#fcf9f8", "surface-dim": "#dcd9d9", "surface-container-low": "#f6f3f2", "secondary-fixed": "#d4e3ff", "on-surface": "#1c1b1b", "tertiary-fixed": "#f1dfcf", "inverse-primary": "#feba48", "on-background": "#1c1b1b", "outline": "#837563", "primary-fixed": "#ffddaf", "on-secondary-fixed-variant": "#2d486c", "on-primary": "#ffffff", "on-tertiary-fixed": "#231a10", "surface-bright": "#fcf9f8", "inverse-surface": "#313030", "surface-container-highest": "#e5e2e1", "on-primary-fixed-variant": "#614000", "on-secondary-fixed": "#001c3a", "on-tertiary-container": "#4f4337" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "space-xs": "0.25rem", "space-xl": "2rem", "space-lg": "1.5rem", "gutter": "1rem", "space-md": "1rem", "margin": "1rem" }, fontFamily: { "headline-lg": ["Inter"], "headline-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Inter"], "caption-md": ["Inter"], "headline-sm": ["Inter"], "caption-sm": ["Inter"], "body-md": ["Inter"], "label-lg": ["Inter"] }, fontSize: { "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-md": ["24px", { "lineHeight": "30px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "label-md": ["15px", { "lineHeight": "18px", "fontWeight": "600" }], "caption-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["20px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "caption-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-md": ["15px", { "lineHeight": "22px", "fontWeight": "400" }], "label-lg": ["16px", { "lineHeight": "20px", "fontWeight": "600" }] } } } };</script><style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="Nexus Emblem Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UsNCZ-hB5xNRmo9HAUADV23NrXRSncTzvyBrJ7154G-c2Qh0dtvpy2ULwTZmyx6ZWVnDK-r7nZPpvTJ0Nk3P7iocsPQvvKEwRW-D7a8Q63utH3AcHBeUVwJBaKzgWTl3lGImGXdB1Pmak4XkxzXeSRaT_LDMyrYEu1RbAKbIAUWpYirEiu212Kez3Zr5U9zHJqHewA1BjL5I4s3bXq9xFTaYiv7vB9rK_tgTVujkULQSq6xku1bMAEmpFM"><span class="font-headline-sm text-headline-sm text-primary-container tracking-tight">Nexus</span><span class="font-label-md text-label-md text-tertiary ml-space-xs">/ Explore</span></div><div class="flex items-center gap-space-xs"><button aria-label="Notifications" class="relative w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><button aria-label="User Profile" class="w-11 h-11 flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfXYBlaF64aPAgVfjTzie9QhgRNMIlG4C30ri18-CQE__XVUWXHvLZ2vzZnhrScAm--ZTlW_D7Rk3o74LY1A13XJQNuoJQ6qqW1PSZfoA9WRzoOOg_Vrh12b-kfsZkebhS-Aa2yRk5wt8vrFWOrRQC93BkwGoP6QrHE04e_uT_Od5kIB_HE4ZhKS_dSWNxbdg3o_Fn1s2YD9Z3yi4Ansvvsc_VN4lR1wcYJpV87RlE5jI4KozUGy_nyA"></button></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-24 bg-surface"><div class="flex flex-col w-full gap-space-md">
+<!-- Internal Navigation Header -->
+<div class="flex items-center justify-between py-space-xs">
+<button aria-label="Go Back" class="w-11 h-11 -ml-space-xs rounded-full flex items-center justify-center text-on-surface hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<div class="flex items-center gap-space-xs">
+<h1 class="font-headline-sm text-headline-sm text-on-surface">Join Requests</h1>
+<span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary-container text-on-primary font-caption-sm text-caption-sm font-semibold shadow-sm" id="badge-counter">
+        3
+      </span>
+</div>
+<button aria-label="Request Settings" class="w-11 h-11 -mr-space-xs rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[24px]">tune</span>
+</button>
+</div>
+<!-- Hangout Context Banner -->
+<div class="flex flex-col gap-1 px-space-xs pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-primary text-[18px]">drive_file_rename</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold">Thursday Night Bowling</span>
+</div>
+<p class="font-caption-md text-caption-md text-tertiary" id="status-subtitle">
+      3 awaiting your approval · Limit 8 bowlers
+    </p>
+</div>
+<!-- Live Requests Stack -->
+<div class="flex flex-col gap-3" id="requests-container">
+<!-- Request 1 -->
+<div class="flex flex-col bg-tertiary-fixed/60 rounded-xl p-space-md shadow-sm transition-all duration-300" id="req-card-1">
+<div class="flex items-start gap-space-md mb-space-sm">
+<img class="w-11 h-11 rounded-full object-cover shadow-sm shrink-0" data-alt="Portrait photo of Dawit Assefa, a friendly young Ethiopian man with warm studio amber lighting, neutral parchment background, wearing an artisanal mustard linen overshirt, candid smile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAbcR9K0sZk2G_XQqDU_aL7RvMQGtrsYj_OBpmKyuGOQ_Nwi9rwGQfKekni0SNXS7XLx9BfllD3jYPL_3v0kSQN6yn7o6CFocyIGluUz1L0VzV9zi68ZM-RrCldC78ocBPMOJ7Eajzt5j9OCzwSfwj1clsZJIVY8MT_4kRcpT10e4nGJlnDOrBDDag9CbQzHtkmZkvi7UTrmBwPemANAxGqyus_nJcNfpj8Ysy2CFxkbcWBrjMjK27xpA">
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface truncate">Dawit Assefa</span>
+<span class="inline-flex items-center gap-1 font-caption-sm text-caption-sm text-primary px-2 py-0.5 rounded-full bg-surface-container-lowest/80">
+<span class="material-symbols-outlined text-[13px]">stars</span> 4 meetups
+            </span>
+</div>
+<span class="font-caption-md text-caption-md text-tertiary">@dawit_a</span>
+<span class="font-caption-sm text-caption-sm text-outline mt-0.5">Requested 2 hours ago</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="h-9 px-3 rounded-full bg-error-container text-on-error-container font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-1', 'reject')">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span class="">Reject</span>
+</button>
+<button class="h-9 px-4 rounded-full bg-primary-container text-on-primary font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-1', 'approve')">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span class="">Approve</span>
+</button>
+</div>
+</div>
+<!-- Request 2 -->
+<div class="flex flex-col bg-tertiary-fixed/60 rounded-xl p-space-md shadow-sm transition-all duration-300" id="req-card-2">
+<div class="flex items-start gap-space-md mb-space-sm">
+<img class="w-11 h-11 rounded-full object-cover shadow-sm shrink-0" data-alt="Close-up portrait of Selam Bekele, an Ethiopian woman with braided hair and gentle expression, warm sunlit natural backdrop, cinematic earthy tones and tactile textures" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIs8hTMGBn_MWDLjFR5kaBazh1I1JJafO8INoD0ferll9YQeVADC8kimtHXzqHOppdt_q2ZqiCMW9uIDa_1gi7W6sdGrAS-XxhMsdMPobYE43lcQ0Z-gfdxf8SonyzDNOz6Ep4qObSvkqrXlzijVr1mxV3vDD465cZXAuIrDLkQIzEJqoaSl8Hljt-dN0ziLLamoZaffdCd08luv671FR7xHvUAAo9u7py3MAXQGM1IMBcBOKSVlmoyQ">
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface truncate">Selam Bekele</span>
+<span class="inline-flex items-center gap-1 font-caption-sm text-caption-sm text-tertiary px-2 py-0.5 rounded-full bg-surface-container-lowest/80">
+<span class="material-symbols-outlined text-[13px]">verified_user</span> Mutual friend
+            </span>
+</div>
+<span class="font-caption-md text-caption-md text-tertiary">@selam_b</span>
+<span class="font-caption-sm text-caption-sm text-outline mt-0.5">Requested 5 hours ago</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="h-9 px-3 rounded-full bg-error-container text-on-error-container font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-2', 'reject')">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span class="">Reject</span>
+</button>
+<button class="h-9 px-4 rounded-full bg-primary-container text-on-primary font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-2', 'approve')">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span class="">Approve</span>
+</button>
+</div>
+</div>
+<!-- Request 3 -->
+<div class="flex flex-col bg-tertiary-fixed/60 rounded-xl p-space-md shadow-sm transition-all duration-300" id="req-card-3">
+<div class="flex items-start gap-space-md mb-space-sm">
+<img class="w-11 h-11 rounded-full object-cover shadow-sm shrink-0" data-alt="Authentic editorial portrait of Yonas Girma wearing stylish retro horn-rimmed glasses, soft focused cafe interior with wood grain and ambient warm lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBCVlfgjih--4wRTuVf5DDCpPQBiTjF6L789odRW5AxI8o3a40Q5u0puRKHAkCRaVjZuG4P7Di_dU0yFcmv-rQbkw_5dodEpZxfCp7RyaKc27SNkqA86oFRZCuKEC1dXNcQbvwlqv2AYG0MH_LfUBKwZpe74okNIkHW0bZJpkRlTQJ2SSyToCt9ZVZi79Jv8Fm-dOmSszMoTHg4d3ff2slRt-yEbc3KaHvayka1yBWotS5dUsjAWIfZAw">
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md text-on-surface truncate">Yonas Girma</span>
+<span class="inline-flex items-center gap-1 font-caption-sm text-caption-sm text-secondary px-2 py-0.5 rounded-full bg-surface-container-lowest/80">
+<span class="material-symbols-outlined text-[13px]">bolt</span> Fast RSVP
+            </span>
+</div>
+<span class="font-caption-md text-caption-md text-tertiary">@yonas_g</span>
+<span class="font-caption-sm text-caption-sm text-outline mt-0.5">Requested 1 day ago</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="h-9 px-3 rounded-full bg-error-container text-on-error-container font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-3', 'reject')">
+<span class="material-symbols-outlined text-[16px]">close</span>
+<span class="">Reject</span>
+</button>
+<button class="h-9 px-4 rounded-full bg-primary-container text-on-primary font-label-md text-caption-md flex items-center gap-1 active:scale-95 transition-all shadow-sm" onclick="handleDecision('req-card-3', 'approve')">
+<span class="material-symbols-outlined text-[16px]">check</span>
+<span class="">Approve</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Collapsible Past Reviews -->
+<div class="flex flex-col mt-space-sm">
+<button class="flex items-center justify-between w-full py-space-sm px-space-xs text-tertiary hover:text-on-surface transition-colors" id="toggle-reviewed-btn" onclick="toggleReviewed()">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-caption-md">Previously reviewed</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-high text-outline text-caption-sm font-semibold">4</span>
+</div>
+<span class="material-symbols-outlined text-[20px] transition-transform duration-200" id="reviewed-chevron">
+        expand_more
+      </span>
+</button>
+<!-- Collapsible Content (Initially Hidden) -->
+<div class="hidden flex-col gap-space-sm pt-space-xs" id="reviewed-content">
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container font-label-md text-caption-sm font-semibold">
+            AB
+          </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-caption-md text-on-surface truncate">Abebe Bikila</span>
+<span class="font-caption-sm text-caption-sm text-tertiary">Approved yesterday</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-primary-container text-[20px]">check_circle</span>
+</div>
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low">
+<div class="flex items-center gap-space-sm min-w-0">
+<div class="w-8 h-8 rounded-full bg-error-container flex items-center justify-center text-on-error-container font-label-md text-caption-sm font-semibold">
+            LT
+          </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-md text-caption-md text-on-surface truncate">Liya Tadesse</span>
+<span class="font-caption-sm text-caption-sm text-tertiary">Declined 2 days ago</span>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline text-[20px]">cancel</span>
+</div>
+</div>
+</div>
+</div>
+<script>
+  let pendingCount = 3;
+
+  function handleDecision(cardId, action) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    // Tactile micro-animation
+    card.style.transform = action === 'approve' ? 'translateX(12px)' : 'translateX(-12px)';
+    card.style.opacity = '0';
+
+    setTimeout(() => {
+      card.remove();
+      pendingCount = Math.max(0, pendingCount - 1);
+      
+      const badge = document.getElementById('badge-counter');
+      const subtitle = document.getElementById('status-subtitle');
+
+      if (badge) badge.textContent = pendingCount;
+      if (subtitle) {
+        subtitle.textContent = pendingCount === 0 
+          ? 'All caught up! No requests pending.' 
+          : `${pendingCount} awaiting your approval · Limit 8 bowlers`;
+      }
+
+      if (pendingCount === 0) {
+        const container = document.getElementById('requests-container');
+        if (container) {
+          container.innerHTML = `
+            <div class="flex flex-col items-center justify-center p-space-xl text-center bg-surface-container-low rounded-xl">
+              <span class="material-symbols-outlined text-[44px] text-primary-container mb-space-xs">celebration</span>
+              <span class="font-label-md text-label-md text-on-surface">Queue is clear!</span>
+              <p class="font-caption-md text-caption-md text-tertiary mt-1">Your hangout crew is ready for Thursday bowling.</p>
+            </div>
+          `;
+        }
+      }
+    }, 240);
+  }
+
+  function toggleReviewed() {
+    const content = document.getElementById('reviewed-content');
+    const chevron = document.getElementById('reviewed-chevron');
+    if (!content || !chevron) return;
+
+    const isHidden = content.classList.contains('hidden');
+    if (isHidden) {
+      content.classList.remove('hidden');
+      content.classList.add('flex');
+      chevron.style.transform = 'rotate(180deg)';
+    } else {
+      content.classList.remove('flex');
+      content.classList.add('hidden');
+      chevron.style.transform = 'rotate(0deg)';
+    }
+  }
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.05)]" data-active-classes="text-primary-container font-label-md"><div class="flex justify-around items-center h-16 px-space-xs"><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-caption-sm text-caption-sm">Home</span></a><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] transition-colors text-primary-container font-label-md" data-path="explore" href="#"><span class="material-symbols-outlined text-[24px]">explore</span><span class="font-caption-sm text-caption-sm">Explore</span></a><button aria-label="Create New Post or Event" class="w-11 h-11 rounded-full bg-primary-container text-on-primary shadow-sm flex items-center justify-center transition-transform active:scale-95 shrink-0"><span class="material-symbols-outlined text-[24px]">add</span></button><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="hangouts" href="#"><span class="material-symbols-outlined text-[24px]">forum</span><span class="font-caption-sm text-caption-sm">Hangouts</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="font-caption-sm text-caption-sm">Profile</span></a></div></nav>
+
+</body></html>

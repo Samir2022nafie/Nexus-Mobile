@@ -46,7 +46,7 @@ export const Input: React.FC<InputProps> = ({
           <MaterialIcons
             name={leftIcon}
             size={20}
-            color={error ? Colors.error : isFocused ? Colors.primary : Colors.outline}
+            color={error ? Colors.error : isFocused ? Colors.primaryContainer : Colors.outline}
             style={styles.leftIcon}
           />
         )}
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   inputFocused: {
-    borderColor: Colors.primary,
+    borderColor: Colors.primaryContainer,
     backgroundColor: Colors.surfaceContainerLowest,
   },
   inputError: {

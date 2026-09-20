@@ -1,23 +1,24 @@
 {
   "expo": {
-    "name": "Nexus-Mobile",
-    "slug": "Nexus-Mobile",
+    "name": "Nexus",
+    "slug": "nexus-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "nexusmobile",
-    "userInterfaceStyle": "automatic",
+    "scheme": "nexus",
+    "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nexus.mobile"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#805600",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.nexus.mobile"
     },
     "web": {
       "bundler": "metro",
@@ -26,12 +27,20 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#fcf9f8"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Nexus to access your photos to upload images.",
+          "cameraPermission": "Allow Nexus to access your camera to take photos."
         }
       ]
     ],

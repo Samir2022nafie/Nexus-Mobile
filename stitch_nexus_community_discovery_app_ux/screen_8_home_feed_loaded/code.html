@@ -1,0 +1,425 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-surface-variant": "#514535", "surface-container-lowest": "#ffffff", "error": "#ba1a1a", "secondary-fixed-dim": "#adc8f3", "secondary": "#455f85", "primary": "#805600", "on-primary-container": "#5f3f00", "on-tertiary-fixed-variant": "#504539", "primary-container": "#e8a736", "secondary-container": "#b8d3ff", "surface-container": "#f0eded", "surface-container-high": "#eae7e7", "surface": "#fcf9f8", "surface-variant": "#e5e2e1", "on-error": "#ffffff", "outline-variant": "#d5c4af", "tertiary-fixed-dim": "#d5c4b4", "on-secondary-container": "#415b80", "inverse-on-surface": "#f3f0ef", "tertiary-container": "#c0b0a1", "on-error-container": "#93000a", "primary-fixed-dim": "#feba48", "on-tertiary": "#ffffff", "on-secondary": "#ffffff", "on-primary-fixed": "#281800", "surface-tint": "#805600", "error-container": "#ffdad6", "tertiary": "#695c50", "background": "#fcf9f8", "surface-dim": "#dcd9d9", "surface-container-low": "#f6f3f2", "secondary-fixed": "#d4e3ff", "on-surface": "#1c1b1b", "tertiary-fixed": "#f1dfcf", "inverse-primary": "#feba48", "on-background": "#1c1b1b", "outline": "#837563", "primary-fixed": "#ffddaf", "on-secondary-fixed-variant": "#2d486c", "on-primary": "#ffffff", "on-tertiary-fixed": "#231a10", "surface-bright": "#fcf9f8", "inverse-surface": "#313030", "surface-container-highest": "#e5e2e1", "on-primary-fixed-variant": "#614000", "on-secondary-fixed": "#001c3a", "on-tertiary-container": "#4f4337" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-sm": "0.5rem", "space-xs": "0.25rem", "space-xl": "2rem", "space-lg": "1.5rem", "gutter": "1rem", "space-md": "1rem", "margin": "1rem" }, fontFamily: { "headline-lg": ["Inter"], "headline-md": ["Inter"], "body-lg": ["Inter"], "label-md": ["Inter"], "caption-md": ["Inter"], "headline-sm": ["Inter"], "caption-sm": ["Inter"], "body-md": ["Inter"], "label-lg": ["Inter"] }, fontSize: { "headline-lg": ["28px", { "lineHeight": "34px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "headline-md": ["24px", { "lineHeight": "30px", "letterSpacing": "-0.015em", "fontWeight": "700" }], "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }], "label-md": ["15px", { "lineHeight": "18px", "fontWeight": "600" }], "caption-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "headline-sm": ["20px", { "lineHeight": "26px", "letterSpacing": "-0.01em", "fontWeight": "700" }], "caption-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-md": ["15px", { "lineHeight": "22px", "fontWeight": "400" }], "label-lg": ["16px", { "lineHeight": "20px", "fontWeight": "600" }] } } } };</script></head><body class="bg-surface text-on-surface font-body-md text-body-md flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="Nexus Emblem Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UsNCZ-hB5xNRmo9HAUADV23NrXRSncTzvyBrJ7154G-c2Qh0dtvpy2ULwTZmyx6ZWVnDK-r7nZPpvTJ0Nk3P7iocsPQvvKEwRW-D7a8Q63utH3AcHBeUVwJBaKzgWTl3lGImGXdB1Pmak4XkxzXeSRaT_LDMyrYEu1RbAKbIAUWpYirEiu212Kez3Zr5U9zHJqHewA1BjL5I4s3bXq9xFTaYiv7vB9rK_tgTVujkULQSq6xku1bMAEmpFM"><span class="font-headline-sm text-headline-sm text-primary-container tracking-tight">Nexus</span><span class="font-label-md text-label-md text-tertiary ml-space-xs">/ Home</span></div><div class="flex items-center gap-space-xs"><button aria-label="Notifications" class="relative w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface"><span class="material-symbols-outlined">notifications</span><span class="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-error ring-2 ring-surface"></span></button><button aria-label="User Profile" class="w-11 h-11 flex items-center justify-center"><img alt="Profile" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfXYBlaF64aPAgVfjTzie9QhgRNMIlG4C30ri18-CQE__XVUWXHvLZ2vzZnhrScAm--ZTlW_D7Rk3o74LY1A13XJQNuoJQ6qqW1PSZfoA9WRzoOOg_Vrh12b-kfsZkebhS-Aa2yRk5wt8vrFWOrRQC93BkwGoP6QrHE04e_uT_Od5kIB_HE4ZhKS_dSWNxbdg3o_Fn1s2YD9Z3yi4Ansvvsc_VN4lR1wcYJpV87RlE5jI4KozUGy_nyA"></button></div></div></header><main class="flex-1 flex flex-col relative w-full px-margin pt-16 pb-24 bg-surface"><div class="flex flex-col w-full space-y-space-lg">
+<!-- Section 1: Your Communities -->
+<section class="flex flex-col w-full">
+<div class="flex items-center justify-between mb-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Your Communities</h2>
+<a class="font-label-md text-label-md text-secondary hover:text-on-surface flex items-center transition-colors" href="#">
+        See All <span class="material-symbols-outlined text-[16px] ml-0.5">chevron_right</span>
+</a>
+</div>
+<!-- Horizontal Scroll Carousel -->
+<div class="flex gap-3 overflow-x-auto pb-2 -mx-margin px-margin no-scrollbar">
+<!-- Card 1 -->
+<article class="flex-shrink-0 w-[140px] h-[160px] bg-tertiary-fixed rounded-xl p-3 flex flex-col justify-between shadow-sm active:scale-98 transition-transform cursor-pointer">
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-container/20 flex items-center justify-center mb-2 overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="Vibrant outdoor emblem showing pine trees and mountain ridge line, warm earthy color palette, warm sunlit vector icon illustration" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoKPKE27lYDPSZ7EgCOF5oMIwQ5ZrZavLY8n-i2Vd8QY9KUYLXQy0NS6NNlyAi-iYuEt_wcC4W1zxFesi4Q-M-kUIbH3JqYLOnimVwlOz2VZGjz14RVrMja1pglGlps_NPk79OuoWSmZENXZ8CpYy6Eh3Mltd2BYsASUqtI3JgwWqh1nlun_y3FHyrtZsID-JFOgzUPmXxtxvM5KzfE1znIGwEutoiMt4VCqVgbWOJixxb5m6mulJIQw">
+</div>
+<h3 class="font-label-md text-label-md text-on-surface line-clamp-1">Trail Blazers</h3>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-primary-container text-on-primary-fixed font-caption-sm text-caption-sm font-semibold">Outdoor</span>
+</div>
+<div class="text-center font-caption-sm text-caption-sm text-tertiary">
+          247 members
+        </div>
+</article>
+<!-- Card 2 -->
+<article class="flex-shrink-0 w-[140px] h-[160px] bg-tertiary-fixed rounded-xl p-3 flex flex-col justify-between shadow-sm active:scale-98 transition-transform cursor-pointer">
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-secondary-fixed flex items-center justify-center mb-2 overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="Artistic sketchbook with watercolor paint brush and sepia ink wash icon, artisanal craft texture, warm natural lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAR9PtstkWSY7fM7we_d30eFEmd5JTbWK-f8_RoKY31T9mQhAdePxFgewyEsNRPLRpmH7ckoxvGgLhGDSH7mBObzFzzbIt1jUBb9vZ3mBmN53IS-C8Jbim0jGqa7Vy0OIxryTtnOFe23kHA0rsMQWJUvFRwZaSZjHis1Bn1hL3G5U3scxGkRYNrS6vaJy_ClC6Ock7qzupvJv0uYQ2JhcfVBYF4QhG4r5-oUA67PT91RptFaC7P2MvQXg">
+</div>
+<h3 class="font-label-md text-label-md text-on-surface line-clamp-1">Urban Sketchers</h3>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-caption-sm text-caption-sm font-semibold">Art</span>
+</div>
+<div class="text-center font-caption-sm text-caption-sm text-tertiary">
+          89 members
+        </div>
+</article>
+<!-- Card 3 -->
+<article class="flex-shrink-0 w-[140px] h-[160px] bg-tertiary-fixed rounded-xl p-3 flex flex-col justify-between shadow-sm active:scale-98 transition-transform cursor-pointer">
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed-dim flex items-center justify-center mb-2 overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="Steaming artisan ceramic coffee mug beside an open sleek code editor laptop screen, earthy golden illumination" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOaye5uDG7HThQYMeJMj2A5upJy2jAb6jw3cP4gDjes49ROjh2da2zOf1X6_MtG9PRdUc6-LW4k5m3c9xlV_A4F393KdqiuPyoFu_752k1vti9YiZSkVjyJPGgCN-uFIlTsyOxAovK-A2HpCq-FUDm81-GZGNoFcze2VxguoYPkjgYDofGwLYDUUTrcto4b7w1wLz0Zgk32v672Qzm3GWhBogqrsBHq-PqOQq8CQmk7p4oGizpbrnL5A">
+</div>
+<h3 class="font-label-md text-label-md text-on-surface line-clamp-1">Code &amp; Coffee</h3>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-caption-sm text-caption-sm font-semibold">Tech</span>
+</div>
+<div class="text-center font-caption-sm text-caption-sm text-tertiary">
+          412 members
+        </div>
+</article>
+<!-- Card 4 (Peek) -->
+<article class="flex-shrink-0 w-[140px] h-[160px] bg-tertiary-fixed rounded-xl p-3 flex flex-col justify-between shadow-sm opacity-90 cursor-pointer">
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center mb-2 overflow-hidden shadow-inner">
+<img class="w-full h-full object-cover" data-alt="Artisanal wooden dice and tabletop game meeples arranged neatly on a polished oak surface with golden hour sunlight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBPpTZhJAGzns_ke2G6wFYbPbMBD0Z60k6hynGwPtLcAO3lnCj-P_iSh-SFn9jPq_9cIuCBSIYAHsUqNom_bKrSUTe2WpsaFgSt_bu-kD8nn5fjVQL3eha9INjcIZefYMd_qMTsYQVJxRO7ds-xRud3ISEhvHuYOQrQJjLdlEl1rR4Zta0nh_RbWUflBjW9EckUmvXDMPwSsyWvBC943jGkcJMeqafiRnSmeAPcNbF0kojC5xAN8jhIyg">
+</div>
+<h3 class="font-label-md text-label-md text-on-surface line-clamp-1">Board Game Night</h3>
+<span class="mt-1 px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-caption-sm text-caption-sm font-semibold">Gaming</span>
+</div>
+<div class="text-center font-caption-sm text-caption-sm text-tertiary">
+          156 members
+        </div>
+</article>
+</div>
+</section>
+<!-- Section 2: Upcoming Events -->
+<section class="flex flex-col w-full">
+<div class="flex items-center justify-between mb-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Upcoming Events</h2>
+<a class="font-label-md text-label-md text-secondary hover:text-on-surface flex items-center transition-colors" href="#">
+        See All <span class="material-symbols-outlined text-[16px] ml-0.5">chevron_right</span>
+</a>
+</div>
+<div class="flex gap-3 overflow-x-auto pb-2 -mx-margin px-margin no-scrollbar">
+<!-- Event 1 -->
+<article class="flex-shrink-0 w-[260px] h-[200px] bg-tertiary-fixed rounded-xl overflow-hidden flex flex-col shadow-sm active:scale-98 transition-transform cursor-pointer">
+<div class="h-24 w-full relative">
+<img class="w-full h-full object-cover" data-alt="Panoramic sunrise shining over golden misty mountain ridges and early morning hiking trails, warm glowing aesthetic, high editorial photography" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUfhPiDv72wOX4Q1M9Vf_mdg2-7Jzq8XoleV7dbEM5XE2KunO7Bsd1ndway1SE_KvRyYwgXoqTOt5fWYt2b-yuE5jc5uobNOYBRpA0SgK0jIGt9HDFtY9ErGARLNZDWxgZiRvUlQzIP3NaeKp95QHQkPxZnd_N-UbmkBSB_s69AeI2wZ87joMUhC2v0xbYGtExSFNpwGzrvV2Dke2K9W5kJPQcQ5uEmGPHNfT3bCjFdzhO1-2EZXFetQ">
+<span class="absolute top-2 left-2 bg-surface/90 backdrop-blur-md px-2 py-0.5 rounded-md font-caption-sm text-caption-sm font-semibold text-on-surface shadow-sm">
+            Trail Blazers
+          </span>
+</div>
+<div class="p-3 flex flex-col flex-1 justify-between">
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold line-clamp-1">Summit Ridge Sunrise Hike</h3>
+<div class="flex items-center justify-between font-caption-md text-caption-md text-tertiary mt-1">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
+              Oct 15 · 5:30 AM
+            </span>
+<span class="flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[16px]">group</span>
+              12/30 going
+            </span>
+</div>
+</div>
+</article>
+<!-- Event 2 -->
+<article class="flex-shrink-0 w-[260px] h-[200px] bg-tertiary-fixed rounded-xl overflow-hidden flex flex-col shadow-sm active:scale-98 transition-transform cursor-pointer">
+<div class="h-24 w-full relative">
+<img class="w-full h-full object-cover" data-alt="Charming brightly lit sunlit artist studio workshop with wooden easels, paints, warm ceramic cups, and paper canvases" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9Y_2fLVACr1GLk8o_w9SuHICg3GgbJtw3cMrlqktbTbmWqsM-s2n1B940DysUXO1IFVtVM9v5VgW3SxlRLZ5OErpd8pLhY20dwB6bEZsGNpuP2j8YAHLarvr3qhMkj4ouXQOrtX-BcxMyQ3HdqIeMLmkXi2Fx87OMClPZ-m2iWX-Oir0yilSDBdc1Jy5trOygX3__6l2nNq-_qlQokLTuj6j3J39L1kPL2q4jDa3cwXpOnH64k_NHrw">
+<span class="absolute top-2 left-2 bg-surface/90 backdrop-blur-md px-2 py-0.5 rounded-md font-caption-sm text-caption-sm font-semibold text-on-surface shadow-sm">
+            Urban Sketchers
+          </span>
+</div>
+<div class="p-3 flex flex-col flex-1 justify-between">
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold line-clamp-1">Weekend Watercolor Workshop</h3>
+<div class="flex items-center justify-between font-caption-md text-caption-md text-tertiary mt-1">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
+              Oct 18 · 10:00 AM
+            </span>
+<span class="flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[16px]">group</span>
+              8/20 going
+            </span>
+</div>
+</div>
+</article>
+<!-- Event 3 (Peek) -->
+<article class="flex-shrink-0 w-[260px] h-[200px] bg-tertiary-fixed rounded-xl overflow-hidden flex flex-col shadow-sm opacity-90 cursor-pointer">
+<div class="h-24 w-full relative">
+<img class="w-full h-full object-cover" data-alt="Cozy nighttime collaborative co-working loft space with fairy lights, exposed brick, laptops, and warm amber task lamps" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRX-fEydVu67wAVxEvz2pNeColT8CuSL1NTRvOBaxPaXmqxq5xgesRgKV0EGH4CtkeXVViijro31XwLFuhKHgc9CLyf1yHbaWlGigefD0MCvBOlHvOEqmcSl3vVgO-AXLkhGcMtkOo-cLBIUYoVzkowy_LNFzJ0ZWx21h0fjHb4AbSVqc4icoNUUq__laGm2JWpXgVLIsLtIAE5ugZHYqbJeAuHKklnTFdevwNxokNM-O7dqm5I8l9gA">
+<span class="absolute top-2 left-2 bg-surface/90 backdrop-blur-md px-2 py-0.5 rounded-md font-caption-sm text-caption-sm font-semibold text-on-surface shadow-sm">
+            Code &amp; Coffee
+          </span>
+</div>
+<div class="p-3 flex flex-col flex-1 justify-between">
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold line-clamp-1">Late Night Hackathon</h3>
+<div class="flex items-center justify-between font-caption-md text-caption-md text-tertiary mt-1">
+<span class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px] text-primary">calendar_today</span>
+              Oct 24 · 8:00 PM
+            </span>
+<span class="flex items-center gap-1 text-secondary font-medium">
+<span class="material-symbols-outlined text-[16px]">group</span>
+              24/40 going
+            </span>
+</div>
+</div>
+</article>
+</div>
+</section>
+<!-- Section 3: Hangouts Near You -->
+<section class="flex flex-col w-full">
+<div class="flex items-center justify-between mb-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Hangouts Near You</h2>
+<a class="font-label-md text-label-md text-secondary hover:text-on-surface flex items-center transition-colors" href="#">
+        See All <span class="material-symbols-outlined text-[16px] ml-0.5">chevron_right</span>
+</a>
+</div>
+<div class="flex gap-3 overflow-x-auto pb-2 -mx-margin px-margin no-scrollbar">
+<!-- Hangout 1 -->
+<article class="flex-shrink-0 w-[240px] h-[175px] bg-tertiary-fixed rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<img class="w-7 h-7 rounded-full object-cover" data-alt="Warm portrait avatar of a creative young man with glasses and friendly smile in a cozy café setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBTU2QzJQ4qNyPlVIvm-0hSr9Y6qznwXSEBJFHXW4JtWx1bwNEOw9ZajBRKAb0Nmgx-DZdKdhc-fhkYPiL2DboesYz-FMjpc3fpYYZW9bDvAE7xojLNVWULh_xkXT-1yQ1HAgH4mPrdVThpm3Jex86ngfcjeTBN_XFMuznphPi7pljCGnvst9CQDeTuu3QrusnMwmJBgXPmWCEBhV3oK6qsGLvAtTb98MGMKhORlNzDtJh8RsqcsMPMQ">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">Liam K.</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-on-surface font-caption-sm text-caption-sm font-semibold flex items-center gap-1 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              Open
+            </span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold line-clamp-1">Casual Friday Coffee &amp; Code</h3>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Oct 20 · 2:00 PM
+          </p>
+</div>
+<div class="flex items-center justify-between pt-2">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">8/15 spots</span>
+<button class="h-8 px-4 rounded-full bg-primary-container text-on-primary-container font-label-md text-caption-md font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm">
+            Join
+          </button>
+</div>
+</article>
+<!-- Hangout 2 -->
+<article class="flex-shrink-0 w-[240px] h-[175px] bg-tertiary-fixed rounded-xl p-3.5 flex flex-col justify-between shadow-sm">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<img class="w-7 h-7 rounded-full object-cover" data-alt="Candid portrait of an expressive young woman laughing, warm natural sunlight and bokeh greenery" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAI922g7IvwhU3mxgd1BSOZ5FfKgQdQYcTlpm3a7Q3S74TazxgocXPe0IIyKbYdV_ZcIJsZuZqs6K_qMcUWtmUxF1pGtPj5fqM-H11YieUR9QXzKivAtrIDplF9WI4AewfwVkAAKRMp-KoORzHhFV6xMszTyZbDBXF7uDW2-v3B-oHcUHvQ93_xQqqvVZ9eXyDd0A4eeT4t-F7NEgN5UuqaSX3MPhW77FtjlF_hv6ivh_kQwuhV-8GDRA">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">Mina T.</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-caption-sm text-caption-sm font-semibold shadow-sm">
+              Request
+            </span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold line-clamp-1">Board Game Evening</h3>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Oct 21 · 6:00 PM
+          </p>
+</div>
+<div class="flex items-center justify-between pt-2">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">4/8 spots</span>
+<button class="h-8 px-4 rounded-full bg-secondary text-on-secondary font-label-md text-caption-md font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm">
+            Request
+          </button>
+</div>
+</article>
+<!-- Hangout 3 (Peek) -->
+<article class="flex-shrink-0 w-[240px] h-[175px] bg-tertiary-fixed rounded-xl p-3.5 flex flex-col justify-between shadow-sm opacity-90">
+<div>
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-2">
+<img class="w-7 h-7 rounded-full object-cover" data-alt="Portrait photo of a young designer with curly hair smiling gently outdoors in autumn" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSWFysmRUKS5uym0Ok9U9YkBY0UHOpz0afFgL_crdkVHZjlUUFVpgOk07kS9mOclaZuuNaRv-W0-qY2DsB_pgbqKmi35S7msUBtRVXIbWcG3G9s4s5LVYgkT3jpucjp8sNyNCvgsBDGehBmxEA_f4ucn68rOqm_M_lX3apipO2FnERdunkfIKfskGu4M9SszDE2_d1Ub5xWT2478nfHDCbRMDmnjdZahyo0Dk3r6jJg8MwDbviXw26kg">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">Alex V.</span>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-lowest text-on-surface font-caption-sm text-caption-sm font-semibold flex items-center gap-1 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              Open
+            </span>
+</div>
+<h3 class="font-label-md text-label-md text-on-surface font-semibold line-clamp-1">Sunset Rooftop Sketching</h3>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+            Oct 22 · 5:00 PM
+          </p>
+</div>
+<div class="flex items-center justify-between pt-2">
+<span class="font-caption-sm text-caption-sm text-tertiary font-medium">5/10 spots</span>
+<button class="h-8 px-4 rounded-full bg-primary-container text-on-primary-container font-label-md text-caption-md font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm">
+            Join
+          </button>
+</div>
+</article>
+</div>
+</section>
+<!-- Section 4: Trending Discussions -->
+<section class="flex flex-col w-full">
+<div class="flex items-center justify-between mb-space-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface tracking-tight">Trending Discussions</h2>
+</div>
+<div class="flex flex-col gap-3">
+<!-- Post 1 -->
+<article class="w-full bg-tertiary-fixed rounded-xl p-3.5 shadow-sm flex flex-col space-y-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="Smiling female hiker portrait with sun-kissed skin against warm mountain glow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxluaK1e5E_QJNI4xsp6Z1rxMEXu3nyVKMQHGTRZ9885jhmztfnRrbpoe9S2KQRCoFjbbl0KDYMchAfmiB7jGkuN7zhBNaHEIt18jdvwm9kfEGsvENPIwBKtjyBKFCSpvvazTPSlvHPq5kybi2yOE41TMXq25GQtP_1NeWAGPftBI_e6Qr6g0nqSgFJ9hJlrKHKX7OjAC3QsT4wiCnuziXw1nOwZkgsJGsiKpg6OHVciNkNgRTwIRBFg">
+<div>
+<span class="font-label-md text-label-md text-on-surface">Amara D.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary ml-1.5">3h ago</span>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-primary-container text-on-primary-fixed font-caption-sm text-caption-sm font-semibold">
+            Trail Blazers
+          </span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold">Best sunrise spots within 2 hours of the city</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">
+            I've been mapping out all the accessible peaks and wanted to share my top 5 with you all. Make sure to pack headlamps and thermos tea!
+          </p>
+</div>
+<div class="flex items-center justify-between pt-2 text-on-surface-variant">
+<div class="flex items-center gap-4">
+<!-- Heart (Liked) -->
+<button aria-label="Liked" class="flex items-center gap-1.5 text-primary-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-caption-md text-caption-md font-semibold">24</span>
+</button>
+<!-- Comment -->
+<button aria-label="Comments" class="flex items-center gap-1.5 text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">chat_bubble_outline</span>
+<span class="font-caption-md text-caption-md">12</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<!-- Bookmark (Not saved) -->
+<button aria-label="Bookmark" class="text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+<!-- Share -->
+<button aria-label="Share" class="text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Post 2 -->
+<article class="w-full bg-tertiary-fixed rounded-xl p-3.5 shadow-sm flex flex-col space-y-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<img class="w-8 h-8 rounded-full object-cover" data-alt="Portrait of a cheerful software engineer with glasses in a warmly lit modern workspace" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdG7-nrorWbGNA7w62U6djdAYFGIeqnTsMSBqVbiLfLca8zvdnUIQ2Y-eX3UOdFmAJYHlE-NhiBGtmiWajMmx3Y4Vk7zAo9Xcs_RjDP8Xj4j7vup7dKpzt1fisxC90oSV7OHEg8sjukJmj10tnXq-xScdnjQIc2N0pb4mUeulwVPAmpN-r9RqSiqG04cFFy0e0IG29AmPl8IE2BTVbddoYDQUaqSMtVKQbMQV3KCnsEjGl5A4VjmVFLg">
+<div>
+<span class="font-label-md text-label-md text-on-surface">Kai N.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary ml-1.5">5h ago</span>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-caption-sm text-caption-sm font-semibold">
+            Code &amp; Coffee
+          </span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold">TypeScript 5.6 — anyone tried the new features yet?</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">
+            The new type predicates are actually game-changing for validation layers, especially when parsing nested community event schemas.
+          </p>
+</div>
+<div class="flex items-center justify-between pt-2 text-on-surface-variant">
+<div class="flex items-center gap-4">
+<!-- Heart (Unliked) -->
+<button aria-label="Like" class="flex items-center gap-1.5 text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">favorite_border</span>
+<span class="font-caption-md text-caption-md">18</span>
+</button>
+<!-- Comment -->
+<button aria-label="Comments" class="flex items-center gap-1.5 text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">chat_bubble_outline</span>
+<span class="font-caption-md text-caption-md">7</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<!-- Bookmark (Not saved) -->
+<button aria-label="Bookmark" class="text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">bookmark_border</span>
+</button>
+<!-- Share -->
+<button aria-label="Share" class="text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Post 3 -->
+<article class="w-full bg-tertiary-fixed rounded-xl p-3.5 shadow-sm flex flex-col space-y-2.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<img alt="Zara M." class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfXYBlaF64aPAgVfjTzie9QhgRNMIlG4C30ri18-CQE__XVUWXHvLZ2vzZnhrScAm--ZTlW_D7Rk3o74LY1A13XJQNuoJQ6qqW1PSZfoA9WRzoOOg_Vrh12b-kfsZkebhS-Aa2yRk5wt8vrFWOrRQC93BkwGoP6QrHE04e_uT_Od5kIB_HE4ZhKS_dSWNxbdg3o_Fn1s2YD9Z3yi4Ansvvsc_VN4lR1wcYJpV87RlE5jI4KozUGy_nyA">
+<div>
+<span class="font-label-md text-label-md text-on-surface">Zara M.</span>
+<span class="font-caption-sm text-caption-sm text-tertiary ml-1.5">8h ago</span>
+</div>
+</div>
+<span class="px-2.5 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant font-caption-sm text-caption-sm font-semibold">
+            Urban Sketchers
+          </span>
+</div>
+<div class="flex items-start gap-3">
+<div class="flex-1 min-w-0">
+<h3 class="font-label-lg text-label-lg text-on-surface font-semibold">My café sketch from this morning</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">
+              Captured the corner roastery while the rain cleared. Loving the new sepia ink tone pens!
+            </p>
+</div>
+<div class="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
+<img class="w-full h-full object-cover" data-alt="Charming warm tone fountain pen sketch of a cozy neighborhood café window and patrons, sepia and gold highlights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUcP0ZqI2fozAMnoCmyJ9E6l8QqJbV6sQuamEgW9SGP84J504d7hbQVasdKxV3fClsHCehVO-gN-CqIOdH_vGAIR9dUDHY7bTlohE7qhw35P38x7QQXpGCmpO-drZChsXTi2p0EpoR7_5Y2AFZCPIChp8sL9NZQ8l_ZT25SKigxP9RmNah1BilNravS2KP801Z96tDdr75Td4DY1apO4Jakmlw8-Khw9qnCUCbn64rRfoGs-iAuJ2wMg">
+</div>
+</div>
+<div class="flex items-center justify-between pt-2 text-on-surface-variant">
+<div class="flex items-center gap-4">
+<!-- Heart (Liked) -->
+<button aria-label="Liked" class="flex items-center gap-1.5 text-primary-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="font-caption-md text-caption-md font-semibold">41</span>
+</button>
+<!-- Comment -->
+<button aria-label="Comments" class="flex items-center gap-1.5 text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">chat_bubble_outline</span>
+<span class="font-caption-md text-caption-md">9</span>
+</button>
+</div>
+<div class="flex items-center gap-3">
+<!-- Bookmark (Saved) -->
+<button aria-label="Saved" class="text-primary-container active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">bookmark</span>
+</button>
+<!-- Share -->
+<button aria-label="Share" class="text-tertiary hover:text-on-surface active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+</div>
+</div>
+</article>
+</div>
+</section>
+</div>
+<script>
+  // Simple micro-interactions for liking and saving posts
+  document.querySelectorAll('article button').forEach(button => {
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const icon = button.querySelector('.material-symbols-outlined');
+      if (!icon) return;
+
+      if (icon.textContent.includes('favorite')) {
+        const countSpan = button.querySelector('span:last-child');
+        let count = parseInt(countSpan ? countSpan.textContent : '0', 10);
+        const isFilled = icon.style.fontVariationSettings?.includes("'FILL' 1");
+
+        if (isFilled) {
+          icon.style.fontVariationSettings = "'FILL' 0";
+          icon.textContent = 'favorite_border';
+          button.classList.remove('text-primary-container');
+          button.classList.add('text-tertiary');
+          if (countSpan) countSpan.textContent = Math.max(0, count - 1);
+        } else {
+          icon.style.fontVariationSettings = "'FILL' 1";
+          icon.textContent = 'favorite';
+          button.classList.add('text-primary-container');
+          button.classList.remove('text-tertiary');
+          if (countSpan) countSpan.textContent = count + 1;
+        }
+      } else if (icon.textContent.includes('bookmark')) {
+        const isFilled = icon.style.fontVariationSettings?.includes("'FILL' 1");
+        if (isFilled) {
+          icon.style.fontVariationSettings = "'FILL' 0";
+          icon.textContent = 'bookmark_border';
+          button.classList.remove('text-primary-container');
+          button.classList.add('text-tertiary');
+        } else {
+          icon.style.fontVariationSettings = "'FILL' 1";
+          icon.textContent = 'bookmark';
+          button.classList.add('text-primary-container');
+          button.classList.remove('text-tertiary');
+        }
+      }
+    });
+  });
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(0,0,0,0.05)]" data-active-classes="text-primary-container font-label-md"><div class="flex justify-around items-center h-16 px-space-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] transition-colors text-primary-container font-label-md" data-path="home" href="#"><span class="material-symbols-outlined text-[24px]">home</span><span class="font-caption-sm text-caption-sm">Home</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="explore" href="#"><span class="material-symbols-outlined text-[24px]">explore</span><span class="font-caption-sm text-caption-sm">Explore</span></a><button aria-label="Create New Post or Event" class="w-11 h-11 rounded-full bg-primary-container text-on-primary shadow-sm flex items-center justify-center transition-transform active:scale-95"><span class="material-symbols-outlined text-[24px]">add</span></button><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="hangouts" href="#"><span class="material-symbols-outlined text-[24px]">forum</span><span class="font-caption-sm text-caption-sm">Hangouts</span></a><a class="flex flex-col items-center justify-center min-w-[44px] min-h-[44px] text-tertiary hover:text-on-surface transition-colors" data-path="profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="font-caption-sm text-caption-sm">Profile</span></a></div></nav>
+
+</body></html>

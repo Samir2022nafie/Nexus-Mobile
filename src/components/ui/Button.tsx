@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Colors, Typography, BorderRadius, Spacing } from '../../constants/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outlined' | 'text' | 'error';
+type ButtonVariant = 'primary' | 'secondary' | 'tonal' | 'outlined' | 'text' | 'error';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
@@ -47,7 +47,7 @@ export const Button: React.FC<ButtonProps> = ({
     <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
       style={[
         styles.base,
         styles[variant],
@@ -60,14 +60,14 @@ export const Button: React.FC<ButtonProps> = ({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outlined' || variant === 'text' ? Colors.primary : Colors.onPrimary}
+          color={variant === 'outlined' || variant === 'text' ? Colors.primaryContainer : Colors.onPrimary}
         />
       ) : (
         <>
           {icon}
           <Text
             style={[
-              styles.text,
+              styles.text_base,
               styles[`text_${variant}`],
               styles[`textSize_${size}`],
               isDisabled && styles.disabledText,
@@ -88,21 +88,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
   },
   fullWidth: {
     width: '100%',
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
 
   // Variants
   primary: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryContainer,
   },
   secondary: {
-    backgroundColor: Colors.secondaryContainer,
+    backgroundColor: Colors.secondary,
+  },
+  tonal: {
+    backgroundColor: Colors.surfaceContainerHigh,
   },
   outlined: {
     backgroundColor: 'transparent',
@@ -118,19 +121,19 @@ const styles = StyleSheet.create({
 
   // Sizes
   size_sm: {
+    height: 36,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.full,
   },
   size_md: {
+    height: 44,
     paddingHorizontal: Spacing.lg,
-    paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.full,
   },
   size_lg: {
+    height: 48,
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.full,
   },
 
   // Text
@@ -141,13 +144,16 @@ const styles = StyleSheet.create({
     color: Colors.onPrimary,
   },
   text_secondary: {
-    color: Colors.onSecondaryContainer,
+    color: Colors.onSecondary,
+  },
+  text_tonal: {
+    color: Colors.primaryContainer,
   },
   text_outlined: {
-    color: Colors.primary,
+    color: Colors.primaryContainer,
   },
   text_text: {
-    color: Colors.primary,
+    color: Colors.primaryContainer,
   },
   text_error: {
     color: Colors.onError,

@@ -56,29 +56,29 @@ export const Colors = {
   onTertiaryFixed: '#231a10',
   onTertiaryFixedVariant: '#504539',
 
-  // Error
+  // Error & Feedback
   error: '#ba1a1a',
   onError: '#ffffff',
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',
-
-  // Semantic
-  success: '#16a34a',
+  success: '#3da86b',
   successContainer: '#dcfce7',
   warning: '#f59e0b',
   warningContainer: '#fef3c7',
 
-  // Backgrounds & overlays
+  // Backgrounds & tactile cards
   background: '#fcf9f8',
   onBackground: '#1c1b1b',
-  scrim: 'rgba(0,0,0,0.4)',
+  cardBg: '#f1dfcf',
+  cardBorder: '#e5d5c3',
+  scrim: 'rgba(26,26,26,0.35)',
   backdrop: 'rgba(0,0,0,0.5)',
 
   // Tab bar
   tabBarBackground: '#ffffff',
-  tabBarBorder: '#e5e2e1',
-  tabBarActive: '#805600',
-  tabBarInactive: '#837563',
+  tabBarBorder: '#eae7e7',
+  tabBarActive: '#e8a736',
+  tabBarInactive: '#695c50',
 
   // Misc
   white: '#ffffff',

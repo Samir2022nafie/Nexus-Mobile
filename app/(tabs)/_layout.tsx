@@ -2,18 +2,108 @@
  * Main Tab Layout — Bottom tab navigation with 5 tabs:
  * Home, Explore, Create (FAB), Hangouts, Profile
  * Redirects to auth if user is not authenticated.
+ * Includes synchronized scroll hide/reveal animation.
  */
 import React, { useState } from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform, Animated, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Shadows } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { CreateBottomSheet } from '../../src/components/CreateBottomSheet';
+import {
+  TabBarVisibilityProvider,
+  useTabBarVisibility,
+} from '../../src/context/TabBarVisibilityContext';
+
+function AnimatedTabBar({ state, descriptors, navigation }: any) {
+  const { tabBarTranslateY } = useTabBarVisibility();
+  const insets = useSafeAreaInsets();
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+
+  return (
+    <>
+      <Animated.View
+        style={[
+          styles.tabBarAnimatedWrapper,
+          {
+            paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 8,
+            transform: [{ translateY: tabBarTranslateY }],
+          },
+        ]}
+      >
+        <View style={styles.tabBarRow}>
+          {state.routes.map((route: any, index: number) => {
+            const isFocused = state.index === index;
+            const color = isFocused ? Colors.tabBarActive : Colors.tabBarInactive;
+
+            if (route.name === 'create') {
+              return (
+                <TouchableOpacity
+                  key={route.key}
+                  style={styles.fabWrapper}
+                  onPress={() => setCreateModalVisible(true)}
+                  activeOpacity={0.85}
+                  accessibilityLabel="Create options"
+                >
+                  <View style={styles.createButton}>
+                    <MaterialIcons name="add" size={26} color={Colors.onPrimary} />
+                  </View>
+                </TouchableOpacity>
+              );
+            }
+
+            let iconName: any = 'home';
+            let label = 'Home';
+            if (route.name === 'explore') {
+              iconName = 'explore';
+              label = 'Explore';
+            } else if (route.name === 'hangouts') {
+              iconName = 'local-cafe';
+              label = 'Hangouts';
+            } else if (route.name === 'profile') {
+              iconName = 'account-circle';
+              label = 'Profile';
+            }
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+
+            return (
+              <TouchableOpacity
+                key={route.key}
+                style={styles.tabItem}
+                onPress={onPress}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name={iconName} size={24} color={color} />
+                <Text style={[styles.tabLabel, { color }]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </Animated.View>
+
+      <CreateBottomSheet
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+      />
+    </>
+  );
+}
 
 export default function TabLayout() {
   const { isAuthenticated } = useAuth();
-  const [createModalVisible, setCreateModalVisible] = useState(false);
 
   // If not authenticated, redirect to auth stack
   if (!isAuthenticated) {
@@ -21,79 +111,23 @@ export default function TabLayout() {
   }
 
   return (
-    <View style={styles.rootContainer}>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: styles.tabBar,
-          tabBarActiveTintColor: Colors.tabBarActive,
-          tabBarInactiveTintColor: Colors.tabBarInactive,
-          tabBarLabelStyle: styles.tabLabel,
-          tabBarHideOnKeyboard: true,
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="home" size={24} color={color} />
-            ),
+    <TabBarVisibilityProvider>
+      <View style={styles.rootContainer}>
+        <Tabs
+          tabBar={(props) => <AnimatedTabBar {...props} />}
+          screenOptions={{
+            headerShown: false,
+            tabBarHideOnKeyboard: true,
           }}
-        />
-        <Tabs.Screen
-          name="explore"
-          options={{
-            title: 'Explore',
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="explore" size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="create"
-          options={{
-            title: '',
-            tabBarButton: () => (
-              <TouchableOpacity
-                style={styles.fabWrapper}
-                onPress={() => setCreateModalVisible(true)}
-                activeOpacity={0.85}
-                accessibilityLabel="Create options"
-              >
-                <View style={styles.createButton}>
-                  <MaterialIcons name="add" size={26} color={Colors.onPrimary} />
-                </View>
-              </TouchableOpacity>
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="hangouts"
-          options={{
-            title: 'Hangouts',
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="forum" size={23} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color }) => (
-              <MaterialIcons name="account-circle" size={24} color={color} />
-            ),
-          }}
-        />
-      </Tabs>
-
-      {/* Layered sliding bottom sheet over the active screen */}
-      <CreateBottomSheet
-        visible={createModalVisible}
-        onClose={() => setCreateModalVisible(false)}
-      />
-    </View>
+        >
+          <Tabs.Screen name="index" options={{ title: 'Home' }} />
+          <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
+          <Tabs.Screen name="create" options={{ title: '' }} />
+          <Tabs.Screen name="hangouts" options={{ title: 'Hangouts' }} />
+          <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+        </Tabs>
+      </View>
+    </TabBarVisibilityProvider>
   );
 }
 
@@ -101,14 +135,26 @@ const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
   },
-  tabBar: {
+  tabBarAnimatedWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: Colors.surfaceContainerLowest,
     borderTopWidth: 1,
     borderTopColor: Colors.surfaceContainerHigh,
-    height: 68,
-    paddingBottom: Platform.OS === 'ios' ? 14 : 8,
-    paddingTop: 8,
     ...Shadows.sm,
+  },
+  tabBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 56,
+    paddingTop: 6,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tabLabel: {
     fontSize: 11,

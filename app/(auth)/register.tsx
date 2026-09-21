@@ -4,7 +4,7 @@
  * Matches Stitch: screen_2_register_default_empty
  * Enforces: age >= 13, required fields, phone format, password confirmation
  */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,10 @@ import {
   Modal,
   FlatList,
   TextInput,
+  Animated,
+  Easing,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +26,23 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/co
 import { Button } from '../../src/components/ui/Button';
 import { useAuth } from '../../src/context/AuthContext';
 import { ApiRequestError } from '../../src/services/api';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
+const COUNTRY_CODES = [
+  { code: '+251', name: 'Ethiopia', flag: '🇪🇹' },
+  { code: '+1', name: 'USA / Canada', flag: '🇺🇸' },
+  { code: '+44', name: 'United Kingdom', flag: '🇬🇧' },
+  { code: '+254', name: 'Kenya', flag: '🇰🇪' },
+  { code: '+234', name: 'Nigeria', flag: '🇳🇬' },
+  { code: '+971', name: 'UAE', flag: '🇦🇪' },
+  { code: '+49', name: 'Germany', flag: '🇩🇪' },
+  { code: '+33', name: 'France', flag: '🇫🇷' },
+  { code: '+91', name: 'India', flag: '🇮🇳' },
+  { code: '+86', name: 'China', flag: '🇨🇳' },
+  { code: '+27', name: 'South Africa', flag: '🇿🇦' },
+  { code: '+20', name: 'Egypt', flag: '🇪🇬' },
+];
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -129,7 +150,14 @@ export default function RegisterScreen() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedCountryCode, setSelectedCountryCode] = useState('+251');
+  const [countryPickerRendered, setCountryPickerRendered] = useState(false);
+  const countryFadeAnim = useRef(new Animated.Value(0)).current;
+  const countrySlideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+
+  const [datePickerRendered, setDatePickerRendered] = useState(false);
+  const dateFadeAnim = useRef(new Animated.Value(0)).current;
+  const dateSlideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const [tempDay, setTempDay] = useState(15);
   const [tempMonth, setTempMonth] = useState(6);
   const [tempYear, setTempYear] = useState(currentYear - 20);
@@ -151,14 +179,6 @@ export default function RegisterScreen() {
   const validateForm = (): boolean => {
     const errs: Record<string, string> = {};
 
-    if (!form.username.trim()) {
-      errs.username = 'Username is required';
-    } else if (form.username.length > 30) {
-      errs.username = 'Username must be at most 30 characters';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(form.username)) {
-      errs.username = 'Only letters, numbers, and underscores';
-    }
-
     if (!form.firstName.trim()) {
       errs.firstName = 'First name is required';
     }
@@ -167,7 +187,17 @@ export default function RegisterScreen() {
       errs.lastName = 'Last name is required';
     }
 
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    if (!form.username.trim()) {
+      errs.username = 'Username is required';
+    } else if (form.username.length > 30) {
+      errs.username = 'Username must be at most 30 characters';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(form.username)) {
+      errs.username = 'Only letters, numbers, and underscores';
+    }
+
+    if (!form.email.trim()) {
+      errs.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       errs.email = 'Invalid email address';
     }
 
@@ -206,7 +236,7 @@ export default function RegisterScreen() {
 
     try {
       const fullPhone = form.phoneNumber.trim()
-        ? (form.phoneNumber.startsWith('+') ? form.phoneNumber.trim() : `+251${form.phoneNumber.trim()}`)
+        ? (form.phoneNumber.startsWith('+') ? form.phoneNumber.trim() : `${selectedCountryCode}${form.phoneNumber.trim()}`)
         : undefined;
 
       const result = await register({
@@ -249,7 +279,42 @@ export default function RegisterScreen() {
     setTempDay(form.birthDay);
     setTempMonth(form.birthMonth);
     setTempYear(form.birthYear);
-    setShowDatePicker(true);
+    setDatePickerRendered(true);
+    dateFadeAnim.setValue(0);
+    dateSlideAnim.setValue(SCREEN_HEIGHT);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(dateFadeAnim, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dateSlideAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  const closeDatePicker = () => {
+    Animated.parallel([
+      Animated.timing(dateFadeAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(dateSlideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDatePickerRendered(false);
+    });
   };
 
   const confirmDatePicker = () => {
@@ -262,7 +327,46 @@ export default function RegisterScreen() {
       birthYear: tempYear,
     }));
     setErrors((prev) => ({ ...prev, birthDate: '' }));
-    setShowDatePicker(false);
+    closeDatePicker();
+  };
+
+  const openCountryPicker = () => {
+    setCountryPickerRendered(true);
+    countryFadeAnim.setValue(0);
+    countrySlideAnim.setValue(SCREEN_HEIGHT);
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(countryFadeAnim, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(countrySlideAnim, {
+          toValue: 0,
+          duration: 280,
+          easing: Easing.bezier(0.16, 1, 0.3, 1),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+  };
+
+  const closeCountryPicker = () => {
+    Animated.parallel([
+      Animated.timing(countryFadeAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(countrySlideAnim, {
+        toValue: SCREEN_HEIGHT,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCountryPickerRendered(false);
+    });
   };
 
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -311,6 +415,43 @@ export default function RegisterScreen() {
         ) : null}
 
         <View style={styles.form}>
+          {/* First Name & Last Name (2 columns) — Placed FIRST */}
+          <View style={styles.rowTwoCols}>
+            <View style={styles.col}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>First Name</Text>
+                <Text style={styles.requiredBadge}>Required</Text>
+              </View>
+              <View style={[styles.inputBox, errors.firstName && styles.inputBoxError]}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="First name"
+                  placeholderTextColor={Colors.outline}
+                  value={form.firstName}
+                  onChangeText={(v) => updateField('firstName', v)}
+                />
+              </View>
+              {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
+            </View>
+
+            <View style={styles.col}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Last Name</Text>
+                <Text style={styles.requiredBadge}>Required</Text>
+              </View>
+              <View style={[styles.inputBox, errors.lastName && styles.inputBoxError]}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Last name"
+                  placeholderTextColor={Colors.outline}
+                  value={form.lastName}
+                  onChangeText={(v) => updateField('lastName', v)}
+                />
+              </View>
+              {errors.lastName ? <Text style={styles.errorText}>{errors.lastName}</Text> : null}
+            </View>
+          </View>
+
           {/* Username */}
           <View style={styles.fieldGroup}>
             <View style={styles.labelRow}>
@@ -331,13 +472,16 @@ export default function RegisterScreen() {
             {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
           </View>
 
-          {/* Email */}
+          {/* Email — Required */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Email</Text>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Email</Text>
+              <Text style={styles.requiredBadge}>Required</Text>
+            </View>
             <View style={[styles.inputBox, errors.email && styles.inputBoxError]}>
               <TextInput
                 style={styles.textInput}
-                placeholder="Email address (optional)"
+                placeholder="Enter your email address"
                 placeholderTextColor={Colors.outline}
                 value={form.email}
                 onChangeText={(v) => updateField('email', v)}
@@ -345,18 +489,23 @@ export default function RegisterScreen() {
                 autoCapitalize="none"
               />
             </View>
-            <Text style={styles.helperText}>Used for login and recovery</Text>
+            <Text style={styles.helperText}>Used for login and account recovery</Text>
             {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
-          {/* Phone */}
+          {/* Phone with Country Code Picker */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Phone</Text>
             <View style={[styles.inputBox, styles.phoneInputBox]}>
-              <View style={styles.countryCodeBadge}>
-                <Text style={styles.countryCodeText}>+251</Text>
+              <TouchableOpacity
+                style={styles.countryCodeBadge}
+                onPress={openCountryPicker}
+                activeOpacity={0.7}
+                accessibilityLabel="Select country code"
+              >
+                <Text style={styles.countryCodeText}>{selectedCountryCode}</Text>
                 <MaterialIcons name="arrow-drop-down" size={16} color={Colors.onSurfaceVariant} />
-              </View>
+              </TouchableOpacity>
               <View style={styles.dividerVertical} />
               <TextInput
                 style={styles.textInput}
@@ -428,41 +577,6 @@ export default function RegisterScreen() {
             {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
           </View>
 
-          {/* First Name & Last Name (2 columns) */}
-          <View style={styles.rowTwoCols}>
-            <View style={styles.col}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>First Name</Text>
-              </View>
-              <View style={[styles.inputBox, errors.firstName && styles.inputBoxError]}>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="First name"
-                  placeholderTextColor={Colors.outline}
-                  value={form.firstName}
-                  onChangeText={(v) => updateField('firstName', v)}
-                />
-              </View>
-              {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
-            </View>
-
-            <View style={styles.col}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Last Name</Text>
-              </View>
-              <View style={[styles.inputBox, errors.lastName && styles.inputBoxError]}>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="Last name"
-                  placeholderTextColor={Colors.outline}
-                  value={form.lastName}
-                  onChangeText={(v) => updateField('lastName', v)}
-                />
-              </View>
-              {errors.lastName ? <Text style={styles.errorText}>{errors.lastName}</Text> : null}
-            </View>
-          </View>
-
           {/* Date of Birth */}
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Date of Birth</Text>
@@ -497,21 +611,33 @@ export default function RegisterScreen() {
         </View>
       </ScrollView>
 
-      {/* Date Picker Modal */}
+      {/* Date Picker Modal with Decoupled Fade Scrim and Slide Sheet */}
       <Modal
-        visible={showDatePicker}
+        visible={datePickerRendered}
         transparent
-        animationType="slide"
-        onRequestClose={() => setShowDatePicker(false)}
+        animationType="none"
+        onRequestClose={closeDatePicker}
       >
-        <View style={pickerStyles.overlay}>
-          <View style={pickerStyles.sheet}>
+        <View style={pickerStyles.overlay} pointerEvents="box-none">
+          <Animated.View style={[pickerStyles.backdrop, { opacity: dateFadeAnim }]}>
+            <Pressable style={pickerStyles.backdropPressable} onPress={closeDatePicker} />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              pickerStyles.sheet,
+              {
+                paddingBottom: Math.max(insets.bottom, 24),
+                transform: [{ translateY: dateSlideAnim }],
+              },
+            ]}
+          >
             <View style={pickerStyles.header}>
-              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+              <TouchableOpacity onPress={closeDatePicker} style={pickerStyles.headerBtn}>
                 <Text style={pickerStyles.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <Text style={pickerStyles.title}>Date of Birth</Text>
-              <TouchableOpacity onPress={confirmDatePicker}>
+              <TouchableOpacity onPress={confirmDatePicker} style={pickerStyles.headerBtn}>
                 <Text style={pickerStyles.doneText}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -544,7 +670,63 @@ export default function RegisterScreen() {
                 renderLabel={(y) => String(y)}
               />
             </View>
-          </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Country Code Picker Modal with Decoupled Fade Scrim and Slide Sheet */}
+      <Modal
+        visible={countryPickerRendered}
+        transparent
+        animationType="none"
+        onRequestClose={closeCountryPicker}
+      >
+        <View style={pickerStyles.overlay} pointerEvents="box-none">
+          <Animated.View style={[pickerStyles.backdrop, { opacity: countryFadeAnim }]}>
+            <Pressable style={pickerStyles.backdropPressable} onPress={closeCountryPicker} />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              pickerStyles.sheet,
+              {
+                maxHeight: SCREEN_HEIGHT * 0.65,
+                paddingBottom: Math.max(insets.bottom, 20),
+                transform: [{ translateY: countrySlideAnim }],
+              },
+            ]}
+          >
+            <View style={pickerStyles.header}>
+              <Text style={pickerStyles.title}>Select Country Code</Text>
+              <TouchableOpacity onPress={closeCountryPicker} style={pickerStyles.headerBtn}>
+                <MaterialIcons name="close" size={22} color={Colors.tertiary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {COUNTRY_CODES.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[
+                    styles.countryItemRow,
+                    selectedCountryCode === item.code && styles.countryItemRowActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedCountryCode(item.code);
+                    closeCountryPicker();
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.countryFlag}>{item.flag}</Text>
+                  <Text style={styles.countryName}>{item.name}</Text>
+                  <Text style={styles.countryCodeValue}>{item.code}</Text>
+                  {selectedCountryCode === item.code && (
+                    <MaterialIcons name="check" size={20} color={Colors.primaryContainer} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -654,10 +836,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    ...Shadows.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   inputBoxError: {
-    borderWidth: 1.5,
     borderColor: Colors.error,
   },
   textInput: {
@@ -694,6 +876,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.onSurface,
+  },
+  countryItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.surfaceContainerHigh,
+    gap: Spacing.md,
+  },
+  countryItemRowActive: {
+    backgroundColor: Colors.surfaceContainerLow,
+  },
+  countryFlag: {
+    fontSize: 22,
+  },
+  countryName: {
+    flex: 1,
+    ...Typography.bodyMd,
+    color: Colors.onSurface,
+  },
+  countryCodeValue: {
+    ...Typography.labelMd,
+    color: Colors.tertiary,
+    fontWeight: '600',
   },
   dividerVertical: {
     width: 1,
@@ -743,24 +950,40 @@ const styles = StyleSheet.create({
 
 const pickerStyles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'flex-end',
+    zIndex: 9999,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFill as any,
+    backgroundColor: Colors.scrim,
+  },
+  backdropPressable: {
+    ...StyleSheet.absoluteFill as any,
   },
   sheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 40,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    zIndex: 10000,
     ...Shadows.lg,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.sm,
+    paddingTop: Spacing.xs,
     paddingBottom: Spacing.sm,
+  },
+  headerBtn: {
+    padding: Spacing.xs,
   },
   cancelText: {
     ...Typography.bodyMd,
@@ -769,6 +992,7 @@ const pickerStyles = StyleSheet.create({
   title: {
     ...Typography.titleMd,
     color: Colors.onSurface,
+    fontWeight: '700',
   },
   doneText: {
     ...Typography.bodyMd,
@@ -785,7 +1009,7 @@ const pickerStyles = StyleSheet.create({
   columnsRow: {
     flexDirection: 'row',
     height: ITEM_HEIGHT * 5,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
   },
   column: {
     flex: 1,

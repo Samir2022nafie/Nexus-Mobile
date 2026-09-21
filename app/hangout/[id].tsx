@@ -12,13 +12,18 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/theme';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { hangoutsService } from '../../src/services/hangouts';
+import { HangoutItem } from '../../src/types';
+import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function HangoutDetailScreen() {
@@ -31,8 +36,11 @@ export default function HangoutDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
+  const [isRequested, setIsRequested] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [participantsCount, setParticipantsCount] = useState(0);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [respondingUserId, setRespondingUserId] = useState<string | null>(null);
+  const [participantsCount, setParticipantsCount] = useState<number>(0);
 
   const fetchHangout = useCallback(async () => {
     if (!id) return;
@@ -40,9 +48,27 @@ export default function HangoutDetailScreen() {
       const data = await hangoutsService.getById(id).catch(() => null);
       if (data) {
         setHangout(data);
-        setIsJoined(data.isParticipant || false);
+        setIsJoined(Boolean(data.isParticipant));
+        setIsRequested(
+          Boolean(
+            (data as any).hasRequested ||
+              (data as any).isRequested ||
+              (data as any).requestStatus === 'pending' ||
+              (data as any).userRequestStatus === 'pending'
+          )
+        );
         setIsBookmarked(data.isSaved || false);
-        setParticipantsCount((data as any).participants?.length ?? (data.participantsCount || 0));
+        setPendingRequests((data as any).joinRequests || []);
+
+        // Strict approved-only participant counting
+        const approved = ((data as any).participants || []).filter(
+          (p: any) => !p.status || p.status === 'approved' || p.status === 'active'
+        );
+        const count =
+          approved.length > 0
+            ? approved.length
+            : (data.participantsCount || (data.isParticipant ? 1 : 0));
+        setParticipantsCount(count);
       } else {
         setHangout(null);
       }
@@ -57,25 +83,154 @@ export default function HangoutDetailScreen() {
     fetchHangout();
   }, [fetchHangout]);
 
+  const isHangoutHost = Boolean(
+    user?.id && (
+      hangout?.creator_id === user.id ||
+      hangout?.creatorId === user.id ||
+      hangout?.creator?.id === user.id
+    )
+  );
+
+  const handleRespondRequest = async (targetUserId: string, status: 'approved' | 'rejected') => {
+    if (!hangout) return;
+    setRespondingUserId(targetUserId);
+    try {
+      await hangoutsService.respondToJoinRequest(hangout.id, targetUserId, status);
+      const targetReq = pendingRequests.find((r) => r.userId === targetUserId);
+      setPendingRequests((prev) => prev.filter((r) => r.userId !== targetUserId));
+      if (status === 'approved' && targetReq?.user) {
+        setParticipantsCount((prev) => prev + 1);
+        setHangout((prev: any) => ({
+          ...prev,
+          participants: [...(prev?.participants || []), targetReq.user],
+        }));
+      }
+    } catch {
+      Alert.alert('Error', `Failed to ${status === 'approved' ? 'approve' : 'decline'} join request.`);
+    } finally {
+      setRespondingUserId(null);
+    }
+  };
+
+  const handleDeleteHangout = () => {
+    Alert.alert(
+      'Delete Hangout',
+      'Are you sure you want to delete this hangout? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await hangoutsService.delete(hangout.id);
+              router.back();
+            } catch {
+              Alert.alert('Error', 'Failed to delete hangout.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleJoin = async () => {
     if (!hangout) return;
     setActionLoading(true);
-    const nextJoined = !isJoined;
-    setIsJoined(nextJoined);
-    setParticipantsCount((prev) => (nextJoined ? prev + 1 : Math.max(0, prev - 1)));
 
-    try {
-      if (isOpen) {
-        if (!isJoined) {
-          await hangoutsService.join(hangout.id).catch(() => {});
-        } else {
-          await hangoutsService.leave(hangout.id).catch(() => {});
-        }
+    const isDirectJoin = isOpen || isHangoutHost;
+
+    if (isDirectJoin) {
+      if (isJoined) {
+        Alert.alert(
+          'Leave Hangout',
+          'Are you sure you want to leave this hangout?',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => setActionLoading(false) },
+            {
+              text: 'Leave',
+              style: 'destructive',
+              onPress: async () => {
+                setIsJoined(false);
+                setIsRequested(false);
+                setParticipantsCount((prev) => Math.max(0, prev - 1));
+                try {
+                  await hangoutsService.leave(hangout.id);
+                } catch {} finally {
+                  setActionLoading(false);
+                }
+              },
+            },
+          ]
+        );
       } else {
-        await hangoutsService.requestJoin(hangout.id).catch(() => {});
+        setIsJoined(true);
+        setIsRequested(false);
+        setParticipantsCount((prev) => prev + 1);
+        try {
+          await hangoutsService.join(hangout.id);
+        } catch {
+          setIsJoined(false);
+          setParticipantsCount((prev) => Math.max(0, prev - 1));
+        } finally {
+          setActionLoading(false);
+        }
       }
-    } catch {} finally {
-      setActionLoading(false);
+    } else {
+      // Request-based meetup: Unjoined -> Pending -> Joined
+      if (isJoined) {
+        Alert.alert(
+          'Leave Hangout',
+          'Are you sure you want to leave this hangout? You will need to request approval again to rejoin.',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => setActionLoading(false) },
+            {
+              text: 'Leave',
+              style: 'destructive',
+              onPress: async () => {
+                setIsJoined(false);
+                setIsRequested(false);
+                setParticipantsCount((prev) => Math.max(0, prev - 1));
+                try {
+                  await hangoutsService.leave(hangout.id);
+                } catch {} finally {
+                  setActionLoading(false);
+                }
+              },
+            },
+          ]
+        );
+      } else if (isRequested) {
+        Alert.alert(
+          'Cancel Join Request',
+          'Your request is currently waiting for approval from the host. Would you like to cancel it?',
+          [
+            { text: 'No', style: 'cancel', onPress: () => setActionLoading(false) },
+            {
+              text: 'Cancel Request',
+              style: 'destructive',
+              onPress: async () => {
+                setIsRequested(false);
+                try {
+                  await hangoutsService.leave(hangout.id);
+                } catch {} finally {
+                  setActionLoading(false);
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        // Request to join
+        setIsRequested(true);
+        try {
+          await hangoutsService.requestJoin(hangout.id);
+        } catch {
+          setIsRequested(false);
+        } finally {
+          setActionLoading(false);
+        }
+      }
     }
   };
 
@@ -126,19 +281,34 @@ export default function HangoutDetailScreen() {
     hangout.joinType === 'OPEN' ||
     hangout.joinType === 'open';
 
-  const maxSpots = hangout.max_participants || hangout.maxParticipants || 15;
-  const spotsLeft = Math.max(0, maxSpots - participantsCount);
+  const isDirectJoin = isOpen || isHangoutHost;
 
-  // Formatted date and time from database timestamps
-  const startDate = hangout.starts_at ? new Date(hangout.starts_at) : null;
-  const endDate = hangout.ends_at ? new Date(hangout.ends_at) : null;
+  const rawMax = hangout.max_participants ?? hangout.maxParticipants;
+  const hasLimit = typeof rawMax === 'number' && rawMax > 0;
+  const maxSpots = hasLimit ? rawMax : null;
+  const spotsLeft = maxSpots ? Math.max(0, maxSpots - participantsCount) : null;
+
+  const rawStarts = hangout.startsAt || hangout.starts_at;
+  const rawEnds = hangout.endsAt || hangout.ends_at;
+  const startDate = rawStarts ? new Date(rawStarts) : null;
+  const endDate = rawEnds ? new Date(rawEnds) : null;
+  const now = new Date();
+  const isToday =
+    startDate &&
+    startDate.getFullYear() === now.getFullYear() &&
+    startDate.getMonth() === now.getMonth() &&
+    startDate.getDate() === now.getDate();
+  const isOngoing = startDate && startDate <= now && Boolean(endDate && endDate > now);
+  const cutoff = endDate || (startDate ? new Date(startDate.getTime() + 3 * 3600 * 1000) : null);
+  const isPassed = !isToday && !isOngoing && Boolean(cutoff && cutoff < now);
+
   const dateText = startDate
     ? startDate.toLocaleDateString(undefined, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
       })
-    : 'Flexible Date';
+    : 'Date to be announced';
   const timeText = startDate
     ? `${startDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}${
         endDate
@@ -148,13 +318,21 @@ export default function HangoutDetailScreen() {
     : 'Time to be announced';
 
   const locationText =
+    hangout.location?.name ||
     hangout.location?.place_name ||
-    (typeof hangout.location === 'string' ? hangout.location : 'Location to be shared upon joining');
+    hangout.location?.address ||
+    (typeof hangout.location === 'string' ? hangout.location : '') ||
+    'Location to be shared upon joining';
   const locationDistrict =
+    hangout.location?.city ||
+    (hangout.location?.place_name ? hangout.location.place_name.split(',')[0] : '') ||
     hangout.community?.name ||
-    (hangout.location?.place_name ? hangout.location.place_name.split(',')[0] : 'Local Meetup');
+    'Meetup Location';
 
-  const participantsList = hangout.participants || [];
+  const approvedParticipants = (hangout.participants || []).filter(
+    (p: any) => !p.status || p.status === 'approved' || p.status === 'active'
+  );
+  const participantsList = approvedParticipants;
 
   return (
     <View style={styles.screen}>
@@ -176,7 +354,7 @@ export default function HangoutDetailScreen() {
           />
           <View style={styles.coverGradient} />
 
-          {/* Floating Top Nav */}
+          {/* Floating Top Nav: Back Button + Host Controls */}
           <View style={[styles.coverNavRow, { top: insets.top + Spacing.xs }]}>
             <TouchableOpacity
               onPress={() => router.back()}
@@ -186,21 +364,51 @@ export default function HangoutDetailScreen() {
               <MaterialIcons name="arrow-back" size={20} color={Colors.onSurface} />
             </TouchableOpacity>
 
-            <View style={styles.navRightGroup}>
-              <View style={styles.meetupPill}>
-                <View style={styles.beaconDot} />
-                <Text style={styles.meetupText}>Meetup</Text>
+            {isHangoutHost && (
+              <View style={styles.authorActionsRow}>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/new-hangout',
+                      params: { hangoutId: hangout.id },
+                    } as any)
+                  }
+                  style={styles.navBtn}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="edit" size={20} color={Colors.secondary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDeleteHangout}
+                  style={styles.navBtn}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="delete-outline" size={22} color={Colors.error} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.navBtn} activeOpacity={0.8}>
-                <MaterialIcons name="more-horiz" size={20} color={Colors.onSurface} />
-              </TouchableOpacity>
-            </View>
+            )}
           </View>
 
-          {/* Quick Location Micro-chip */}
-          <View style={styles.locationChip}>
-            <MaterialIcons name="storefront" size={16} color={Colors.primaryFixedDim} />
-            <Text style={styles.locationChipText}>{locationDistrict}</Text>
+          {/* Banner Status Pill (Bottom Right) with Distinct Colors */}
+          <View
+            style={[
+              styles.bannerStatusPill,
+              isOpen ? styles.bannerStatusPillOpen : styles.bannerStatusPillRequest,
+            ]}
+          >
+            {isOpen && <View style={styles.openPillDot} />}
+            {!isOpen && (
+              <MaterialIcons
+                name="lock-outline"
+                size={13}
+                color="#ffffff"
+                style={{ marginRight: 2 }}
+              />
+            )}
+            <Text style={styles.bannerStatusPillText}>
+              {isOpen ? 'Open Meetup' : 'Request to Join'}
+            </Text>
           </View>
         </View>
 
@@ -211,12 +419,16 @@ export default function HangoutDetailScreen() {
             <Text style={styles.titleText}>{hangout.title}</Text>
 
             <View style={styles.creatorRow}>
-              <View style={styles.creatorAvatarInitials}>
-                <Text style={styles.initialsText}>
-                  {(hangout.creator?.first_name || 'H')[0]}
-                  {(hangout.creator?.last_name || 'O')[0]}
-                </Text>
-              </View>
+              {hangout.creator?.profile_picture_url ? (
+                <Image
+                  source={{ uri: hangout.creator.profile_picture_url }}
+                  style={styles.creatorAvatarImg}
+                />
+              ) : (
+                <View style={styles.creatorAvatarFallback}>
+                  <MaterialIcons name="person" size={22} color={Colors.tertiary} />
+                </View>
+              )}
               <View>
                 <Text style={styles.creatorHandle}>
                   @{hangout.creator?.username || 'host'}
@@ -228,9 +440,18 @@ export default function HangoutDetailScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Description alone directly below host inside white rounded rectangle card */}
+            {hangout.description ? (
+              <View style={styles.descriptionCard}>
+                <Text style={styles.directDescriptionText}>
+                  {hangout.description}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* 4 Info Matrix Cards — free of white rectangular outline artifacts */}
+          {/* Info Matrix Cards: When & Where */}
           <View style={styles.infoMatrix}>
             {/* When */}
             <View style={styles.infoCard}>
@@ -256,165 +477,123 @@ export default function HangoutDetailScreen() {
                   {locationDistrict}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.mapBtn} activeOpacity={0.7}>
-                <MaterialIcons name="near-me" size={18} color={Colors.secondary} />
-              </TouchableOpacity>
             </View>
+          </View>
 
-            {/* Spots & Attendance Stack */}
-            <View style={styles.infoCard}>
-              <View style={styles.cardIconBox}>
-                <MaterialIcons name="group" size={22} color={Colors.primaryContainer} />
-              </View>
-              <View style={styles.cardTextCol}>
-                <View style={styles.spotsRow}>
-                  <Text style={styles.cardPrimaryText}>
-                    {participantsCount} of {maxSpots} joined
-                  </Text>
-                  <View style={styles.spotsLeftBadge}>
-                    <Text style={styles.spotsLeftText}>{spotsLeft} spots left</Text>
-                  </View>
+          {/* Pending Join Requests for Host */}
+          {isHangoutHost && (hangout.join_type === 'request_based' || hangout.joinType === 'request_based') && pendingRequests.length > 0 && (
+            <View style={styles.requestsSectionCard}>
+              <View style={styles.requestsHeaderRow}>
+                <View style={styles.requestsTitleRow}>
+                  <MaterialIcons name="person-add" size={18} color="#d97706" />
+                  <Text style={styles.requestsTitle}>Pending Join Requests</Text>
                 </View>
-                {participantsList.length > 0 ? (
-                  <View style={styles.avatarStackRow}>
-                    {participantsList.slice(0, 3).map((p: any, idx: number) => {
-                      const initials = `${(p.user?.first_name || p.first_name || 'U')[0]}${
-                        (p.user?.last_name || p.last_name || '')[0] || ''
-                      }`;
-                      const bgColors = [
-                        Colors.secondaryContainer,
-                        Colors.primaryFixedDim,
-                        Colors.tertiaryContainer,
-                      ];
-                      return (
-                        <View
-                          key={p.id || idx}
-                          style={[styles.miniAvatar, { backgroundColor: bgColors[idx % 3] }]}
-                        >
-                          <Text style={styles.miniAvatarText}>{initials}</Text>
+                <View style={styles.requestsCountBadge}>
+                  <Text style={styles.requestsCountText}>{pendingRequests.length}</Text>
+                </View>
+              </View>
+
+              <View style={styles.requestsList}>
+                {pendingRequests.map((req) => {
+                  const rUser = req.user;
+                  const rName =
+                    rUser?.first_name && rUser?.last_name
+                      ? `${rUser.first_name} ${rUser.last_name}`
+                      : rUser?.name || rUser?.first_name || rUser?.username || 'User';
+                  const rAvatar = rUser?.profile_picture_url;
+                  const isResponding = respondingUserId === req.userId;
+
+                  return (
+                    <View key={req.userId} style={styles.requestItemRow}>
+                      <View style={styles.requestUserGroup}>
+                        {rAvatar ? (
+                          <Image source={{ uri: rAvatar }} style={styles.requestAvatar} />
+                        ) : (
+                          <View style={styles.requestAvatarFallback}>
+                            <MaterialIcons name="person" size={18} color={Colors.tertiary} />
+                          </View>
+                        )}
+                        <View style={styles.requestUserInfo}>
+                          <Text style={styles.requestUserName} numberOfLines={1}>
+                            {rName}
+                          </Text>
+                          <Text style={styles.requestUserHandle} numberOfLines={1}>
+                            @{rUser?.username || 'user'}
+                          </Text>
                         </View>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text style={styles.cardSecondaryText}>Be the first to join!</Text>
-                )}
+                      </View>
+
+                      <View style={styles.requestActionBtns}>
+                        <TouchableOpacity
+                          style={styles.requestDeclineBtn}
+                          onPress={() => handleRespondRequest(req.userId, 'rejected')}
+                          disabled={isResponding}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialIcons name="close" size={16} color={Colors.error} />
+                          <Text style={styles.requestDeclineText}>Decline</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.requestApproveBtn}
+                          onPress={() => handleRespondRequest(req.userId, 'approved')}
+                          disabled={isResponding}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialIcons name="check" size={16} color="#16a34a" />
+                          <Text style={styles.requestApproveText}>Approve</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             </View>
+          )}
 
-            {/* Join Type Card */}
-            <View style={styles.infoCard}>
-              <View style={styles.cardIconBox}>
-                <MaterialIcons name="lock-open" size={22} color={Colors.secondary} />
-              </View>
-              <View style={styles.joinTypeRow}>
-                <View
-                  style={[
-                    styles.joinTypePill,
-                    isOpen ? styles.pillOpen : styles.pillRequest,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.joinTypePillText,
-                      isOpen ? styles.textOpen : styles.textRequest,
-                    ]}
-                  >
-                    {isOpen ? 'Open' : 'Request'}
-                  </Text>
+          {/* Unique Distinctive Container for Participants */}
+          <View style={styles.participantsUniqueBox}>
+            <View style={styles.participantsHeaderRow}>
+              <View style={styles.participantsTitleGroup}>
+                <View style={styles.participantsIconBox}>
+                  <MaterialIcons name="groups" size={20} color={Colors.primary} />
                 </View>
-                <Text style={styles.joinTypeSubtitle}>
-                  {isOpen
-                    ? 'Anyone can drop in without approval'
-                    : 'Host approval required to join'}
+                <Text style={styles.participantsMainTitle}>
+                  {hasLimit
+                    ? `${participantsCount} of ${maxSpots} joined`
+                    : `${participantsCount} ${participantsCount === 1 ? 'is going' : 'are going'}`}
+                </Text>
+              </View>
+              <View style={styles.spotsLeftBadge}>
+                <Text style={styles.spotsLeftText}>
+                  {hasLimit ? `${spotsLeft} spots left` : 'No limit'}
                 </Text>
               </View>
             </View>
-          </View>
-
-          {/* About Hangout Block */}
-          <View style={styles.aboutCard}>
-            <View style={styles.aboutHeaderRow}>
-              <Text style={styles.aboutTitle}>About Hangout</Text>
-            </View>
-            <Text style={styles.aboutBody}>
-              {hangout.description || 'No description provided for this hangout.'}
-            </Text>
-            {hangout.community?.name && (
-              <View style={styles.topicTagsRow}>
-                <View style={styles.topicPill}>
-                  <Text style={styles.topicText}>#{hangout.community.slug || 'hangout'}</Text>
-                </View>
-              </View>
-            )}
-          </View>
-
-          {/* Participants Roster */}
-          <View style={styles.rosterCard}>
-            <View style={styles.rosterHeader}>
-              <View style={styles.rosterTitleGroup}>
-                <Text style={styles.rosterTitle}>Participants</Text>
-                <View style={styles.rosterCountPill}>
-                  <Text style={styles.rosterCountText}>{participantsCount}</Text>
-                </View>
-              </View>
-              {participantsCount > 0 && (
-                <Text style={styles.recentlyJoinedText}>Members</Text>
-              )}
-            </View>
 
             {participantsList.length > 0 ? (
-              <View style={styles.rosterAvatarsRow}>
-                {/* Host */}
-                <View style={styles.rosterItem}>
-                  <View style={styles.hostAvatarBox}>
-                    <Text style={styles.hostAvatarInitials}>
-                      {(hangout.creator?.first_name || 'H')[0]}
-                      {(hangout.creator?.last_name || 'O')[0]}
-                    </Text>
-                    <View style={styles.starBadge}>
-                      <MaterialIcons name="star" size={10} color={Colors.onPrimary} />
-                    </View>
-                  </View>
-                  <Text style={styles.rosterItemName} numberOfLines={1}>
-                    {hangout.creator?.first_name || 'Host'}
-                  </Text>
-                  <Text style={styles.rosterItemRole}>Host</Text>
-                </View>
-
-                {/* Other participants */}
-                {participantsList.slice(0, 5).map((p: any, idx: number) => {
-                  const firstName = p.user?.first_name || p.first_name || 'Member';
-                  const lastName = p.user?.last_name || p.last_name || '';
-                  const initials = `${firstName[0]}${lastName[0] || ''}`;
+              <View style={styles.participantAvatarsGrid}>
+                {participantsList.map((p: any, idx: number) => {
+                  const avatarUrl = p.profile_picture_url || p.user?.profile_picture_url;
+                  const pName = p.user?.first_name || p.first_name || p.name || 'Member';
                   return (
-                    <View key={p.id || idx} style={styles.rosterItem}>
-                      <View
-                        style={[
-                          styles.hostAvatarBox,
-                          {
-                            backgroundColor:
-                              idx % 2 === 0
-                                ? Colors.primaryFixedDim
-                                : Colors.tertiaryContainer,
-                          },
-                        ]}
-                      >
-                        <Text style={styles.hostAvatarInitials}>{initials}</Text>
-                      </View>
-                      <Text style={styles.rosterItemName} numberOfLines={1}>
-                        {firstName}
+                    <View key={p.id || idx} style={styles.participantItem}>
+                      {avatarUrl ? (
+                        <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
+                      ) : (
+                        <View style={styles.participantAvatarFallback}>
+                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                        </View>
+                      )}
+                      <Text style={styles.participantNameText} numberOfLines={1}>
+                        {pName}
                       </Text>
                     </View>
                   );
                 })}
               </View>
             ) : (
-              <View style={styles.emptyRosterBox}>
-                <Text style={styles.emptyRosterText}>
-                  No participants yet. Be the first to join!
-                </Text>
-              </View>
+              <Text style={styles.emptyParticipantsText}>Be the first to join this hangout!</Text>
             )}
           </View>
         </View>
@@ -425,29 +604,50 @@ export default function HangoutDetailScreen() {
         <TouchableOpacity
           style={[
             styles.joinBtn,
-            isJoined ? styles.btnJoinedState : styles.btnNotJoinedState,
+            isPassed
+              ? styles.btnPassedState
+              : isJoined
+              ? styles.btnJoinedState
+              : isRequested
+              ? styles.btnRequestedState
+              : styles.btnNotJoinedState,
           ]}
           onPress={handleJoin}
-          disabled={actionLoading}
+          disabled={actionLoading || isPassed}
           activeOpacity={0.85}
         >
-          <MaterialIcons
-            name={isJoined ? 'check-circle' : 'groups'}
-            size={20}
-            color={isJoined ? Colors.onSurface : Colors.onPrimaryContainer}
-          />
-          <Text
-            style={[
-              styles.joinBtnText,
-              isJoined ? styles.textJoinedState : styles.textNotJoinedState,
-            ]}
-          >
-            {isJoined
-              ? 'Joined'
-              : isOpen
-              ? 'Join Hangout'
-              : 'Request to Join'}
-          </Text>
+          {isPassed ? (
+            isJoined ? (
+              <>
+                <MaterialIcons name="check-circle" size={20} color={Colors.tertiary} />
+                <Text style={[styles.joinBtnText, { color: Colors.tertiary }]}>Attended</Text>
+              </>
+            ) : (
+              <>
+                <MaterialIcons name="event-busy" size={20} color={Colors.outline} />
+                <Text style={[styles.joinBtnText, { color: Colors.outline }]}>Hangout Ended</Text>
+              </>
+            )
+          ) : isJoined ? (
+            <>
+              <MaterialIcons name="directions-walk" size={20} color={Colors.onSurface} />
+              <Text style={[styles.joinBtnText, styles.textJoinedState]}>Joined</Text>
+            </>
+          ) : isRequested ? (
+            <>
+              <MaterialIcons name="hourglass-empty" size={18} color="#92400e" />
+              <Text style={[styles.joinBtnText, styles.textRequestedState]}>
+                Waiting for approval
+              </Text>
+            </>
+          ) : (
+            <>
+              <RaisingHandIcon size={20} color={Colors.onPrimaryContainer} />
+              <Text style={[styles.joinBtnText, styles.textNotJoinedState]}>
+                {isOpen ? 'Join Hangout' : 'Request to Join'}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -601,6 +801,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  creatorAvatarImg: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
   creatorAvatarInitials: {
     width: 34,
     height: 34,
@@ -622,6 +827,12 @@ const styles = StyleSheet.create({
   creatorHostRole: {
     ...Typography.captionSm,
     color: Colors.tertiary,
+  },
+  directDescriptionText: {
+    ...Typography.bodyMd,
+    color: Colors.onSurfaceVariant,
+    lineHeight: 22,
+    marginTop: 4,
   },
   infoMatrix: {
     gap: 8,
@@ -703,37 +914,87 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.white,
   },
-  joinTypeRow: {
-    flex: 1,
+  descriptionCard: {
+    backgroundColor: '#ffffff',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  creatorAvatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  participantsUniqueBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(232, 167, 54, 0.35)',
+    gap: 12,
+  },
+  participantsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  participantsTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  joinTypePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
+  participantsIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(232, 167, 54, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pillOpen: {
-    backgroundColor: Colors.secondaryFixed,
-  },
-  pillRequest: {
-    backgroundColor: Colors.tertiaryContainer,
-  },
-  joinTypePillText: {
-    fontSize: 11,
+  participantsMainTitle: {
+    ...Typography.labelMd,
+    color: Colors.onSurface,
     fontWeight: '700',
   },
-  textOpen: {
-    color: Colors.onSecondaryFixed,
+  participantAvatarsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingTop: 4,
   },
-  textRequest: {
-    color: Colors.onTertiaryContainer,
+  participantItem: {
+    alignItems: 'center',
+    width: 52,
+    gap: 4,
   },
-  joinTypeSubtitle: {
-    ...Typography.captionSm,
-    color: Colors.onSurface,
-    flex: 1,
+  participantAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  participantAvatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  participantNameText: {
+    fontSize: 10,
+    color: Colors.onSurfaceVariant,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  emptyParticipantsText: {
+    ...Typography.bodyMd,
+    color: Colors.tertiary,
+    fontStyle: 'italic',
+    paddingVertical: 4,
   },
   aboutCard: {
     backgroundColor: Colors.surface,
@@ -914,5 +1175,166 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  btnRequestedState: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+  },
+  textRequestedState: {
+    color: '#92400e',
+  },
+  authorActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bannerStatusPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  bannerStatusPillOpen: {
+    backgroundColor: 'rgba(5, 150, 105, 0.9)',
+  },
+  bannerStatusPillRequest: {
+    backgroundColor: 'rgba(217, 119, 6, 0.9)',
+  },
+  bannerStatusPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.3,
+  },
+  openPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+  },
+  btnPassedState: {
+    backgroundColor: Colors.surfaceContainerHigh,
+    opacity: 0.85,
+  },
+  requestsSectionCard: {
+    backgroundColor: '#fffbeb',
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  requestsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  requestsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requestsTitle: {
+    ...Typography.titleMd,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#92400e',
+  },
+  requestsCountBadge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+  },
+  requestsCountText: {
+    ...Typography.labelSm,
+    color: '#ffffff',
+    fontWeight: '700',
+  },
+  requestsList: {
+    gap: Spacing.sm,
+  },
+  requestItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+  },
+  requestUserGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  requestAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  requestAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceContainerHighest,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestUserInfo: {
+    flex: 1,
+  },
+  requestUserName: {
+    ...Typography.labelMd,
+    fontWeight: '700',
+    color: Colors.onSurface,
+  },
+  requestUserHandle: {
+    ...Typography.bodySm,
+    color: Colors.tertiary,
+  },
+  requestActionBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  requestDeclineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surfaceContainerHighest,
+  },
+  requestDeclineText: {
+    ...Typography.labelSm,
+    color: Colors.error,
+    fontWeight: '600',
+  },
+  requestApproveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: '#dcfce7',
+  },
+  requestApproveText: {
+    ...Typography.labelSm,
+    color: '#16a34a',
+    fontWeight: '700',
   },
 });

@@ -24,6 +24,17 @@ import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { notificationsService } from '../src/services/notifications';
 import { NotificationItem as NotifType } from '../src/types';
 
+function formatTimeAgo(rawDate?: string) {
+  if (!rawDate) return 'recently';
+  const d = new Date(rawDate);
+  const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -34,7 +45,7 @@ export default function NotificationsScreen() {
   const fetchNotifications = useCallback(async () => {
     try {
       const data = await notificationsService.list({ limit: 50 });
-      setNotifications(data || []);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch {
       setNotifications([]);
     } finally {
@@ -47,8 +58,11 @@ export default function NotificationsScreen() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      await notificationsService.markAllAsRead();
+    } catch {}
   };
 
   const handlePress = async (notif: any) => {
@@ -61,17 +75,20 @@ export default function NotificationsScreen() {
       } catch {}
     }
 
-    if (notif.relatedEntityType === 'post' && notif.relatedEntityId) {
-      router.push(`/post/${notif.relatedEntityId}`);
-    } else if (notif.relatedEntityType === 'event' && notif.relatedEntityId) {
-      router.push(`/event/${notif.relatedEntityId}`);
-    } else if (notif.relatedEntityType === 'hangout' && notif.relatedEntityId) {
-      router.push(`/hangout/${notif.relatedEntityId}`);
+    const entityType = notif.relatedEntityType || notif.related_entity_type;
+    const entityId = notif.relatedEntityId || notif.related_entity_id;
+
+    if (entityType === 'post' && entityId) {
+      router.push(`/post/${entityId}`);
+    } else if (entityType === 'event' && entityId) {
+      router.push(`/event/${entityId}`);
+    } else if (entityType === 'hangout' && entityId) {
+      router.push(`/hangout/${entityId}`);
     }
   };
 
-  const unreadNotifications = notifications.filter((n) => !n.isRead);
-  const readNotifications = notifications.filter((n) => n.isRead);
+  const unreadNotifications = notifications.filter((n) => !(n.isRead ?? n.is_read));
+  const readNotifications = notifications.filter((n) => Boolean(n.isRead ?? n.is_read));
 
   const renderIcon = (type: string) => {
     switch (type) {
@@ -91,6 +108,18 @@ export default function NotificationsScreen() {
         return (
           <View style={[styles.iconBox, { backgroundColor: Colors.secondaryFixed }]}>
             <MaterialIcons name="person-add" size={22} color={Colors.secondary} />
+          </View>
+        );
+      case 'hangout_request':
+        return (
+          <View style={[styles.iconBox, { backgroundColor: '#fef3c7' }]}>
+            <MaterialIcons name="person-add" size={22} color="#d97706" />
+          </View>
+        );
+      case 'hangout_approved':
+        return (
+          <View style={[styles.iconBox, { backgroundColor: '#dcfce7' }]}>
+            <MaterialIcons name="check-circle" size={22} color="#16a34a" />
           </View>
         );
       case 'event_approved':
@@ -188,15 +217,21 @@ export default function NotificationsScreen() {
                   <View style={styles.itemTextCol}>
                     <Text style={styles.itemTitle}>{notif.title}</Text>
                     {notif.message ? (
-                      <Text style={styles.itemMessage} numberOfLines={1}>
+                      <Text style={styles.itemMessage} numberOfLines={2}>
                         {notif.message}
                       </Text>
                     ) : null}
                     <View style={styles.itemMetaRow}>
-                      <Text style={styles.itemTime}>{notif.timeAgo || 'recently'}</Text>
+                      <Text style={styles.itemTime}>
+                        {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
+                      </Text>
                       <View style={styles.metaDot} />
                       <Text style={styles.itemCategory}>
-                        {notif.category || 'Notification'}
+                        {notif.type === 'hangout_request'
+                          ? 'Join Request'
+                          : notif.type === 'hangout_approved'
+                          ? 'Approved'
+                          : notif.category || 'Notification'}
                       </Text>
                     </View>
                   </View>
@@ -229,11 +264,13 @@ export default function NotificationsScreen() {
                       <View style={styles.itemTextCol}>
                         <Text style={styles.itemTitle}>{notif.title}</Text>
                         {notif.message ? (
-                          <Text style={styles.itemMessage} numberOfLines={1}>
+                          <Text style={styles.itemMessage} numberOfLines={2}>
                             {notif.message}
                           </Text>
                         ) : null}
-                        <Text style={styles.itemTime}>{notif.timeAgo || 'earlier'}</Text>
+                        <Text style={styles.itemTime}>
+                          {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   ))}

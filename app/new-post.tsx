@@ -26,11 +26,19 @@ import { communitiesService } from '../src/services/communities';
 import { uploadService } from '../src/services/upload';
 import { Community } from '../src/types';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
+import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 
 export default function NewPostScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ communityId?: string }>();
+  const params = useLocalSearchParams<{
+    communityId?: string;
+    communitySlug?: string;
+    postId?: string;
+  }>();
+
+  const isEditing = Boolean(params.postId);
+  const isCommunityLocked = Boolean(params.communitySlug || params.communityId || isEditing);
 
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedCommunity, setSelectedCommunity] = useState<Community | null>(null);
@@ -39,6 +47,7 @@ export default function NewPostScreen() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const [tags, setTags] = useState<string[]>(['discussion']);
   const [newTagInput, setNewTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
@@ -46,27 +55,67 @@ export default function NewPostScreen() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Load user's communities to pick target
+  // Load user's communities to pick target, or prefill from existing post
   useEffect(() => {
-    const loadCommunities = async () => {
+    const loadData = async () => {
       setLoading(true);
       try {
         const list = await communitiesService.list();
         setCommunities(list);
-        if (params.communityId) {
-          const match = list.find((c) => c.id === params.communityId);
-          if (match) setSelectedCommunity(match);
-        } else if (list.length > 0) {
-          setSelectedCommunity(list[0]);
+
+        if (isEditing && params.postId) {
+          const post = await postsService.getById(params.postId);
+          if (post) {
+            setTitle(post.title || '');
+            setContent(post.content || '');
+            if (post.mediaUrl) {
+              setImages([post.mediaUrl]);
+              setImageUrlInput(post.mediaUrl);
+            }
+            if (post.tags && post.tags.length > 0) {
+              setTags(post.tags);
+            }
+            const postCommunityId = (post as any).communityId || post.community?.id;
+            const postCommunitySlug = (post as any).communitySlug || post.community?.slug;
+            const match = list.find(
+              (c) =>
+                (postCommunityId && c.id === postCommunityId) ||
+                (postCommunitySlug && c.slug === postCommunitySlug)
+            );
+            if (match) {
+              setSelectedCommunity(match);
+            } else if (post.community) {
+              setSelectedCommunity(post.community as Community);
+            }
+          }
+        } else {
+          const targetIdentifier = params.communitySlug || params.communityId;
+          if (targetIdentifier) {
+            const match = list.find(
+              (c) => c.slug === targetIdentifier || c.id === targetIdentifier
+            );
+            if (match) {
+              setSelectedCommunity(match);
+            } else if (params.communitySlug) {
+              try {
+                const fetched = await communitiesService.getBySlug(params.communitySlug);
+                if (fetched) setSelectedCommunity(fetched);
+              } catch {
+                // fallback
+              }
+            }
+          } else if (list.length > 0) {
+            setSelectedCommunity(list[0]);
+          }
         }
       } catch (err) {
-        console.error('Failed to load communities', err);
+        console.error('Failed to load communities or post details', err);
       } finally {
         setLoading(false);
       }
     };
-    loadCommunities();
-  }, [params.communityId]);
+    loadData();
+  }, [params.communityId, params.communitySlug, params.postId, isEditing]);
 
   const handlePickImage = async () => {
     try {
@@ -103,7 +152,7 @@ export default function NewPostScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedCommunity) {
+    if (!isEditing && !selectedCommunity) {
       Alert.alert('Required', 'Please select a community to post in.');
       return;
     }
@@ -118,34 +167,44 @@ export default function NewPostScreen() {
 
     setSubmitting(true);
     try {
-      // Upload local image if any
+      // Upload local image if any or use URL directly
       let mediaUrl: string | undefined = undefined;
-      if (images.length > 0) {
-        const uri = images[0];
-        if (uri.startsWith('http')) {
-          mediaUrl = uri;
+      const rawUri = imageUrlInput.trim() || (images.length > 0 ? images[0] : undefined);
+      const effectiveUri = rawUri ? extractDirectImageUrl(rawUri) : undefined;
+      if (effectiveUri) {
+        if (effectiveUri.startsWith('http')) {
+          mediaUrl = effectiveUri;
         } else {
           try {
-            const filename = uri.split('/').pop() || 'post-image.jpg';
+            const filename = effectiveUri.split('/').pop() || 'post-image.jpg';
             const presigned = await uploadService.getPresignedUrl(filename, 'image/jpeg');
-            await uploadService.uploadFile(presigned.uploadUrl, uri, 'image/jpeg');
+            await uploadService.uploadFile(presigned.uploadUrl, effectiveUri, 'image/jpeg');
             mediaUrl = presigned.publicUrl;
           } catch {
-            mediaUrl = uri;
+            mediaUrl = effectiveUri;
           }
         }
       }
 
-      await postsService.create(selectedCommunity.id, {
-        title: title.trim(),
-        content: content.trim(),
-        mediaUrl,
-        tags: tags.length > 0 ? tags : undefined,
-      });
+      if (isEditing && params.postId) {
+        await postsService.update(params.postId, {
+          title: title.trim(),
+          content: content.trim(),
+          mediaUrl,
+          tags: tags.length > 0 ? tags : [],
+        });
+      } else if (selectedCommunity) {
+        await postsService.create(selectedCommunity.slug, {
+          title: title.trim(),
+          content: content.trim(),
+          mediaUrl,
+          tags: tags.length > 0 ? tags : undefined,
+        });
+      }
 
       router.back();
     } catch (err: any) {
-      Alert.alert('Post Failed', err?.message || 'Could not publish post. Please try again.');
+      Alert.alert(isEditing ? 'Update Failed' : 'Post Failed', err?.message || 'Could not save post. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -166,7 +225,7 @@ export default function NewPostScreen() {
         >
           <MaterialIcons name="close" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>New Post</Text>
+        <Text style={styles.headerTitle}>{isEditing ? 'Edit Post' : 'New Post'}</Text>
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={submitting || !title.trim() || !content.trim()}
@@ -175,7 +234,9 @@ export default function NewPostScreen() {
             (!title.trim() || !content.trim() || submitting) && styles.postBtnDisabled,
           ]}
         >
-          <Text style={styles.postBtnText}>{submitting ? 'Posting...' : 'Post'}</Text>
+          <Text style={styles.postBtnText}>
+            {submitting ? (isEditing ? 'Saving...' : 'Posting...') : isEditing ? 'Save' : 'Post'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -187,9 +248,10 @@ export default function NewPostScreen() {
       >
         {/* Community Context Pill */}
         <TouchableOpacity
-          style={styles.communityPill}
-          onPress={() => setShowCommunityPicker(!showCommunityPicker)}
-          activeOpacity={0.8}
+          style={[styles.communityPill, isCommunityLocked && styles.communityPillLocked]}
+          onPress={() => !isCommunityLocked && setShowCommunityPicker(!showCommunityPicker)}
+          activeOpacity={isCommunityLocked ? 1 : 0.8}
+          disabled={isCommunityLocked}
         >
           <View style={styles.communityIconWrap}>
             <MaterialIcons name="landscape" size={16} color={Colors.onPrimaryContainer} />
@@ -197,7 +259,9 @@ export default function NewPostScreen() {
           <Text style={styles.communityName}>
             {selectedCommunity ? selectedCommunity.name : 'Select a community'}
           </Text>
-          <MaterialIcons name="arrow-drop-down" size={20} color={Colors.tertiary} />
+          {!isCommunityLocked && (
+            <MaterialIcons name="arrow-drop-down" size={20} color={Colors.tertiary} />
+          )}
         </TouchableOpacity>
 
         {/* Dropdown for selecting community */}
@@ -244,7 +308,69 @@ export default function NewPostScreen() {
           multiline
         />
 
-        {/* Content Body Input */}
+        {/* Image Attachment Input & Preview — Positioned Below Title and Above Description */}
+        <View style={styles.imageInputCard}>
+          <Text style={styles.imageInputLabel}>ATTACH IMAGE VIA WEB LINK</Text>
+          <View style={styles.urlInputRow}>
+            <MaterialIcons name="link" size={20} color={Colors.tertiary} style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.urlTextInput}
+              placeholder="Paste image URL (https://...)"
+              placeholderTextColor={Colors.outline}
+              value={imageUrlInput}
+              onChangeText={(text) => {
+                setImageUrlInput(text);
+                const direct = extractDirectImageUrl(text);
+                if (direct.startsWith('http')) {
+                  setImages([direct]);
+                }
+                if (text.trim().startsWith('http') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(text.trim())) {
+                  resolveImageUrl(text.trim()).then((resolved) => {
+                    if (resolved && resolved.startsWith('http')) {
+                      setImages([resolved]);
+                    }
+                  });
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {imageUrlInput.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => {
+                  setImageUrlInput('');
+                  setImages([]);
+                }}
+                style={{ padding: 4 }}
+              >
+                <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={handlePickImage} style={{ padding: 4 }}>
+                <MaterialIcons name="photo-camera" size={20} color={Colors.primaryContainer} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Image Previews */}
+        {images.map((uri, idx) => (
+          <View key={uri} style={styles.imagePreviewContainer}>
+            <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
+            <TouchableOpacity
+              style={styles.removeImageBtn}
+              onPress={() => {
+                handleRemoveImage(idx);
+                setImageUrlInput('');
+              }}
+              accessibilityLabel="Remove image"
+            >
+              <MaterialIcons name="close" size={16} color={Colors.onSurface} />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {/* Content Body Input — Below Image Attachment */}
         <TextInput
           style={styles.bodyInput}
           placeholder="What's on your mind? Share thoughts, trail notes, or questions..."
@@ -254,20 +380,6 @@ export default function NewPostScreen() {
           multiline
           textAlignVertical="top"
         />
-
-        {/* Image Previews */}
-        {images.map((uri, idx) => (
-          <View key={uri} style={styles.imagePreviewContainer}>
-            <Image source={{ uri }} style={styles.previewImage} />
-            <TouchableOpacity
-              style={styles.removeImageBtn}
-              onPress={() => handleRemoveImage(idx)}
-              accessibilityLabel="Remove image"
-            >
-              <MaterialIcons name="close" size={16} color={Colors.onSurface} />
-            </TouchableOpacity>
-          </View>
-        ))}
 
         <View style={styles.divider} />
 
@@ -320,20 +432,8 @@ export default function NewPostScreen() {
             onPress={handlePickImage}
             accessibilityLabel="Attach photo"
           >
-            <MaterialIcons name="image" size={24} color={Colors.tertiary} />
+            <MaterialIcons name="image" size={24} color={Colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.toolbarBtn}
-            onPress={() => setShowTagInput(true)}
-            accessibilityLabel="Add tag"
-          >
-            <MaterialIcons name="local-offer" size={24} color={Colors.tertiary} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.draftStatus}>
-          <MaterialIcons name="check-circle" size={16} color={Colors.primaryContainer} />
-          <Text style={styles.draftText}>Ready</Text>
         </View>
       </View>
     </View>
@@ -402,6 +502,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.surfaceContainerHigh,
   },
+  communityPillLocked: {
+    backgroundColor: 'rgba(232, 167, 54, 0.12)',
+    borderColor: 'rgba(232, 167, 54, 0.3)',
+  },
   communityIconWrap: {
     width: 24,
     height: 24,
@@ -468,13 +572,13 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.sm,
     ...Shadows.sm,
   },
   previewImage: {
     width: '100%',
     height: '100%',
-    objectFit: 'cover',
   },
   removeImageBtn: {
     position: 'absolute',
@@ -591,5 +695,33 @@ const styles = StyleSheet.create({
   draftText: {
     ...Typography.captionSm,
     color: Colors.tertiary,
+  },
+  imageInputCard: {
+    marginHorizontal: Spacing.margin,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  imageInputLabel: {
+    ...Typography.captionSm,
+    color: Colors.tertiary,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  urlInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.surfaceContainerHigh,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  urlTextInput: {
+    flex: 1,
+    ...Typography.bodyMd,
+    color: Colors.onSurface,
+    paddingVertical: 0,
   },
 });

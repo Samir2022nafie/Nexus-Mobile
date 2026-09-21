@@ -38,7 +38,12 @@ export default function SettingsScreen() {
         text: 'Log Out',
         style: 'destructive',
         onPress: async () => {
-          await logout();
+          try {
+            await logout();
+            router.replace('/(auth)/welcome');
+          } catch {
+            router.replace('/(auth)/welcome');
+          }
         },
       },
     ]);
@@ -57,7 +62,10 @@ export default function SettingsScreen() {
             try {
               await usersService.deleteMyAccount();
               await logout();
-            } catch {}
+              router.replace('/(auth)/welcome');
+            } catch {
+              router.replace('/(auth)/welcome');
+            }
           },
         },
       ]

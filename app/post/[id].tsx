@@ -8,7 +8,7 @@
  * - Post not found screen with back button
  * - No Android shadow/elevation artifacts
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
+  Modal,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +30,8 @@ import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/t
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { useAuth } from '../../src/context/AuthContext';
+import { usePostState } from '../../src/context/PostStateContext';
+import { extractDirectImageUrl } from '../../src/utils/imageUrl';
 import { postsService } from '../../src/services/posts';
 import { commentsService } from '../../src/services/comments';
 import { Post, Comment } from '../../src/types';
@@ -35,8 +40,9 @@ import { formatCategoryName } from '../../src/utils/categories';
 export default function ThreadDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, highlightCommentId } = useLocalSearchParams<{ id: string; highlightCommentId?: string }>();
   const { user } = useAuth();
+  const { setPostLiked, setPostSaved, setPostCommentCount, updatePostCommentCount } = usePostState();
 
   const [post, setPost] = useState<Post | any>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -46,6 +52,123 @@ export default function ThreadDetailScreen() {
   const [hasLiked, setHasLiked] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editCommentText, setEditCommentText] = useState('');
+
+  // Fixed bottom comment bar scroll animation
+  const commentBarTranslateY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const lastScrollTime = useRef(Date.now());
+  const commentBarVisible = useRef(true);
+
+  const handlePostScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const currentTime = Date.now();
+    const dy = currentY - lastScrollY.current;
+    const dt = Math.max(1, currentTime - lastScrollTime.current);
+    const velocityY = dy / dt;
+
+    lastScrollY.current = currentY;
+    lastScrollTime.current = currentTime;
+
+    if (currentY <= 15) {
+      if (!commentBarVisible.current) {
+        commentBarVisible.current = true;
+        Animated.timing(commentBarTranslateY, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (dy > 2 && currentY > 30) {
+      if (commentBarVisible.current) {
+        commentBarVisible.current = false;
+        Animated.timing(commentBarTranslateY, {
+          toValue: 120,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (dy < -4 && velocityY < -0.6) {
+      if (!commentBarVisible.current) {
+        commentBarVisible.current = true;
+        Animated.timing(commentBarTranslateY, {
+          toValue: 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+      }
+    }
+  };
+
+  const startEditComment = (comment: any) => {
+    setEditingCommentId(comment.id);
+    setEditCommentText(comment.content || '');
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditCommentText('');
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    setPost((prev: any) => (prev ? { ...prev, commentsCount: Math.max(0, (prev.commentsCount || 1) - 1) } : prev));
+    try {
+      await commentsService.delete(commentId);
+    } catch (err) {
+      console.error('Failed to delete comment', err);
+    }
+  };
+
+  const handleSaveEditedComment = async (commentId: string) => {
+    if (!editCommentText.trim()) return;
+    const nextContent = editCommentText.trim();
+    setComments((prev) =>
+      prev.map((c) => (c.id === commentId ? { ...c, content: nextContent } : c))
+    );
+    setEditingCommentId(null);
+    try {
+      await commentsService.update(commentId, { content: nextContent });
+    } catch {}
+  };
+
+  const isPostAuthor = Boolean(
+    post &&
+      user &&
+      (post.author_id === user.id ||
+        post.author?.id === user.id ||
+        post.userId === user.id ||
+        (post.author?.username && user.username && post.author.username === user.username))
+  );
+
+  const openEditPost = () => {
+    if (!post?.id) return;
+    router.push({ pathname: '/new-post', params: { postId: post.id } } as any);
+  };
+
+  const handleDeletePost = () => {
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this discussion? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await postsService.delete(post.id);
+              router.back();
+            } catch {
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -62,13 +185,15 @@ export default function ThreadDetailScreen() {
       } else {
         setPost(null);
       }
-      setComments(commentsData || []);
+      const loadedComments = commentsData || [];
+      setComments(loadedComments);
+      setPostCommentCount(id, loadedComments.length || postData?.commentCount || 0);
     } catch {
       setPost(null);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, setPostCommentCount]);
 
   useEffect(() => {
     fetchData();
@@ -76,17 +201,21 @@ export default function ThreadDetailScreen() {
 
   const handleReaction = async () => {
     const nextLiked = !hasLiked;
+    const nextCount = Math.max(0, likesCount + (nextLiked ? 1 : -1));
     setHasLiked(nextLiked);
-    setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    setLikesCount(nextCount);
     if (!id) return;
+    setPostLiked(id, nextLiked, nextCount);
     try {
       await postsService.toggleReaction(id);
     } catch {}
   };
 
   const handleSave = async () => {
-    setHasSaved(!hasSaved);
+    const nextSaved = !hasSaved;
+    setHasSaved(nextSaved);
     if (!id) return;
+    setPostSaved(id, nextSaved);
     try {
       await postsService.toggleSave(id);
     } catch {}
@@ -119,6 +248,7 @@ export default function ThreadDetailScreen() {
         ]);
       }
       setNewComment('');
+      updatePostCommentCount(id, 1);
     } catch {} finally {
       setSubmitting(false);
     }
@@ -158,18 +288,24 @@ export default function ThreadDetailScreen() {
     );
   }
 
-  const catDisplay = formatCategoryName(post.community?.category, true);
-  const timeDisplay = post.created_at
-    ? new Date(post.created_at).toLocaleDateString()
-    : 'Recently';
+  const timeDisplay = post.created_at || post.createdAt
+    ? new Date(post.created_at || post.createdAt).toLocaleDateString([], {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : '';
+
+  const postMedia = extractDirectImageUrl(post.mediaUrl || post.media_url);
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       style={styles.screen}
     >
       <View style={[styles.inner, { paddingTop: insets.top }]}>
-        {/* Top Header Bar */}
+        {/* Top Header Bar — Back button, Title, and Author Edit/Delete */}
         <View style={styles.topBar}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -181,64 +317,119 @@ export default function ThreadDetailScreen() {
           <Text style={styles.topBarTitle} numberOfLines={1}>
             {post.community?.name || 'Discussion'}
           </Text>
-          <TouchableOpacity style={styles.backButton} activeOpacity={0.7}>
-            <MaterialIcons name="more-vert" size={24} color={Colors.onSurface} />
-          </TouchableOpacity>
+          {isPostAuthor ? (
+            <View style={styles.authorActionsRow}>
+              <TouchableOpacity
+                onPress={openEditPost}
+                style={styles.authorActionBtn}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="edit" size={18} color={Colors.secondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeletePost}
+                style={styles.authorActionBtn}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="delete-outline" size={19} color={Colors.error} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.backButton} />
+          )}
         </View>
 
         <ScrollView
           style={styles.container}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onScroll={handlePostScroll}
+          scrollEventThrottle={16}
         >
           {/* Main Post Card */}
           <View style={styles.postCard}>
-            {/* Community Affiliation & Category */}
+            {/* Community Affiliation & Real Timestamp */}
             <View style={styles.affiliationRow}>
-              <View style={styles.affiliationGroup}>
+              <TouchableOpacity
+                style={styles.affiliationGroup}
+                onPress={() => post.community?.slug && router.push(`/community/${post.community.slug}`)}
+                activeOpacity={0.8}
+              >
                 <View style={styles.commIconCircle}>
-                  <MaterialIcons name="terrain" size={14} color={Colors.secondary} />
+                  <MaterialIcons name="groups" size={16} color={Colors.primary} />
                 </View>
                 <Text style={styles.commLinkText} numberOfLines={1}>
                   {post.community?.name || 'Nexus Community'}
                 </Text>
-                <Text style={styles.dotSeparator}>·</Text>
-                <View style={styles.categoryPill}>
-                  <Text style={styles.categoryPillText} numberOfLines={1}>
-                    {catDisplay}
-                  </Text>
-                </View>
-              </View>
+              </TouchableOpacity>
               <Text style={styles.timeAgoText}>{timeDisplay}</Text>
             </View>
 
-            {/* Author Row */}
+            {/* Author Row — "Community Member" removed */}
             <View style={styles.authorRow}>
-              <Image
-                source={{
-                  uri:
-                    post.author?.profile_picture_url ||
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120',
-                }}
-                style={styles.authorAvatar}
-              />
-              <View style={styles.authorDetails}>
-                <View style={styles.authorNameRow}>
-                  <Text style={styles.authorFullName}>
-                    {post.author?.first_name} {post.author?.last_name || ''}
-                  </Text>
-                  <Text style={styles.authorHandle}>@{post.author?.username || 'member'}</Text>
+              {post.author?.profile_picture_url ? (
+                <Image
+                  source={{ uri: post.author.profile_picture_url }}
+                  style={styles.authorAvatar}
+                />
+              ) : (
+                <View style={styles.authorAvatarFallback}>
+                  <MaterialIcons name="person" size={20} color={Colors.tertiary} />
                 </View>
-                <Text style={styles.authorBadge}>Community Member</Text>
+              )}
+              <View style={styles.authorDetails}>
+                <Text style={styles.authorFullName}>
+                  {post.author?.first_name} {post.author?.last_name || ''}
+                </Text>
+                <Text style={styles.authorHandle}>@{post.author?.username || 'member'}</Text>
               </View>
             </View>
 
             {/* Post Title */}
             {post.title ? <Text style={styles.postTitle}>{post.title}</Text> : null}
 
+            {/* Post Media Image (Below Title, Above Description) */}
+            {postMedia ? (
+              <View style={styles.postMediaContainer}>
+                <Image
+                  source={{ uri: postMedia }}
+                  style={styles.postMediaImage}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : null}
+
             {/* Post Content */}
             <Text style={styles.postBody}>{post.content}</Text>
+
+            {/* Collapsible / Expandable Tags Section directly above Reaction Bar */}
+            {post.tags && post.tags.length > 0 && (
+              <View style={styles.tagsContainer}>
+                <View style={styles.tagsRow}>
+                  {(tagsExpanded ? post.tags : post.tags.slice(0, 4)).map((tag: any, idx: number) => {
+                    const tagName = typeof tag === 'string' ? tag : (tag?.name || tag?.tag?.name || '');
+                    if (!tagName) return null;
+                    return (
+                      <View key={idx} style={styles.tagPill}>
+                        <Text style={styles.tagPillText}>#{tagName}</Text>
+                      </View>
+                    );
+                  })}
+                  {post.tags.length > 4 && (
+                    <TouchableOpacity
+                      onPress={() => setTagsExpanded(!tagsExpanded)}
+                      style={styles.expandTagsBtn}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.expandTagsText}>
+                        {tagsExpanded ? 'Show less' : `+${post.tags.length - 4} more`}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )}
 
             {/* Reaction & Interaction Bar */}
             <View style={styles.reactionBar}>
@@ -297,16 +488,132 @@ export default function ThreadDetailScreen() {
             </View>
           </View>
 
-          {/* Inline Comment Composer */}
-          <View style={styles.composerBox}>
-            <Image
-              source={{
-                uri:
-                  user?.profile_picture_url ||
-                  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-              }}
-              style={styles.composerAvatar}
+          {/* Comments Stream */}
+          {comments.length === 0 ? (
+            <EmptyState
+              icon="chat-bubble-outline"
+              title="No comments yet"
+              subtitle="Be the first to share your thoughts on this discussion."
             />
+          ) : (
+            <View style={styles.commentsStream}>
+              {comments.map((comment) => {
+                const isAuthor =
+                  comment.author?.id === user?.id ||
+                  comment.userId === user?.id ||
+                  comment.author?.username === user?.username;
+                const isHighlighted = comment.id === highlightCommentId;
+                const isEditing = editingCommentId === comment.id;
+
+                return (
+                  <View
+                    key={comment.id}
+                    style={[
+                      styles.commentItem,
+                      isHighlighted && styles.commentItemHighlighted,
+                    ]}
+                  >
+                    <View style={styles.commentTopRow}>
+                      {comment.author?.profile_picture_url ? (
+                        <Image
+                          source={{ uri: comment.author.profile_picture_url }}
+                          style={styles.commentAvatar}
+                        />
+                      ) : (
+                        <View style={styles.commentAvatarFallback}>
+                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                        </View>
+                      )}
+                      <View style={styles.commentBody}>
+                        <View style={styles.commentAuthorLine}>
+                          <Text style={styles.commentAuthorName}>
+                            {comment.author?.first_name} {comment.author?.last_name || ''}
+                          </Text>
+                          <Text style={styles.commentTimeText}>
+                            ·{' '}
+                            {comment.created_at || comment.createdAt
+                              ? new Date(comment.created_at || comment.createdAt).toLocaleDateString([], {
+                                  month: 'short',
+                                  day: 'numeric',
+                                })
+                              : 'recently'}
+                          </Text>
+                          {isAuthor && !isEditing && (
+                            <View style={styles.commentActionBtnsRow}>
+                              <TouchableOpacity
+                                onPress={() => startEditComment(comment)}
+                                style={styles.editCommentIconBtn}
+                                activeOpacity={0.7}
+                              >
+                                <MaterialIcons name="edit" size={14} color={Colors.secondary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleDeleteComment(comment.id)}
+                                style={styles.deleteCommentIconBtn}
+                                activeOpacity={0.7}
+                              >
+                                <MaterialIcons name="delete-outline" size={15} color={Colors.error} />
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+
+                        {isEditing ? (
+                          <View style={styles.editCommentBox}>
+                            <TextInput
+                              style={styles.editCommentInput}
+                              value={editCommentText}
+                              onChangeText={setEditCommentText}
+                              multiline
+                            />
+                            <View style={styles.editCommentActionsRow}>
+                              <TouchableOpacity
+                                onPress={cancelEditComment}
+                                style={styles.editCommentCancelBtn}
+                              >
+                                <Text style={styles.editCommentCancelText}>Cancel</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleSaveEditedComment(comment.id)}
+                                style={styles.editCommentSaveBtn}
+                              >
+                                <Text style={styles.editCommentSaveText}>Save</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          <Text style={styles.commentContent}>{comment.content}</Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Fixed Bottom Comment Bar Docked Above Safe Area */}
+        <Animated.View
+          style={[
+            styles.fixedCommentBar,
+            {
+              paddingBottom: Math.max(insets.bottom, 10),
+              transform: [{ translateY: commentBarTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.composerBox}>
+            {user?.profile_picture_url ? (
+              <Image
+                source={{ uri: user.profile_picture_url }}
+                style={styles.composerAvatar}
+              />
+            ) : (
+              <View style={styles.composerAvatarFallback}>
+                <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+              </View>
+            )}
             <View style={styles.composerInputWrapper}>
               <TextInput
                 style={styles.composerInput}
@@ -332,47 +639,7 @@ export default function ThreadDetailScreen() {
               />
             </TouchableOpacity>
           </View>
-
-          {/* Comments Stream */}
-          {comments.length === 0 ? (
-            <EmptyState
-              icon="chat-bubble-outline"
-              title="No comments yet"
-              subtitle="Be the first to share your thoughts on this discussion."
-            />
-          ) : (
-            <View style={styles.commentsStream}>
-              {comments.map((comment) => (
-                <View key={comment.id} style={styles.commentItem}>
-                  <View style={styles.commentTopRow}>
-                    <Image
-                      source={{
-                        uri:
-                          comment.author?.profile_picture_url ||
-                          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
-                      }}
-                      style={styles.commentAvatar}
-                    />
-                    <View style={styles.commentBody}>
-                      <View style={styles.commentAuthorLine}>
-                        <Text style={styles.commentAuthorName}>
-                          {comment.author?.first_name} {comment.author?.last_name || ''}
-                        </Text>
-                        <Text style={styles.commentTimeText}>
-                          ·{' '}
-                          {comment.created_at || comment.createdAt
-                            ? new Date(comment.created_at || comment.createdAt).toLocaleDateString()
-                            : 'recently'}
-                        </Text>
-                      </View>
-                      <Text style={styles.commentContent}>{comment.content}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -544,6 +811,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 24,
   },
+  postMediaContainer: {
+    height: 240,
+    width: '100%',
+    borderRadius: BorderRadius.xl,
+    overflow: 'hidden',
+    backgroundColor: Colors.surfaceContainerHigh,
+    marginVertical: Spacing.sm,
+  },
+  postMediaImage: {
+    width: '100%',
+    height: '100%',
+  },
   postBody: {
     ...Typography.bodyMd,
     color: Colors.onSurface,
@@ -687,5 +966,217 @@ const styles = StyleSheet.create({
     color: Colors.onSurface,
     lineHeight: 20,
     marginTop: 2,
+  },
+  authorAvatarFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  composerAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commentAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagsContainer: {
+    paddingVertical: 2,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  tagPill: {
+    backgroundColor: 'rgba(232, 167, 54, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+  },
+  tagPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  expandTagsBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  expandTagsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.secondary,
+  },
+  commentItemHighlighted: {
+    backgroundColor: 'rgba(232, 167, 54, 0.12)',
+    borderColor: Colors.primaryContainer,
+    borderWidth: 1.5,
+  },
+  commentActionBtnsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 6,
+  },
+  editCommentIconBtn: {
+    padding: 2,
+  },
+  deleteCommentIconBtn: {
+    padding: 2,
+  },
+  editCommentBox: {
+    marginTop: 6,
+    gap: 6,
+  },
+  editCommentInput: {
+    ...Typography.bodyMd,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    color: Colors.onSurface,
+  },
+  editCommentActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  editCommentCancelBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  editCommentCancelText: {
+    fontSize: 12,
+    color: Colors.tertiary,
+    fontWeight: '600',
+  },
+  editCommentSaveBtn: {
+    backgroundColor: Colors.primaryContainer,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
+  },
+  editCommentSaveText: {
+    fontSize: 12,
+    color: Colors.onPrimaryContainer,
+    fontWeight: '700',
+  },
+  authorActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  authorActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.surfaceContainerHighest,
+  },
+  fixedCommentBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.cardBorder,
+    paddingTop: 8,
+    paddingHorizontal: Spacing.md,
+    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: 12,
+    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    ...Typography.headlineSm,
+    color: Colors.onSurface,
+    fontWeight: '700',
+  },
+  editTitleInput: {
+    ...Typography.labelMd,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    color: Colors.onSurface,
+  },
+  editBodyInput: {
+    ...Typography.bodyMd,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    color: Colors.onSurface,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+  },
+  modalCancelText: {
+    ...Typography.labelMd,
+    color: Colors.tertiary,
+    fontWeight: '600',
+  },
+  modalSaveBtn: {
+    backgroundColor: Colors.primaryContainer,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+  },
+  modalSaveText: {
+    ...Typography.labelMd,
+    color: Colors.onPrimaryContainer,
+    fontWeight: '700',
   },
 });

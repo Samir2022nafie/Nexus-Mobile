@@ -1,14 +1,17 @@
 /**
  * Explore Screen — Matches Stitch screen_9, screen_10, screen_11
- * Sub-tabs: Communities | Events | Hangouts
+ * Sub-tabs: Communities | Events | Posts
  * Features:
- * - AppHeader (/ Explore)
+ * - Horizontal swipe paging between Communities, Events, and Posts tabs
+ * - Tap Explore tab icon scrolls current active tab to top
+ * - Search decoupling: search filters across Communities, Events, and Posts reliably
  * - Sub-tab selector with active gold indicator
  * - Tactile search bar with magnifying glass
  * - Horizontal category chips (All, Outdoor, Sports, Art, Tech, Music, Food)
- * - 3 distinct feed designs for Communities, Events, and Hangouts
+ * - 3 distinct feed designs for Communities, Events, and Posts
+ * - Fully synchronized likes, saves, and comments via PostStateContext
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,81 +21,175 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  useWindowDimensions,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
-import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { communitiesService } from '../../src/services/communities';
-import { hangoutsService } from '../../src/services/hangouts';
+import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
-import { Community, HangoutItem } from '../../src/types';
+import { Community } from '../../src/types';
 import { BACKEND_CATEGORIES, formatCategoryName } from '../../src/utils/categories';
+import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
+import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
+import { usePostState } from '../../src/context/PostStateContext';
+import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 
-const SUB_TABS = ['Communities', 'Events', 'Hangouts'] as const;
+const SUB_TABS = ['Communities', 'Events', 'Posts'] as const;
 type SubTab = typeof SUB_TABS[number];
 
 const CATEGORIES = ['All', ...BACKEND_CATEGORIES.map((c) => c.label)];
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const params = useLocalSearchParams<{ tab?: string }>();
 
   const [activeTab, setActiveTab] = useState<SubTab>(
-    params.tab === 'events' ? 'Events' : params.tab === 'hangouts' ? 'Hangouts' : 'Communities'
+    params.tab === 'events' ? 'Events' : params.tab === 'posts' || params.tab === 'hangouts' ? 'Posts' : 'Communities'
   );
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [communities, setCommunities] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
-  const [hangouts, setHangouts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [savedPosts, setSavedPosts] = useState<Record<string, boolean>>({});
   const [savedEvents, setSavedEvents] = useState<Record<string, boolean>>({});
   const [joinedCommunities, setJoinedCommunities] = useState<Record<string, boolean>>({});
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const {
+    likedPosts: globalLiked,
+    savedPosts: globalSaved,
+    toggleLike,
+    toggleSave,
+  } = usePostState();
+
+  const { handleTabBarScroll } = useTabBarVisibility();
+  const lastScrollY = useRef(0);
+  const lastScrollTime = useRef(Date.now());
+
+  const horizontalScrollRef = useRef<ScrollView>(null);
+  const communitiesScrollRef = useRef<ScrollView>(null);
+  const eventsScrollRef = useRef<ScrollView>(null);
+  const postsScrollRef = useRef<ScrollView>(null);
+
+  const onExploreScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const currentTime = Date.now();
+    const dy = currentY - lastScrollY.current;
+    const dt = Math.max(1, currentTime - lastScrollTime.current);
+    const velocityY = dy / dt;
+
+    lastScrollY.current = currentY;
+    lastScrollTime.current = currentTime;
+
+    handleTabBarScroll(dy, velocityY, currentY);
+  };
+
+  const handleSelectTab = (tab: SubTab) => {
+    setActiveTab(tab);
+    const index = SUB_TABS.indexOf(tab);
+    if (index !== -1) {
+      horizontalScrollRef.current?.scrollTo({ x: index * screenWidth, animated: true });
+    }
+  };
+
+  // Scroll current active tab to top on navigation tabPress
   useEffect(() => {
-    if (params.tab === 'events') setActiveTab('Events');
-    else if (params.tab === 'hangouts') setActiveTab('Hangouts');
+    const unsubscribe = (navigation as any)?.addListener?.('tabPress', () => {
+      if ((navigation as any)?.isFocused?.()) {
+        if (activeTab === 'Communities') {
+          communitiesScrollRef.current?.scrollTo({ y: 0, animated: true });
+        } else if (activeTab === 'Events') {
+          eventsScrollRef.current?.scrollTo({ y: 0, animated: true });
+        } else {
+          postsScrollRef.current?.scrollTo({ y: 0, animated: true });
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigation, activeTab]);
+
+  useEffect(() => {
+    if (params.tab === 'events') handleSelectTab('Events');
+    else if (params.tab === 'posts' || params.tab === 'hangouts') handleSelectTab('Posts');
+    else if (params.tab === 'communities') handleSelectTab('Communities');
   }, [params.tab]);
 
+  // Decoupled fetch: fetch base communities, events, and posts without wiping on query
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [commData, hangData] = await Promise.all([
-        communitiesService.list({ q: search || undefined, limit: 30 }).catch(() => []),
-        hangoutsService.list({ limit: 30 }).catch(() => []),
-      ]);
-
+      const commData = await communitiesService.list({ limit: 50 }).catch(() => []);
       const realComms = commData || [];
-      const realHangs = hangData || [];
       setCommunities(realComms);
-      setHangouts(realHangs);
 
       if (realComms.length > 0) {
         try {
-          const evPromises = realComms.slice(0, 5).map((c) =>
-            eventsService.listByCommunity(c.slug, { limit: 10 }).catch(() => [])
+          const evPromises = realComms.slice(0, 12).map((c) =>
+            eventsService.listByCommunity(c.slug, { limit: 12 }).then((evs) =>
+              (Array.isArray(evs) ? evs : (evs as any)?.data || []).map((e: any) => ({
+                ...e,
+                community: c,
+                communityName: c.name,
+                communityCategory: c.category?.name || c.category,
+                communitySlug: c.slug,
+                communityAvatar:
+                  c.profile_picture_url ||
+                  (c as any).profilePictureUrl ||
+                  (c as any).cover_image_url ||
+                  (c as any).coverImageUrl ||
+                  (c as any).banner_url,
+              }))
+            ).catch(() => [])
           );
-          const evResults = await Promise.all(evPromises);
+
+          const postPromises = realComms.slice(0, 12).map((c) =>
+            postsService.listByCommmunity(c.slug, { limit: 12 }).then((pList) =>
+              (Array.isArray(pList) ? pList : (pList as any)?.data || []).map((p: any) => ({
+                ...p,
+                community: c,
+                communityName: c.name,
+                communityCategory: c.category?.name || c.category,
+                communitySlug: c.slug,
+              }))
+            ).catch(() => [])
+          );
+
+          const [evResults, postResults] = await Promise.all([
+            Promise.all(evPromises),
+            Promise.all(postPromises),
+          ]);
+
           setEvents(evResults.flat());
+          const flatPosts = postResults.flat();
+          setPosts(flatPosts);
         } catch {
           setEvents([]);
+          setPosts([]);
         }
       } else {
         setEvents([]);
+        setPosts([]);
       }
     } catch {
       setCommunities([]);
       setEvents([]);
-      setHangouts([]);
+      setPosts([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [search]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -103,92 +200,178 @@ export default function ExploreScreen() {
     fetchData();
   };
 
-  const toggleCommunityJoin = (commId: string) => {
-    setJoinedCommunities((prev) => ({ ...prev, [commId]: !prev[commId] }));
+  const toggleCommunityJoin = async (comm: any) => {
+    const currentlyJoined =
+      joinedCommunities[comm.id] !== undefined
+        ? joinedCommunities[comm.id]
+        : Boolean(comm.isMember);
+    const nextJoined = !currentlyJoined;
+
+    setJoinedCommunities((prev) => ({ ...prev, [comm.id]: nextJoined }));
+
+    setCommunities((prev) =>
+      prev.map((c) =>
+        c.id === comm.id
+          ? {
+              ...c,
+              memberCount: Math.max(0, (c.memberCount || 0) + (nextJoined ? 1 : -1)),
+            }
+          : c
+      )
+    );
+
+    try {
+      if (nextJoined) {
+        await communitiesService.join(comm.slug);
+      } else {
+        await communitiesService.leave(comm.slug);
+      }
+    } catch {
+      // Revert on failure
+      setJoinedCommunities((prev) => ({ ...prev, [comm.id]: currentlyJoined }));
+      setCommunities((prev) =>
+        prev.map((c) =>
+          c.id === comm.id
+            ? {
+                ...c,
+                memberCount: Math.max(0, (c.memberCount || 0) + (currentlyJoined ? 1 : -1)),
+              }
+            : c
+        )
+      );
+    }
   };
 
   const toggleEventSave = (eventId: string) => {
     setSavedEvents((prev) => ({ ...prev, [eventId]: !prev[eventId] }));
   };
 
-  // Filter items by category
+  const handleToggleLike = async (postId: string) => {
+    const post = posts.find((p) => p.id === postId);
+    const initialLiked = Boolean(post?.hasReacted || post?.isLiked || post?.has_reacted);
+    const currentlyLiked = globalLiked[postId] ?? likedPosts[postId] ?? initialLiked;
+    const baseLikes = post?.likesCount ?? post?.reactionCount ?? 0;
+    const nextLiked = !currentlyLiked;
+
+    setLikedPosts((prev) => ({ ...prev, [postId]: nextLiked }));
+    try {
+      await toggleLike(postId, currentlyLiked, baseLikes);
+    } catch {
+      setLikedPosts((prev) => ({ ...prev, [postId]: currentlyLiked }));
+    }
+  };
+
+  const handleToggleSave = async (postId: string) => {
+    const post = posts.find((p) => p.id === postId);
+    const initialSaved = Boolean(post?.isSaved || post?.hasSaved || post?.is_saved);
+    const currentlySaved = globalSaved[postId] ?? savedPosts[postId] ?? initialSaved;
+    const nextSaved = !currentlySaved;
+
+    setSavedPosts((prev) => ({ ...prev, [postId]: nextSaved }));
+    try {
+      await toggleSave(postId, currentlySaved);
+    } catch {
+      setSavedPosts((prev) => ({ ...prev, [postId]: currentlySaved }));
+    }
+  };
+
+  // Memory filtering decoupled across all tabs
   const filteredCommunities = communities.filter((comm) => {
-    if (selectedCategory === 'All') return true;
-    const shortCat = formatCategoryName(comm.category, true);
-    return shortCat.toLowerCase() === selectedCategory.toLowerCase();
+    if (selectedCategory !== 'All') {
+      const shortCat = formatCategoryName(comm.category, true);
+      if (shortCat.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const nameMatch = comm.name?.toLowerCase().includes(q);
+      const descMatch = comm.description?.toLowerCase().includes(q);
+      const catMatch = formatCategoryName(comm.category, false).toLowerCase().includes(q);
+      return Boolean(nameMatch || descMatch || catMatch);
+    }
+    return true;
   });
 
   const filteredEvents = events.filter((ev) => {
-    if (selectedCategory === 'All') return true;
-    const cat = ev.community?.category || ev.category;
-    const shortCat = formatCategoryName(cat, true);
-    return shortCat.toLowerCase() === selectedCategory.toLowerCase();
+    if (selectedCategory !== 'All') {
+      const cat = ev.community?.category || ev.category;
+      const shortCat = formatCategoryName(cat, true);
+      if (shortCat.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const titleMatch = ev.title?.toLowerCase().includes(q);
+      const descMatch = ev.description?.toLowerCase().includes(q);
+      const locMatch = (ev.location?.place_name || ev.locationName || '').toLowerCase().includes(q);
+      const commMatch = (ev.communityName || ev.community?.name || '').toLowerCase().includes(q);
+      return Boolean(titleMatch || descMatch || locMatch || commMatch);
+    }
+    return true;
   });
 
-  const filteredHangouts = hangouts.filter((h) => {
-    if (selectedCategory === 'All') return true;
-    if (!h.community?.category) return true;
-    const shortCat = formatCategoryName(h.community.category, true);
-    return shortCat.toLowerCase() === selectedCategory.toLowerCase();
+  const filteredPosts = posts.filter((p) => {
+    if (selectedCategory !== 'All') {
+      const cat = p.community?.category?.name || p.community?.category || p.communityCategory;
+      const shortCat = formatCategoryName(cat, true);
+      if (shortCat.toLowerCase() !== selectedCategory.toLowerCase()) return false;
+    }
+    if (search.trim()) {
+      const query = search.toLowerCase();
+      const titleMatch = p.title?.toLowerCase().includes(query);
+      const contentMatch = p.content?.toLowerCase().includes(query);
+      const authorMatch = (p.authorName || `${p.author?.first_name || ''} ${p.author?.last_name || ''}`).toLowerCase().includes(query);
+      const commMatch = (p.communityName || p.community?.name || '').toLowerCase().includes(query);
+      const tagMatch = Array.isArray(p.tags) && p.tags.some((t: any) => {
+        const name = typeof t === 'string' ? t : (t?.name || t?.tag?.name || '');
+        return name.toLowerCase().includes(query);
+      });
+      return Boolean(titleMatch || contentMatch || authorMatch || commMatch || tagMatch);
+    }
+    return true;
   });
 
   return (
-    <View style={styles.screen}>
-      <AppHeader breadcrumb="Explore" />
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.primaryContainer}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Sub-tab Navigation Row */}
-        <View style={styles.subTabRow}>
-          {SUB_TABS.map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <TouchableOpacity
-                key={tab}
-                style={styles.subTabButton}
-                onPress={() => setActiveTab(tab)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.subTabText, isActive && styles.subTabTextActive]}>
-                  {tab}
-                </Text>
-                {isActive && <View style={styles.activeIndicator} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <MaterialIcons name="search" size={20} color={Colors.tertiary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={`Search ${activeTab.toLowerCase()}...`}
-            placeholderTextColor={Colors.tertiary}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            onSubmitEditing={fetchData}
-            underlineColorAndroid="transparent"
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* Sub-tab Navigation Row */}
+      <View style={styles.subTabRow}>
+        {SUB_TABS.map((tab) => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={styles.subTabButton}
+              onPress={() => handleSelectTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, isActive && styles.subTabTextActive]}>
+                {tab}
+              </Text>
+              {isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
-          ) : null}
-        </View>
+          );
+        })}
+      </View>
 
-        {/* Category Filter Chips */}
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <MaterialIcons name="search" size={20} color={Colors.tertiary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={`Search ${activeTab.toLowerCase()}...`}
+          placeholderTextColor={Colors.tertiary}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          underlineColorAndroid="transparent"
+        />
+        {search ? (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Category Filter Chips */}
+      <View style={styles.categoryChipsWrapper}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -215,312 +398,352 @@ export default function ExploreScreen() {
             );
           })}
         </ScrollView>
+      </View>
 
-        {loading ? (
-          <LoadingSpinner message="Discovering..." />
-        ) : activeTab === 'Communities' ? (
-          /* Communities Feed */
-          <View style={styles.cardsFeed}>
-            {filteredCommunities.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <MaterialIcons name="groups" size={48} color={Colors.tertiary} />
-                <Text style={styles.emptyTitle}>No communities found</Text>
-                <Text style={styles.emptySubtitle}>
-                  {selectedCategory !== 'All'
-                    ? `No communities created under "${selectedCategory}" yet.`
-                    : 'No communities found in the database.'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => router.push('/new-community')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.emptyActionBtnText}>Create Community</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredCommunities.map((comm) => {
-                const isJoined = joinedCommunities[comm.id] || comm.isMember;
-                const catDisplay = formatCategoryName(comm.category, true);
-                return (
+      {/* Horizontal Swiping Pager */}
+      {loading ? (
+        <LoadingSpinner message="Discovering..." />
+      ) : (
+        <ScrollView
+          ref={horizontalScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.pager}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+            if (SUB_TABS[idx] && SUB_TABS[idx] !== activeTab) {
+              setActiveTab(SUB_TABS[idx]);
+            }
+          }}
+        >
+          {/* Page 0: Communities */}
+          <ScrollView
+            ref={communitiesScrollRef}
+            style={{ width: screenWidth }}
+            contentContainerStyle={styles.content}
+            onScroll={onExploreScroll}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={Colors.primaryContainer}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.cardsFeed}>
+              {filteredCommunities.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="groups" size={48} color={Colors.tertiary} />
+                  <Text style={styles.emptyTitle}>No communities found</Text>
+                  <Text style={styles.emptySubtitle}>
+                    {selectedCategory !== 'All'
+                      ? `No communities created under "${selectedCategory}" yet.`
+                      : 'No communities found matching your search.'}
+                  </Text>
                   <TouchableOpacity
-                    key={comm.id}
-                    style={styles.communityCard}
-                    onPress={() => router.push(`/community/${comm.slug}`)}
-                    activeOpacity={0.85}
+                    style={styles.emptyActionBtn}
+                    onPress={() => router.push('/new-community')}
+                    activeOpacity={0.8}
                   >
-                    <View style={styles.commTopRow}>
-                      <View style={styles.commMetaGroup}>
-                        <Image
-                          source={{
-                            uri:
-                              comm.profile_picture_url ||
-                              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
-                          }}
-                          style={styles.commAvatar}
-                        />
-                        <View style={styles.commTextGroup}>
-                          <Text style={styles.commName} numberOfLines={1}>
-                            {comm.name}
-                          </Text>
-                          <View style={styles.commBadgeRow}>
-                            <View style={styles.commCategoryPill}>
-                              <Text style={styles.commCategoryText} numberOfLines={1}>
-                                {catDisplay}
+                    <Text style={styles.emptyActionBtnText}>Create Community</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                filteredCommunities.map((comm) => {
+                  const isJoined =
+                    joinedCommunities[comm.id] !== undefined
+                      ? joinedCommunities[comm.id]
+                      : Boolean(comm.isMember);
+                  const catDisplay = formatCategoryName(comm.category, true);
+                  return (
+                    <TouchableOpacity
+                      key={comm.id}
+                      style={styles.communityCard}
+                      onPress={() => router.push(`/community/${comm.slug}`)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.commTopRow}>
+                        <View style={styles.commMetaGroup}>
+                          {comm.profile_picture_url || comm.profilePictureUrl || comm.cover_image_url || comm.coverImageUrl || comm.banner_url || comm.bannerUrl ? (
+                            <Image
+                              source={{
+                                uri:
+                                  comm.profile_picture_url ||
+                                  comm.profilePictureUrl ||
+                                  comm.cover_image_url ||
+                                  comm.coverImageUrl ||
+                                  comm.banner_url ||
+                                  comm.bannerUrl,
+                              }}
+                              style={styles.commAvatar}
+                            />
+                          ) : (
+                            <View style={styles.commAvatarFallback}>
+                              <MaterialIcons name="groups" size={24} color={Colors.primary} />
+                            </View>
+                          )}
+                          <View style={styles.commTextGroup}>
+                            <Text style={styles.commName} numberOfLines={1}>
+                              {comm.name}
+                            </Text>
+                            <View style={styles.commBadgeRow}>
+                              <View style={styles.commCategoryPill}>
+                                <Text style={styles.commCategoryText}>{catDisplay}</Text>
+                              </View>
+                              <Text style={styles.commMemberCount}>
+                                {comm.memberCount || comm.membersCount || 1} members
                               </Text>
                             </View>
-                            <Text style={styles.commMemberCount}>
-                              {comm.memberCount || 0} members
-                            </Text>
                           </View>
                         </View>
-                      </View>
 
-                      {/* Joined / Join Button */}
-                      <TouchableOpacity
-                        style={[styles.joinToggleBtn, isJoined ? styles.btnJoined : styles.btnNotJoined]}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          toggleCommunityJoin(comm.id);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        {isJoined && (
-                          <MaterialIcons
-                            name="check-circle"
-                            size={15}
-                            color={Colors.primaryContainer}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.joinToggleText,
-                            isJoined ? styles.btnJoinedText : styles.btnNotJoinedText,
-                          ]}
-                        >
-                          {isJoined ? 'Joined' : 'Join'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <Text style={styles.commDescription} numberOfLines={2}>
-                      {comm.description || 'Welcome to this community! Join to engage in discussions.'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </View>
-        ) : activeTab === 'Events' ? (
-          /* Events Feed */
-          <View style={styles.cardsFeed}>
-            {filteredEvents.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <MaterialIcons name="event" size={48} color={Colors.tertiary} />
-                <Text style={styles.emptyTitle}>No events scheduled</Text>
-                <Text style={styles.emptySubtitle}>
-                  {selectedCategory !== 'All'
-                    ? `No events scheduled under "${selectedCategory}".`
-                    : 'No upcoming events found in the database.'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => router.push('/new-event')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.emptyActionBtnText}>Plan an Event</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredEvents.map((event) => {
-                const isSaved = savedEvents[event.id] || event.isSaved;
-                return (
-                  <TouchableOpacity
-                    key={event.id}
-                    style={styles.eventCard}
-                    onPress={() => router.push({ pathname: '/event/[id]', params: { id: event.id, slug: event.community?.slug || event.communitySlug } } as any)}
-                    activeOpacity={0.9}
-                  >
-                    <View style={styles.eventCoverWrapper}>
-                      <Image
-                        source={{
-                          uri:
-                            event.cover_image_url ||
-                            event.coverImageUrl ||
-                            'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                        }}
-                        style={styles.eventCover}
-                      />
-                      <View style={styles.eventAccessBadge}>
-                        <View
-                          style={[
-                            styles.accessDot,
-                            { backgroundColor: event.isPublic !== false ? Colors.success : Colors.secondary },
-                          ]}
-                        />
-                        <Text
-                          style={[
-                            styles.accessText,
-                            { color: event.isPublic !== false ? Colors.success : Colors.secondary },
-                          ]}
-                        >
-                          {event.isPublic !== false ? 'Public' : 'Community'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.eventContent}>
-                      <View style={styles.eventCommunityRow}>
-                        <View style={styles.commMiniIcon}>
-                          <Text style={styles.commMiniIconText}>
-                            {(event.community?.name || event.communityName || 'N')[0]}
-                          </Text>
-                        </View>
-                        <Text style={styles.eventCommunityName}>
-                          {event.community?.name || event.communityName || 'Nexus Community'}
-                        </Text>
-                      </View>
-
-                      <Text style={styles.eventTitle}>{event.title}</Text>
-                      <Text style={styles.eventDateTime}>{event.dateText || (event.starts_at ? new Date(event.starts_at).toLocaleDateString() : 'Upcoming')}</Text>
-
-                      {(event.location?.place_name || event.location) && (
-                        <View style={styles.locationRow}>
-                          <MaterialIcons name="location-on" size={16} color={Colors.secondary} />
-                          <Text style={styles.locationText} numberOfLines={1}>
-                            {event.location?.place_name || event.location}
-                          </Text>
-                        </View>
-                      )}
-
-                      <View style={styles.eventBottomRow}>
-                        <View style={styles.goingRow}>
-                          <MaterialIcons name="group" size={18} color={Colors.onSurfaceVariant} />
-                          <Text style={styles.goingText}>{event.participantsCount ? `${event.participantsCount} going` : 'Upcoming'}</Text>
-                        </View>
                         <TouchableOpacity
-                          style={styles.bookmarkBtn}
-                          onPress={(e) => {
-                            e.stopPropagation?.();
-                            toggleEventSave(event.id);
-                          }}
-                          activeOpacity={0.7}
+                          style={[
+                            styles.joinToggleBtn,
+                            isJoined ? styles.btnJoined : styles.btnNotJoined,
+                          ]}
+                          onPress={() => toggleCommunityJoin(comm)}
+                          activeOpacity={0.8}
                         >
                           <MaterialIcons
-                            name={isSaved ? 'bookmark' : 'bookmark-border'}
-                            size={22}
-                            color={isSaved ? Colors.primaryContainer : Colors.tertiary}
+                            name={isJoined ? 'check' : 'add'}
+                            size={16}
+                            color={isJoined ? Colors.primaryContainer : Colors.onPrimaryContainer}
                           />
+                          <Text
+                            style={[
+                              styles.joinToggleText,
+                              isJoined ? styles.btnJoinedText : styles.btnNotJoinedText,
+                            ]}
+                          >
+                            {isJoined ? 'Joined' : 'Join'}
+                          </Text>
                         </TouchableOpacity>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            )}
-          </View>
-        ) : (
-          /* Hangouts Feed */
-          <View style={styles.cardsFeed}>
-            <View style={styles.hangoutStatusBanner}>
-              <View style={styles.beaconRow}>
-                <View style={styles.pingDot} />
-                <Text style={styles.beaconTitle}>
-                  {filteredHangouts.length} {filteredHangouts.length === 1 ? 'Hangout' : 'Hangouts'} Near You
-                </Text>
-              </View>
-            </View>
 
-            {filteredHangouts.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <MaterialIcons name="explore" size={48} color={Colors.tertiary} />
-                <Text style={styles.emptyTitle}>No hangouts active right now</Text>
-                <Text style={styles.emptySubtitle}>
-                  {selectedCategory !== 'All'
-                    ? `No hangouts active in the "${selectedCategory}" category.`
-                    : 'Be the first to host a hangout in your area!'}
-                </Text>
-                <TouchableOpacity
-                  style={styles.emptyActionBtn}
-                  onPress={() => router.push('/new-hangout')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.emptyActionBtnText}>Host a Hangout</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              filteredHangouts.map((h) => {
-                const isOpen = h.isOpen ?? (h.joinType === 'OPEN' || h.join_type === 'OPEN' || h.joinType === 'open' || h.join_type === 'open');
-                return (
+                      {comm.description ? (
+                        <Text style={styles.commDescription} numberOfLines={2}>
+                          {comm.description}
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Page 1: Events */}
+          <ScrollView
+            ref={eventsScrollRef}
+            style={{ width: screenWidth }}
+            contentContainerStyle={styles.content}
+            onScroll={onExploreScroll}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={Colors.primaryContainer}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.cardsFeed}>
+              {filteredEvents.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="event" size={48} color={Colors.tertiary} />
+                  <Text style={styles.emptyTitle}>No events found</Text>
+                  <Text style={styles.emptySubtitle}>
+                    {selectedCategory !== 'All'
+                      ? `No events scheduled under "${selectedCategory}" yet.`
+                      : 'No events matching your search.'}
+                  </Text>
                   <TouchableOpacity
-                    key={h.id}
-                    style={styles.hangoutFeedCard}
-                    onPress={() => router.push(`/hangout/${h.id}`)}
-                    activeOpacity={0.9}
+                    style={styles.emptyActionBtn}
+                    onPress={() => router.push('/new-event')}
+                    activeOpacity={0.8}
                   >
-                    <View style={styles.hangoutTopRow}>
-                      <View style={styles.hangoutHostInfo}>
-                        <Image
-                          source={{
-                            uri:
-                              h.creatorAvatar ||
-                              h.creator?.profile_picture_url ||
-                              'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-                          }}
-                          style={styles.hostAvatar}
-                        />
-                        <View>
-                          <Text style={styles.hostName}>
-                            {h.creatorName || h.creator?.first_name || 'Host'}
+                    <Text style={styles.emptyActionBtnText}>Plan an Event</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                sortItemsByDate(filteredEvents).map((event: any) => {
+                  const dateInfo = categorizeItemByDate(event);
+                  const isSaved = savedEvents[event.id] ?? false;
+                  return (
+                    <TouchableOpacity
+                      key={event.id}
+                      style={[styles.eventCard, dateInfo.isPassed && { opacity: 0.6 }]}
+                      onPress={() => router.push(`/event/${event.id}`)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.eventCoverWrapper}>
+                        {(() => {
+                          const coverUrl =
+                            event.cover_image_url ||
+                            event.coverImageUrl ||
+                            event.community?.banner_url ||
+                            event.community?.bannerUrl ||
+                            event.community?.cover_image_url ||
+                            event.community?.coverImageUrl ||
+                            'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800';
+                          return (
+                            <Image
+                              source={{ uri: coverUrl }}
+                              style={styles.eventCover}
+                            />
+                          );
+                        })()}
+                        <View style={styles.eventAccessBadge}>
+                          <View
+                            style={[
+                              styles.accessDot,
+                              {
+                                backgroundColor:
+                                  event.isPublic !== false ? Colors.success : Colors.secondary,
+                              },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.accessText,
+                              { color: event.isPublic !== false ? Colors.success : Colors.secondary },
+                            ]}
+                          >
+                            {event.isPublic !== false ? 'Public' : 'Community'}
                           </Text>
-                          <Text style={styles.hostSub}>created this</Text>
                         </View>
                       </View>
-                      <View style={styles.distanceBadge}>
-                        <MaterialIcons name="near-me" size={14} color={Colors.tertiary} />
-                        <Text style={styles.distanceText}>{h.distanceText || (h.location?.place_name ? h.location.place_name.slice(0, 15) : 'Nearby')}</Text>
-                      </View>
-                    </View>
 
-                    <Text style={styles.hangoutFeedTitle}>{h.title}</Text>
-                    <Text style={styles.hangoutFeedDesc} numberOfLines={2}>
-                      {h.description || "Let's hang out and connect!"}
-                    </Text>
+                      <View style={styles.eventContent}>
+                        {(() => {
+                          const commAvatar =
+                            event.communityAvatar ||
+                            event.community?.profile_picture_url ||
+                            event.community?.profilePictureUrl ||
+                            event.community?.cover_image_url ||
+                            event.community?.coverImageUrl ||
+                            event.community?.banner_url ||
+                            event.community?.bannerUrl;
+                          const commName = event.communityName || event.community?.name || 'Nexus Community';
+                          return (
+                            <View style={styles.eventCommunityRow}>
+                              {commAvatar ? (
+                                <Image source={{ uri: commAvatar }} style={styles.eventCommunityAvatar} />
+                              ) : (
+                                <View style={styles.eventCommunityAvatarFallback}>
+                                  <MaterialIcons name="groups" size={14} color={Colors.primary} />
+                                </View>
+                              )}
+                              <Text style={styles.eventCommunityName} numberOfLines={1}>
+                                {commName}
+                              </Text>
+                            </View>
+                          );
+                        })()}
 
-                    <View style={styles.hangoutScheduleTag}>
-                      <MaterialIcons name="schedule" size={14} color={Colors.tertiary} />
-                      <Text style={styles.hangoutScheduleText}>{h.timeText || (h.starts_at ? new Date(h.starts_at).toLocaleDateString() : 'Today')}</Text>
-                    </View>
-
-                    <View style={styles.hangoutFooterRow}>
-                      <Text style={styles.hangoutSpotsText}>
-                        {h.spotsText || `${h.participantsCount || 1}/${h.maxParticipants || 10} spots`}
-                      </Text>
-                      <TouchableOpacity
-                        style={[
-                          styles.hangoutJoinBtn,
-                          isOpen ? styles.hangoutBtnGold : styles.hangoutBtnBlue,
-                        ]}
-                        onPress={() => router.push(`/hangout/${h.id}`)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.hangoutJoinBtnText,
-                            isOpen ? styles.hangoutTextGold : styles.hangoutTextBlue,
-                          ]}
-                        >
-                          {isOpen ? 'Join' : 'Request'}
+                        <Text style={styles.eventTitle}>{event.title}</Text>
+                        <Text style={[styles.eventDateTime, dateInfo.isPassed && { color: Colors.outline }]}>
+                          {dateInfo.dateText}
                         </Text>
-                      </TouchableOpacity>
-                    </View>
+
+                        {(event.location?.place_name || event.location) && (
+                          <View style={styles.locationRow}>
+                            <MaterialIcons name="location-on" size={16} color={Colors.secondary} />
+                            <Text style={styles.locationText} numberOfLines={1}>
+                              {event.location?.place_name || event.location}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.eventBottomRow}>
+                          <View style={styles.goingRow}>
+                            <MaterialIcons name="group" size={18} color={Colors.onSurfaceVariant} />
+                            <Text style={styles.goingText}>
+                              {`${event.participantsCount ?? event.participantCount ?? 0} ${dateInfo.isPassed ? 'went' : 'going'}`}
+                            </Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.bookmarkBtn}
+                            onPress={(e) => {
+                              e.stopPropagation?.();
+                              toggleEventSave(event.id);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <MaterialIcons
+                              name={isSaved ? 'bookmark' : 'bookmark-border'}
+                              size={22}
+                              color={isSaved ? Colors.primaryContainer : Colors.tertiary}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Page 2: Posts */}
+          <ScrollView
+            ref={postsScrollRef}
+            style={{ width: screenWidth }}
+            contentContainerStyle={styles.content}
+            onScroll={onExploreScroll}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={Colors.primaryContainer}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.discussionsFeed}>
+              {filteredPosts.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <MaterialIcons name="forum" size={48} color={Colors.tertiary} />
+                  <Text style={styles.emptyTitle}>No posts found</Text>
+                  <Text style={styles.emptySubtitle}>
+                    {selectedCategory !== 'All'
+                      ? `No posts shared under "${selectedCategory}" yet.`
+                      : search
+                      ? `No posts matching "${search}".`
+                      : 'No discussions found in the explore feed.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.emptyActionBtn}
+                    onPress={() => router.push('/new-post')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.emptyActionBtnText}>Create Post</Text>
                   </TouchableOpacity>
-                );
-              })
-            )}
-          </View>
-        )}
-      </ScrollView>
+                </View>
+              ) : (
+                filteredPosts.map((post: any) => (
+                  <FeedDiscussionCard
+                    key={post.id}
+                    post={post}
+                    isLiked={globalLiked[post.id] ?? likedPosts[post.id] ?? post.hasReacted}
+                    isSaved={globalSaved[post.id] ?? savedPosts[post.id] ?? post.isSaved}
+                    onToggleLike={handleToggleLike}
+                    onToggleSave={handleToggleSave}
+                    onPressPost={(id) => router.push(`/post/${id}`)}
+                    onPressCommunity={(slug) => router.push(`/community/${slug}`)}
+                  />
+                ))
+              )}
+            </View>
+          </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -530,11 +753,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface,
   },
-  container: {
+  pager: {
     flex: 1,
   },
   content: {
-    paddingBottom: 48,
+    paddingBottom: 60,
   },
   subTabRow: {
     flexDirection: 'row',
@@ -588,6 +811,9 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
     ...Typography.bodyMd,
     color: Colors.onSurface,
+  },
+  categoryChipsWrapper: {
+    height: 48,
   },
   categoryScroll: {
     paddingHorizontal: Spacing.md,
@@ -648,6 +874,14 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: Colors.surfaceContainerHigh,
+  },
+  commAvatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(232, 167, 54, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   commTextGroup: {
     flex: 1,
@@ -761,18 +995,19 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 4,
   },
-  commMiniIcon: {
+  eventCommunityAvatar: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: Colors.surfaceContainerHigh,
+  },
+  eventCommunityAvatarFallback: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(232, 167, 54, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  commMiniIconText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.secondary,
   },
   eventCommunityName: {
     ...Typography.labelMd,
@@ -825,125 +1060,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Hangouts
-  hangoutStatusBanner: {
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  beaconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.success,
-  },
-  beaconTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onSurfaceVariant,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  hangoutFeedCard: {
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  hangoutTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  hangoutHostInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  hostAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  hostName: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  hostSub: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-  },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  distanceText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-  },
-  hangoutFeedTitle: {
-    ...Typography.headlineSm,
-    fontSize: 18,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  hangoutFeedDesc: {
-    ...Typography.bodyMd,
-    color: Colors.tertiary,
-    lineHeight: 20,
-  },
-  hangoutScheduleTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  hangoutScheduleText: {
-    ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
-  },
-  hangoutFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(105, 92, 80, 0.15)',
-  },
-  hangoutSpotsText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  hangoutJoinBtn: {
-    height: 32,
-    paddingHorizontal: 16,
-    borderRadius: BorderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hangoutBtnGold: {
-    backgroundColor: Colors.primaryContainer,
-  },
-  hangoutBtnBlue: {
-    backgroundColor: Colors.secondary,
-  },
-  hangoutJoinBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  hangoutTextGold: {
-    color: Colors.onPrimaryContainer,
-  },
-  hangoutTextBlue: {
-    color: Colors.surface,
+  // Posts Feed — Matches Home Feed "What people are saying"
+  discussionsFeed: {
+    paddingHorizontal: Spacing.md,
+    gap: 12,
   },
   emptyContainer: {
     paddingVertical: Spacing.xl,

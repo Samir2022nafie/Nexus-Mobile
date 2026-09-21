@@ -5,9 +5,9 @@ import api from './api';
 import { Post, CreatePostDto, UpdatePostDto, PostListParams } from '../types';
 
 export const postsService = {
-  /** GET /communities/:slug/posts */
-  listByCommmunity(slug: string, params?: PostListParams): Promise<Post[]> {
-    return api.get<Post[]>(`/communities/${slug}/posts`, params as Record<string, any>);
+  async listByCommmunity(slug: string, params?: PostListParams): Promise<Post[]> {
+    const res = await api.get<any>(`/communities/${slug}/posts`, params as Record<string, any>);
+    return Array.isArray(res) ? res : (res?.data || []);
   },
 
   /** GET /posts/:id */

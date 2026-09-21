@@ -26,6 +26,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/const
 import { useAuth } from '../src/context/AuthContext';
 import { usersService } from '../src/services/users';
 import { ApiRequestError } from '../src/services/api';
+import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -33,11 +34,10 @@ export default function EditProfileScreen() {
   const { user, updateUser, logout } = useAuth();
 
   const [form, setForm] = useState({
-    firstName: user?.first_name || 'Sarah',
-    lastName: user?.last_name || 'Martinez',
-    bio:
-      user?.bio ||
-      'Trail runner, café sketcher, and weekend camper. Always looking for the next adventure ⛰️',
+    firstName: user?.first_name || '',
+    lastName: user?.last_name || '',
+    bio: user?.bio || '',
+    profilePictureUrl: user?.profile_picture_url || '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,6 +50,7 @@ export default function EditProfileScreen() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         bio: form.bio.trim(),
+        profilePictureUrl: form.profilePictureUrl.trim() || undefined,
       });
       updateUser(updated);
       router.back();
@@ -63,6 +64,7 @@ export default function EditProfileScreen() {
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
           bio: form.bio.trim(),
+          profile_picture_url: form.profilePictureUrl.trim() || user?.profile_picture_url,
         } as any);
         router.back();
       }
@@ -125,6 +127,7 @@ export default function EditProfileScreen() {
             <Image
               source={{
                 uri:
+                  form.profilePictureUrl ||
                   user?.profile_picture_url ||
                   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
               }}
@@ -194,14 +197,30 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {/* Profile Picture URL (Read-only) */}
+          {/* Profile Picture URL (Unlocked) */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>PROFILE PICTURE URL</Text>
-            <View style={[styles.inputBox, styles.readOnlyBox]}>
-              <Text style={styles.readOnlyText} numberOfLines={1}>
-                {user?.profile_picture_url || 'https://storage.nexus.app/uploads/sarah_avatar.webp'}
-              </Text>
-              <MaterialIcons name="lock" size={18} color={Colors.tertiary} />
+            <View style={styles.inputBox}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="https://example.com/avatar.jpg"
+                placeholderTextColor={Colors.outline}
+                value={form.profilePictureUrl}
+                onChangeText={(v) => {
+                  const direct = extractDirectImageUrl(v);
+                  setForm((p) => ({ ...p, profilePictureUrl: direct }));
+                  if (v.trim().startsWith('http') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(v.trim())) {
+                    resolveImageUrl(v.trim()).then((resolved) => {
+                      if (resolved && resolved.startsWith('http')) {
+                        setForm((p) => ({ ...p, profilePictureUrl: resolved }));
+                      }
+                    });
+                  }
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <MaterialIcons name="link" size={18} color={Colors.tertiary} />
             </View>
           </View>
 

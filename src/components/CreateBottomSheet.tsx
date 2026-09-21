@@ -60,9 +60,14 @@ const CREATE_OPTIONS: CreateOption[] = [
 interface CreateBottomSheetProps {
   visible: boolean;
   onClose: () => void;
+  communityContext?: {
+    id: string;
+    slug: string;
+    name: string;
+  };
 }
 
-export function CreateBottomSheet({ visible, onClose }: CreateBottomSheetProps) {
+export function CreateBottomSheet({ visible, onClose, communityContext }: CreateBottomSheetProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -154,7 +159,18 @@ export function CreateBottomSheet({ visible, onClose }: CreateBottomSheetProps) 
       setIsRendered(false);
       isClosingRef.current = false;
       onClose();
-      router.push(route as any);
+      if (route === '/new-post' && communityContext) {
+        router.push({
+          pathname: '/new-post',
+          params: {
+            communityId: communityContext.id,
+            communitySlug: communityContext.slug,
+            communityName: communityContext.name,
+          },
+        } as any);
+      } else {
+        router.push(route as any);
+      }
     });
   };
 

@@ -3,7 +3,7 @@
  * Matches Stitch create modal aesthetics
  * Backend: POST /communities
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
   TouchableOpacity,
   Switch,
   TextInput,
+  Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
@@ -21,10 +22,13 @@ import { Button } from '../src/components/ui/Button';
 import { communitiesService } from '../src/services/communities';
 import { ApiRequestError } from '../src/services/api';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
+import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 
 export default function NewCommunityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ slug?: string }>();
+  const isEditing = Boolean(params.slug);
 
   const [form, setForm] = useState({
     name: '',
@@ -32,16 +36,45 @@ export default function NewCommunityScreen() {
     description: '',
     rules: '',
     categoryId: BACKEND_CATEGORIES[0].id,
+    profilePictureUrl: '',
+    bannerUrl: '',
     isPrivate: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEditing);
   const [generalError, setGeneralError] = useState('');
+
+  useEffect(() => {
+    if (!isEditing || !params.slug) return;
+    communitiesService
+      .getBySlug(params.slug)
+      .then((c) => {
+        if (c) {
+          setForm({
+            name: c.name || '',
+            slug: c.slug || '',
+            description: c.description || '',
+            rules: c.rules || '',
+            categoryId: (c as any).category_id || (c as any).categoryId || BACKEND_CATEGORIES[0].id,
+            profilePictureUrl: c.profile_picture_url || (c as any).profilePictureUrl || '',
+            bannerUrl: c.banner_url || (c as any).bannerUrl || '',
+            isPrivate: Boolean(c.is_private ?? (c as any).isPrivate),
+          });
+        }
+      })
+      .catch(() => {
+        setGeneralError('Could not load community details');
+      })
+      .finally(() => {
+        setInitialLoading(false);
+      });
+  }, [params.slug, isEditing]);
 
   const updateField = (field: string, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: '' }));
-    if (field === 'name') {
+    if (field === 'name' && !isEditing) {
       setForm((prev) => ({
         ...prev,
         slug: (value as string)
@@ -55,9 +88,11 @@ export default function NewCommunityScreen() {
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = 'Community name is required';
-    if (!form.slug.trim()) errs.slug = 'Slug is required';
-    if (!/^[a-z0-9-]+$/.test(form.slug))
-      errs.slug = 'Only lowercase letters, numbers, and hyphens';
+    if (!isEditing) {
+      if (!form.slug.trim()) errs.slug = 'Slug is required';
+      if (!/^[a-z0-9-]+$/.test(form.slug))
+        errs.slug = 'Only lowercase letters, numbers, and hyphens';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -67,14 +102,27 @@ export default function NewCommunityScreen() {
     setLoading(true);
     setGeneralError('');
     try {
-      await communitiesService.create({
-        name: form.name.trim(),
-        slug: form.slug.trim(),
-        description: form.description.trim() || undefined,
-        rules: form.rules.trim() || undefined,
-        isPrivate: form.isPrivate,
-        categoryId: form.categoryId,
-      });
+      if (isEditing && params.slug) {
+        await communitiesService.update(params.slug, {
+          name: form.name.trim(),
+          description: form.description.trim() || undefined,
+          rules: form.rules.trim() || undefined,
+          isPrivate: form.isPrivate,
+          profilePictureUrl: form.profilePictureUrl.trim() || undefined,
+          bannerUrl: form.bannerUrl.trim() || undefined,
+        } as any);
+      } else {
+        await communitiesService.create({
+          name: form.name.trim(),
+          slug: form.slug.trim(),
+          description: form.description.trim() || undefined,
+          rules: form.rules.trim() || undefined,
+          isPrivate: form.isPrivate,
+          categoryId: form.categoryId,
+          profilePictureUrl: form.profilePictureUrl.trim() || undefined,
+          bannerUrl: form.bannerUrl.trim() || undefined,
+        });
+      }
       router.back();
     } catch (err) {
       if (err instanceof ApiRequestError && err.details) {
@@ -85,7 +133,7 @@ export default function NewCommunityScreen() {
         setErrors(fieldErrors);
       } else {
         setGeneralError(
-          err instanceof ApiRequestError ? err.message : 'Failed to create community'
+          err instanceof ApiRequestError ? err.message : isEditing ? 'Failed to update community' : 'Failed to create community'
         );
       }
     } finally {
@@ -104,14 +152,16 @@ export default function NewCommunityScreen() {
         >
           <MaterialIcons name="close" size={24} color={Colors.onSurface} />
         </TouchableOpacity>
-        <Text style={styles.topBarTitle}>New Community</Text>
+        <Text style={styles.topBarTitle}>{isEditing ? 'Edit Community' : 'New Community'}</Text>
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
           style={styles.createBtn}
           activeOpacity={0.8}
         >
-          <Text style={styles.createText}>{loading ? 'Creating...' : 'Create'}</Text>
+          <Text style={styles.createText}>
+            {loading ? 'Saving...' : isEditing ? 'Save' : 'Create'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -222,6 +272,72 @@ export default function NewCommunityScreen() {
           </View>
         </View>
 
+        {/* Profile Picture (Avatar) URL */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>PROFILE PICTURE URL (OPTIONAL)</Text>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="https://example.com/avatar.jpg"
+              placeholderTextColor={Colors.outline}
+              value={form.profilePictureUrl}
+              onChangeText={(v) => {
+                const direct = extractDirectImageUrl(v);
+                updateField('profilePictureUrl', direct);
+                if (v.trim().startsWith('http') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(v.trim())) {
+                  resolveImageUrl(v.trim()).then((resolved) => {
+                    if (resolved && resolved.startsWith('http')) {
+                      updateField('profilePictureUrl', resolved);
+                    }
+                  });
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <MaterialIcons name="image" size={20} color={Colors.tertiary} />
+          </View>
+          {form.profilePictureUrl.trim().startsWith('http') ? (
+            <View style={styles.avatarPreviewBox}>
+              <Image source={{ uri: form.profilePictureUrl.trim() }} style={styles.avatarPreviewImg} resizeMode="cover" />
+              <Text style={styles.previewSuccessText}>Avatar Preview</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Banner Picture URL */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>BANNER PICTURE URL (OPTIONAL)</Text>
+          <View style={styles.inputBox}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="https://example.com/banner.jpg"
+              placeholderTextColor={Colors.outline}
+              value={form.bannerUrl}
+              onChangeText={(v) => {
+                const direct = extractDirectImageUrl(v);
+                updateField('bannerUrl', direct);
+                if (v.trim().startsWith('http') && !/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(v.trim())) {
+                  resolveImageUrl(v.trim()).then((resolved) => {
+                    if (resolved && resolved.startsWith('http')) {
+                      updateField('bannerUrl', resolved);
+                    }
+                  });
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <MaterialIcons name="add-photo-alternate" size={20} color={Colors.tertiary} />
+          </View>
+          {form.bannerUrl.trim().startsWith('http') ? (
+            <View style={styles.bannerPreviewBox}>
+              <Image source={{ uri: form.bannerUrl.trim() }} style={styles.bannerPreviewImg} resizeMode="cover" />
+              <Text style={styles.previewSuccessText}>Banner Preview</Text>
+            </View>
+          ) : null}
+        </View>
+
         {/* Privacy Toggle Card */}
         <View style={styles.privacyCard}>
           <View style={{ flex: 1 }}>
@@ -239,7 +355,7 @@ export default function NewCommunityScreen() {
         </View>
 
         <Button
-          title="Create Community"
+          title={isEditing ? 'Save Changes' : 'Create Community'}
           onPress={handleSubmit}
           loading={loading}
           fullWidth
@@ -391,5 +507,37 @@ const styles = StyleSheet.create({
     color: Colors.tertiary,
     marginTop: 2,
     lineHeight: 16,
+  },
+  avatarPreviewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+  },
+  avatarPreviewImg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  bannerPreviewBox: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: Colors.surfaceContainerLow,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+  },
+  bannerPreviewImg: {
+    width: '100%',
+    height: 120,
+    borderRadius: BorderRadius.md,
+  },
+  previewSuccessText: {
+    ...Typography.captionSm,
+    color: Colors.primaryContainer,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

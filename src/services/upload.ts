@@ -23,4 +23,15 @@ export const uploadService = {
       body: blob,
     });
   },
+
+  /** POST /upload/resolve-url — Resolves redirect/share links (Google, Pinterest, etc.) into direct image URLs */
+  async resolveUrl(url: string): Promise<string> {
+    try {
+      const res = await api.post<{ resolvedUrl: string }>('/upload/resolve-url', { url });
+      return res.resolvedUrl || url;
+    } catch {
+      return url;
+    }
+  },
 };
+

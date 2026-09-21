@@ -18,18 +18,22 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/theme';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { useAuth } from '../../src/context/AuthContext';
 import { eventsService } from '../../src/services/events';
 import { communitiesService } from '../../src/services/communities';
+import { formatCategoryName } from '../../src/utils/categories';
 
 export default function EventDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const { id, slug } = useLocalSearchParams<{ id: string; slug?: string }>();
 
   const [event, setEvent] = useState<any>(null);
@@ -64,12 +68,24 @@ export default function EventDetailScreen() {
       }
 
       if (targetSlug) {
-        const data = await eventsService.getById(targetSlug, id).catch(() => null);
+        const [data, comm] = await Promise.all([
+          eventsService.getById(targetSlug, id).catch(() => null),
+          communitiesService.getBySlug(targetSlug).catch(() => null),
+        ]);
         if (data) {
-          setEvent(data);
-          setIsJoined(data.isParticipant || false);
-          setIsBookmarked(data.isSaved || false);
-          setParticipantsCount((data as any).participants?.length ?? (data.participantsCount || 0));
+          const merged = {
+            ...comm,
+            ...data,
+            community: {
+              ...(comm || {}),
+              ...((data as any)?.community || {}),
+              category: ((data as any)?.community?.category || comm?.category),
+            },
+          };
+          setEvent(merged);
+          setIsJoined(merged.isParticipant || false);
+          setIsBookmarked(merged.isSaved || false);
+          setParticipantsCount((merged as any).participants?.length ?? (merged.participantsCount || 0));
         } else {
           setEvent(null);
         }
@@ -86,6 +102,41 @@ export default function EventDetailScreen() {
   useEffect(() => {
     fetchEvent();
   }, [fetchEvent]);
+
+  const isEventOrganizer = Boolean(
+    user?.id &&
+    (event?.creator_id === user.id ||
+      event?.creatorId === user.id ||
+      event?.creator?.id === user.id ||
+      event?.organizer_id === user.id ||
+      event?.organizerId === user.id ||
+      event?.organizer?.id === user.id ||
+      event?.author_id === user.id ||
+      event?.authorId === user.id ||
+      event?.author?.id === user.id)
+  );
+
+  const handleDeleteEvent = () => {
+    Alert.alert(
+      'Delete Event',
+      'Are you sure you want to delete this event? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await eventsService.delete(communitySlug, event.id);
+              router.back();
+            } catch {
+              Alert.alert('Error', 'Failed to delete event.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleToggleJoin = async () => {
     if (!event || !communitySlug) return;
@@ -147,35 +198,93 @@ export default function EventDetailScreen() {
     );
   }
 
-  // Format real event dates from database
-  const startDate = event.starts_at ? new Date(event.starts_at) : null;
-  const endDate = event.ends_at ? new Date(event.ends_at) : null;
+  // Format real event dates from database (supporting both startsAt and starts_at)
+  const rawStarts = event.startsAt || event.starts_at;
+  const rawEnds = event.endsAt || event.ends_at;
+  const startDate = rawStarts ? new Date(rawStarts) : null;
+  const endDate = rawEnds ? new Date(rawEnds) : null;
+  const now = new Date();
+  const isToday =
+    startDate &&
+    startDate.getFullYear() === now.getFullYear() &&
+    startDate.getMonth() === now.getMonth() &&
+    startDate.getDate() === now.getDate();
+  const isOngoing = startDate && startDate <= now && Boolean(endDate && endDate > now);
+  const cutoff = endDate || (startDate ? new Date(startDate.getTime() + 3 * 3600 * 1000) : null);
+  const isPassed = !isToday && !isOngoing && Boolean(cutoff && cutoff < now);
+
+  const isSameDay =
+    startDate &&
+    endDate &&
+    startDate.getFullYear() === endDate.getFullYear() &&
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getDate() === endDate.getDate();
+
   const dateText = startDate
-    ? startDate.toLocaleDateString(undefined, {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : 'Upcoming Event';
+    ? isSameDay || !endDate
+      ? startDate.toLocaleDateString(undefined, {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : `${startDate.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+        })} – ${endDate.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })}`
+    : 'Date to be announced';
+
   const timeText = startDate
-    ? `${startDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}${
-        endDate
-          ? ` – ${endDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
-          : ''
-      }`
-    : 'Time TBA';
+    ? endDate
+      ? isSameDay
+        ? `${startDate.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })} – ${endDate.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}`
+        : `Starts ${startDate.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })} · Ends ${endDate.toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+          })}`
+      : startDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : 'Time to be announced';
 
   const locationName =
+    event.location?.name ||
     event.location?.place_name ||
-    (typeof event.location === 'string' ? event.location : 'Location to be announced');
+    event.location?.address ||
+    (typeof event.location === 'string' ? event.location : '') ||
+    (event.is_online ? 'Online Event' : 'Location to be announced');
   const locationDistrict =
+    event.location?.city ||
+    (event.location?.place_name ? event.location.place_name.split(',')[0] : '') ||
     event.community?.name ||
-    (event.location?.place_name ? event.location.place_name.split(',')[0] : 'Community Event');
+    'Community Event';
 
-  const maxSpots = event.max_participants || event.maxParticipants || 50;
+  const rawMax = event.max_participants || event.maxParticipants;
+  const hasLimit = typeof rawMax === 'number' && rawMax > 0;
+  const maxSpots = hasLimit ? rawMax : null;
   const isPublic = event.visibility !== 'community' && event.visibility !== 'subcommunity';
-  const participantsList = event.participants || [];
+  const rawCategory =
+    event.community?.category?.name ||
+    event.community?.category ||
+    (event as any).communityCategory ||
+    (event as any).category ||
+    'Community';
+  const categoryLabel = formatCategoryName(rawCategory, true) || 'Community';
+
+  const participantsList = (event.participants || []).filter(
+    (p: any) => !p.status || p.status === 'approved' || p.status === 'active'
+  );
 
   return (
     <View style={styles.screen}>
@@ -195,10 +304,8 @@ export default function EventDetailScreen() {
             }}
             style={styles.heroImage}
           />
-          <View style={styles.heroGradientTop} />
-          <View style={styles.heroGradientBottom} />
 
-          {/* Quick Nav Actions */}
+          {/* Quick Nav Actions: Back Button & Author Controls */}
           <View style={[styles.heroNavRow, { top: insets.top + Spacing.xs }]}>
             <TouchableOpacity
               onPress={() => router.back()}
@@ -207,56 +314,66 @@ export default function EventDetailScreen() {
             >
               <MaterialIcons name="arrow-back" size={24} color={Colors.white} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.heroCircleBtn} activeOpacity={0.8}>
-              <MaterialIcons name="more-horiz" size={24} color={Colors.white} />
-            </TouchableOpacity>
+
+            {isEventOrganizer && (
+              <View style={styles.authorActionsRow}>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/new-event',
+                      params: { eventId: event.id, slug: communitySlug },
+                    } as any)
+                  }
+                  style={styles.heroCircleBtn}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="edit" size={20} color={Colors.white} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDeleteEvent}
+                  style={styles.heroCircleBtn}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="delete-outline" size={22} color={Colors.error} />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
-          {/* Location Chip Pill */}
-          <View style={styles.locationChipBadge}>
-            <MaterialIcons name="terrain" size={14} color={Colors.primaryContainer} />
-            <Text style={styles.locationChipText}>{locationDistrict}</Text>
+          {/* Banner Category Pill (Bottom Right) */}
+          <View style={styles.categoryChipBadge}>
+            <Text style={styles.categoryChipText}>{categoryLabel}</Text>
           </View>
         </View>
 
         {/* Event Body */}
         <View style={styles.body}>
-          {/* Title & Affiliation */}
+          {/* 1. Title */}
           <Text style={styles.eventTitle}>{event.title}</Text>
 
-          <View style={styles.organizerRow}>
-            <View style={styles.organizerGroup}>
-              <View style={styles.hikingIcon}>
-                <MaterialIcons name="person" size={18} color={Colors.onPrimaryFixed} />
-              </View>
-              <View>
-                <Text style={styles.orgLabel}>Organized by</Text>
-                <Text style={styles.orgName}>
-                  @{event.creator?.username || event.organizer || 'organizer'}
-                </Text>
-              </View>
+          {/* 2. Community Name Prominently */}
+          <TouchableOpacity
+            style={styles.communityRowProminent}
+            onPress={() => communitySlug && router.push(`/community/${communitySlug}`)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.commIconProminent}>
+              <MaterialIcons name="groups" size={20} color={Colors.primary} />
             </View>
+            <Text style={styles.communityNameProminent} numberOfLines={1}>
+              {event.community?.name || 'Nexus Community'}
+            </Text>
+          </TouchableOpacity>
 
-            {event.community?.name && (
-              <>
-                <View style={styles.dotSeparator} />
-                <TouchableOpacity
-                  style={styles.communityBadge}
-                  onPress={() => router.push(`/community/${communitySlug}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.commIconSmall}>
-                    <MaterialIcons name="groups" size={14} color={Colors.secondary} />
-                  </View>
-                  <Text style={styles.commNameText} numberOfLines={1}>
-                    {event.community.name}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+          {/* 3. Description alone in white rounded rectangle card */}
+          {event.description ? (
+            <View style={styles.descriptionCard}>
+              <Text style={styles.descriptionText}>{event.description}</Text>
+            </View>
+          ) : null}
 
-          {/* 3 Info Matrix Cards — free of white rectangular outline artifacts */}
+          {/* 4. 2 Info Matrix Cards (Date & Time, Location) */}
           <View style={styles.infoMatrix}>
             {/* Card 1: Date & Time */}
             <View style={styles.infoCard}>
@@ -283,67 +400,50 @@ export default function EventDetailScreen() {
                 </Text>
               </View>
             </View>
+          </View>
 
-            {/* Card 3: Attendees stack */}
-            <View style={styles.infoCard}>
-              <View style={styles.cardIconBox}>
-                <MaterialIcons name="group" size={22} color={Colors.onSurface} />
-              </View>
-              <View style={styles.cardTextCol}>
-                <Text style={styles.cardPrimaryText}>
-                  {participantsCount} {event.max_participants ? `of ${event.max_participants}` : ''} going
+          {/* 5. Participants in a Unique Container */}
+          <View style={styles.participantsUniqueBox}>
+            <View style={styles.participantsHeaderRow}>
+              <View style={styles.participantsTitleGroup}>
+                <View style={styles.participantsIconBox}>
+                  <MaterialIcons name="groups" size={20} color={Colors.primary} />
+                </View>
+                <Text style={styles.participantsMainTitle}>
+                  {participantsCount} {isPassed ? 'went' : hasLimit ? `of ${maxSpots} going` : 'going'}
                 </Text>
-                {participantsList.length > 0 ? (
-                  <View style={styles.avatarStackRow}>
-                    {participantsList.slice(0, 4).map((p: any, idx: number) => {
-                      const initials = `${(p.user?.first_name || p.first_name || 'U')[0]}${
-                        (p.user?.last_name || p.last_name || '')[0] || ''
-                      }`;
-                      const bgColors = [
-                        Colors.primaryContainer,
-                        Colors.secondary,
-                        Colors.tertiary,
-                        Colors.secondaryContainer,
-                      ];
-                      return (
-                        <View
-                          key={p.id || idx}
-                          style={[styles.stackAvatar, { backgroundColor: bgColors[idx % 4] }]}
-                        >
-                          <Text style={styles.stackAvatarText}>{initials}</Text>
+              </View>
+              <View style={[styles.spotsLeftBadge, !hasLimit && styles.noLimitBadge]}>
+                <Text style={[styles.spotsLeftText, !hasLimit && styles.noLimitText]}>
+                  {hasLimit ? `${Math.max(0, (maxSpots || 0) - participantsCount)} spots left` : 'No limit'}
+                </Text>
+              </View>
+            </View>
+
+            {participantsList.length > 0 ? (
+              <View style={styles.participantAvatarsGrid}>
+                {participantsList.map((p: any, idx: number) => {
+                  const avatarUrl = p.profile_picture_url || p.user?.profile_picture_url;
+                  const pName = p.user?.first_name || p.first_name || p.name || 'Member';
+                  return (
+                    <View key={p.id || idx} style={styles.participantItem}>
+                      {avatarUrl ? (
+                        <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
+                      ) : (
+                        <View style={styles.participantAvatarFallback}>
+                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
                         </View>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text style={styles.cardSecondaryText}>Be the first to join!</Text>
-                )}
+                      )}
+                      <Text style={styles.participantNameText} numberOfLines={1}>
+                        {pName}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
-            </View>
-          </View>
-
-          {/* Badges: Public / Community Access */}
-          <View style={styles.badgesRow}>
-            <View style={styles.publicBadge}>
-              <View style={styles.beaconDot} />
-              <Text style={styles.publicBadgeText}>
-                {isPublic ? 'Public Event' : 'Community Members Only'}
-              </Text>
-            </View>
-            {event.is_verified && (
-              <View style={styles.verifiedBadge}>
-                <MaterialIcons name="verified" size={14} color={Colors.primaryContainer} />
-                <Text style={styles.verifiedBadgeText}>Verified</Text>
-              </View>
+            ) : (
+              <Text style={styles.emptyParticipantsText}>Be the first to join this event!</Text>
             )}
-          </View>
-
-          {/* About the Event */}
-          <View style={styles.aboutSection}>
-            <Text style={styles.sectionHeading}>About this Event</Text>
-            <Text style={styles.bodyParagraph}>
-              {event.description || 'No description provided for this event.'}
-            </Text>
           </View>
         </View>
       </ScrollView>
@@ -353,25 +453,45 @@ export default function EventDetailScreen() {
         <TouchableOpacity
           style={[
             styles.joinButton,
-            isJoined ? styles.btnJoinedState : styles.btnNotJoinedState,
+            isPassed
+              ? styles.btnPassedState
+              : isJoined
+              ? styles.btnJoinedState
+              : styles.btnNotJoinedState,
           ]}
           onPress={handleToggleJoin}
-          disabled={actionLoading}
+          disabled={actionLoading || isPassed}
           activeOpacity={0.85}
         >
-          <MaterialIcons
-            name={isJoined ? 'check-circle' : 'how-to-reg'}
-            size={20}
-            color={isJoined ? Colors.onSurface : Colors.onPrimaryContainer}
-          />
-          <Text
-            style={[
-              styles.joinButtonText,
-              isJoined ? styles.textJoinedState : styles.textNotJoinedState,
-            ]}
-          >
-            {isJoined ? 'Joined' : 'Join Event'}
-          </Text>
+          {isPassed ? (
+            isJoined ? (
+              <>
+                <MaterialIcons name="check-circle" size={20} color={Colors.tertiary} />
+                <Text style={[styles.joinButtonText, { color: Colors.tertiary }]}>Attended</Text>
+              </>
+            ) : (
+              <>
+                <MaterialIcons name="event-busy" size={20} color={Colors.outline} />
+                <Text style={[styles.joinButtonText, { color: Colors.outline }]}>Event Ended</Text>
+              </>
+            )
+          ) : (
+            <>
+              <MaterialIcons
+                name={isJoined ? 'check-circle' : 'how-to-reg'}
+                size={20}
+                color={isJoined ? Colors.onSurface : Colors.onPrimaryContainer}
+              />
+              <Text
+                style={[
+                  styles.joinButtonText,
+                  isJoined ? styles.textJoinedState : styles.textNotJoinedState,
+                ]}
+              >
+                {isJoined ? 'Joined' : 'Join Event'}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -466,6 +586,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 10,
   },
+  authorActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   heroCircleBtn: {
     width: 40,
     height: 40,
@@ -474,22 +599,97 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  locationChipBadge: {
+  categoryChipBadge: {
     position: 'absolute',
     bottom: 12,
-    left: Spacing.md,
+    right: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(28, 27, 27, 0.75)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    gap: 6,
+    backgroundColor: 'rgba(28, 27, 27, 0.85)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    zIndex: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  categoryChipText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalContainer: {
+    width: '100%',
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  modalTitle: {
+    ...Typography.headlineSm,
+    color: Colors.onSurface,
+    fontWeight: '700',
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    backgroundColor: Colors.surfaceContainerHigh,
+    ...Typography.bodyMd,
+    color: Colors.onSurface,
+  },
+  modalTextArea: {
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    backgroundColor: Colors.surfaceContainerHigh,
+    ...Typography.bodyMd,
+    color: Colors.onSurface,
+    height: 100,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+    marginTop: 4,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
     borderRadius: BorderRadius.full,
   },
-  locationChipText: {
-    fontSize: 12,
-    color: Colors.white,
+  modalCancelText: {
+    ...Typography.labelMd,
+    color: Colors.secondary,
     fontWeight: '600',
+  },
+  modalSubmitBtn: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.primaryContainer,
+  },
+  modalSubmitText: {
+    ...Typography.labelMd,
+    color: Colors.onPrimaryContainer,
+    fontWeight: '700',
   },
   body: {
     padding: Spacing.md,
@@ -501,59 +701,37 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 30,
   },
-  organizerRow: {
+  communityRowProminent: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
   },
-  organizerGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  hikingIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryFixed,
+  commIconProminent: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(232, 167, 54, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  orgLabel: {
-    fontSize: 11,
-    color: Colors.tertiary,
-  },
-  orgName: {
-    ...Typography.labelMd,
+  communityNameProminent: {
+    fontSize: 16,
+    fontWeight: '700',
     color: Colors.onSurface,
-    fontWeight: '700',
   },
-  dotSeparator: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.tertiary,
-    marginHorizontal: 4,
+  descriptionCard: {
+    backgroundColor: '#ffffff',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
   },
-  communityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    maxWidth: 180,
-  },
-  commIconSmall: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.secondaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commNameText: {
-    ...Typography.labelMd,
-    color: Colors.secondary,
-    fontWeight: '700',
+  descriptionText: {
+    ...Typography.bodyMd,
+    color: Colors.onSurfaceVariant,
+    lineHeight: 22,
   },
   infoMatrix: {
     gap: 8,
@@ -592,77 +770,90 @@ const styles = StyleSheet.create({
     color: Colors.onSurfaceVariant,
     marginTop: 2,
   },
-  avatarStackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  participantsUniqueBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(232, 167, 54, 0.35)',
+    gap: 12,
     marginTop: 4,
   },
-  stackAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+  participantsHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: -6,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
+    justifyContent: 'space-between',
   },
-  stackAvatarText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  badgesRow: {
+  participantsTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  publicBadge: {
-    flexDirection: 'row',
+  participantsIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(232, 167, 54, 0.12)',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(61, 168, 107, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
+    justifyContent: 'center',
   },
-  beaconDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.success,
-  },
-  publicBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#2e7d32',
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primaryFixed,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-  },
-  verifiedBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onPrimaryFixedVariant,
-  },
-  aboutSection: {
-    gap: 6,
-  },
-  sectionHeading: {
+  participantsMainTitle: {
     ...Typography.labelMd,
     color: Colors.onSurface,
     fontWeight: '700',
   },
-  bodyParagraph: {
+  spotsLeftBadge: {
+    backgroundColor: Colors.primaryFixed,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.sm,
+  },
+  spotsLeftText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.onPrimaryFixedVariant,
+  },
+  noLimitBadge: {
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+  },
+  noLimitText: {
+    color: '#059669',
+  },
+  participantAvatarsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingTop: 4,
+  },
+  participantItem: {
+    alignItems: 'center',
+    width: 52,
+    gap: 4,
+  },
+  participantAvatarImg: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  participantAvatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  participantNameText: {
+    fontSize: 10,
+    color: Colors.onSurfaceVariant,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  emptyParticipantsText: {
     ...Typography.bodyMd,
-    color: Colors.onSurface,
-    lineHeight: 22,
+    color: Colors.tertiary,
+    fontStyle: 'italic',
+    paddingVertical: 4,
   },
   bottomTray: {
     position: 'absolute',
@@ -702,6 +893,10 @@ const styles = StyleSheet.create({
   },
   textJoinedState: {
     color: Colors.onSurface,
+  },
+  btnPassedState: {
+    backgroundColor: Colors.surfaceContainerHigh,
+    opacity: 0.85,
   },
   bookmarkButton: {
     width: 48,

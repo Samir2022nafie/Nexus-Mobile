@@ -215,6 +215,7 @@ export interface CreatePostDto {
 export interface UpdatePostDto {
   title?: string;
   content?: string;
+  mediaUrl?: string;
   tags?: string[];
 }
 

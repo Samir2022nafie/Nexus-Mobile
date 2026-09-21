@@ -3,9 +3,12 @@
  * Features:
  * - AppHeader (/ Hangouts)
  * - Live Beacon: "5 Hangouts Near You" with pulsing emerald beacon + filter toggle
- * - Tactile warm cards with host avatar, distance, title, description, schedule, spots counter, and pill Join/Request button
+ * - Status pill on each card ("Open Meet" [emerald] vs "Request to Join" [warm amber])
+ * - 3-state functional action button (Unjoined with RaisingHandIcon, Pending with hourglass, Joined with walking person)
+ * - Dynamic tab bar hide/reveal on scroll with useTabBarVisibility
+ * - Tab press scrolls to top
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,18 +17,57 @@ import {
   RefreshControl,
   TouchableOpacity,
   Image,
+  TextInput,
+  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
-import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { hangoutsService } from '../../src/services/hangouts';
+import { useAuth } from '../../src/context/AuthContext';
 import { HangoutItem } from '../../src/types';
+import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
+import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
+import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 
 export default function HangoutsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const { handleTabBarScroll } = useTabBarVisibility();
+  const { user } = useAuth();
+
+  const lastScrollY = useRef(0);
+  const lastScrollTime = useRef(Date.now());
+
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const currentTime = Date.now();
+    const dy = currentY - lastScrollY.current;
+    const dt = Math.max(1, currentTime - lastScrollTime.current);
+    const velocityY = dy / dt;
+    lastScrollY.current = currentY;
+    lastScrollTime.current = currentTime;
+    handleTabBarScroll(dy, velocityY, currentY);
+  };
+
+  // Tab press listener: scroll to top
+  useEffect(() => {
+    const unsubscribe = (navigation as any)?.addListener?.('tabPress', () => {
+      if ((navigation as any)?.isFocused?.()) {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const [hangouts, setHangouts] = useState<any[]>([]);
+  const [joinedHangouts, setJoinedHangouts] = useState<Record<string, boolean>>({});
+  const [requestedHangouts, setRequestedHangouts] = useState<Record<string, boolean>>({});
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -33,6 +75,14 @@ export default function HangoutsScreen() {
     try {
       const data = await hangoutsService.list({ limit: 30 });
       setHangouts(data || []);
+      const initialJoined: Record<string, boolean> = {};
+      const initialRequested: Record<string, boolean> = {};
+      (data || []).forEach((h: any) => {
+        if (h.isParticipant) initialJoined[h.id] = true;
+        if (h.hasRequested || h.isRequested || h.requestStatus === 'pending') initialRequested[h.id] = true;
+      });
+      setJoinedHangouts(initialJoined);
+      setRequestedHangouts(initialRequested);
     } catch {
       setHangouts([]);
     } finally {
@@ -45,18 +95,153 @@ export default function HangoutsScreen() {
     fetchHangouts();
   }, [fetchHangouts]);
 
+  // Screen focus listener: sync data when returning
+  useEffect(() => {
+    const unsubscribe = (navigation as any)?.addListener?.('focus', () => {
+      fetchHangouts();
+    });
+    return unsubscribe;
+  }, [navigation, fetchHangouts]);
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchHangouts();
   };
 
+  const handleToggleJoin = async (e: any, h: any) => {
+    e.stopPropagation?.();
+    const isOpen = h.isOpen ?? (h.joinType === 'OPEN' || h.join_type === 'OPEN' || h.joinType === 'open' || h.join_type === 'open');
+    const isHost = Boolean(user && (h.creatorId === user.id || h.creator_id === user.id || h.creator?.id === user.id));
+    const isDirectJoin = isOpen || isHost;
+    const currentlyJoined = joinedHangouts[h.id] !== undefined ? joinedHangouts[h.id] : Boolean(h.isParticipant);
+
+    if (isDirectJoin) {
+      if (currentlyJoined) {
+        Alert.alert('Leave Hangout', 'Are you sure you want to leave this hangout?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Leave',
+            style: 'destructive',
+            onPress: async () => {
+              setJoinedHangouts((prev) => ({ ...prev, [h.id]: false }));
+              try {
+                await hangoutsService.leave(h.id);
+              } catch {
+                setJoinedHangouts((prev) => ({ ...prev, [h.id]: true }));
+              }
+            },
+          },
+        ]);
+      } else {
+        setJoinedHangouts((prev) => ({ ...prev, [h.id]: true }));
+        try {
+          await hangoutsService.join(h.id);
+        } catch {
+          setJoinedHangouts((prev) => ({ ...prev, [h.id]: false }));
+        }
+      }
+    } else {
+      // Request-based meetup: 3-state logic
+      if (currentlyJoined) {
+        Alert.alert('Leave Hangout', 'Are you sure you want to leave this hangout?', [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Leave',
+            style: 'destructive',
+            onPress: async () => {
+              setJoinedHangouts((prev) => ({ ...prev, [h.id]: false }));
+              try {
+                await hangoutsService.leave(h.id);
+              } catch {
+                setJoinedHangouts((prev) => ({ ...prev, [h.id]: true }));
+              }
+            },
+          },
+        ]);
+      } else {
+        const currentlyRequested =
+          requestedHangouts[h.id] !== undefined
+            ? requestedHangouts[h.id]
+            : Boolean(h.hasRequested || h.isRequested || h.requestStatus === 'pending');
+
+        if (currentlyRequested) {
+          Alert.alert('Cancel Request', 'Cancel your request to join this hangout?', [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Cancel Request',
+              style: 'destructive',
+              onPress: async () => {
+                setRequestedHangouts((prev) => ({ ...prev, [h.id]: false }));
+                try {
+                  await hangoutsService.leave(h.id);
+                } catch {
+                  setRequestedHangouts((prev) => ({ ...prev, [h.id]: true }));
+                }
+              },
+            },
+          ]);
+        } else {
+          setRequestedHangouts((prev) => ({ ...prev, [h.id]: true }));
+          try {
+            await hangoutsService.requestJoin(h.id);
+          } catch {
+            setRequestedHangouts((prev) => ({ ...prev, [h.id]: false }));
+          }
+        }
+      }
+    }
+  };
+
+  const filteredHangouts = hangouts.filter((h) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const titleMatch = h.title?.toLowerCase().includes(q);
+    const descMatch = h.description?.toLowerCase().includes(q);
+    const hostMatch = (h.creatorName || h.creator?.first_name || '').toLowerCase().includes(q);
+    const placeMatch = (h.location?.place_name || '').toLowerCase().includes(q);
+    return Boolean(titleMatch || descMatch || hostMatch || placeMatch);
+  });
+
   return (
-    <View style={styles.screen}>
-      <AppHeader breadcrumb="Hangouts" />
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* Persistent Header: Search Bar + Live Beacon */}
+      <View style={styles.persistentHeader}>
+        <View style={styles.searchContainer}>
+          <MaterialIcons name="search" size={20} color={Colors.tertiary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search hangouts..."
+            placeholderTextColor={Colors.tertiary}
+            value={search}
+            onChangeText={setSearch}
+            returnKeyType="search"
+            underlineColorAndroid="transparent"
+          />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.statusBar}>
+          <View style={styles.beaconGroup}>
+            <View style={styles.beaconRing}>
+              <View style={styles.beaconDot} />
+            </View>
+            <Text style={styles.beaconText}>
+              {filteredHangouts.length} {filteredHangouts.length === 1 ? 'Hangout' : 'Hangouts'} Near You
+            </Text>
+          </View>
+        </View>
+      </View>
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.container}
         contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -66,22 +251,6 @@ export default function HangoutsScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Status Banner */}
-        <View style={styles.statusBar}>
-          <View style={styles.beaconGroup}>
-            <View style={styles.beaconRing}>
-              <View style={styles.beaconDot} />
-            </View>
-            <Text style={styles.beaconText}>
-              {hangouts.length} {hangouts.length === 1 ? 'Hangout' : 'Hangouts'} Near You
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.filterBtn} activeOpacity={0.7}>
-            <MaterialIcons name="tune" size={16} color={Colors.secondary} />
-            <Text style={styles.filterText}>Filter</Text>
-          </TouchableOpacity>
-        </View>
-
         {loading ? (
           <LoadingSpinner message="Loading hangouts..." />
         ) : hangouts.length === 0 ? (
@@ -102,73 +271,113 @@ export default function HangoutsScreen() {
           </View>
         ) : (
           <View style={styles.list}>
-            {hangouts.map((h) => {
+            {sortItemsByDate(filteredHangouts).map((h) => {
               const isOpen = h.isOpen ?? (h.joinType === 'OPEN' || h.join_type === 'OPEN' || h.joinType === 'open' || h.join_type === 'open');
+              const dateInfo = categorizeItemByDate(h);
+              const creatorAvatar = h.creatorAvatar || h.creator?.profile_picture_url;
+              const isJoined =
+                joinedHangouts[h.id] !== undefined
+                  ? joinedHangouts[h.id]
+                  : Boolean(h.isParticipant);
+              const isRequested =
+                !isJoined &&
+                (requestedHangouts[h.id] !== undefined
+                  ? requestedHangouts[h.id]
+                  : Boolean(h.hasRequested || h.isRequested || h.requestStatus === 'pending'));
+
+              const pCount = h.participantsCount ?? h.participantCount ?? 0;
+              const rawMax = h.maxParticipants ?? h.max_participants;
+              const hasLimit = typeof rawMax === 'number' && rawMax > 0;
+              const spotsDisplay = h.spotsText || (hasLimit ? `${pCount}/${rawMax} spots` : `${pCount} going`);
+
               return (
                 <TouchableOpacity
                   key={h.id}
-                  style={styles.card}
+                  style={[styles.card, dateInfo.isPassed && styles.cardPassed]}
                   activeOpacity={0.88}
                   onPress={() => router.push(`/hangout/${h.id}`)}
                 >
                   {/* Header Row */}
                   <View style={styles.cardHeader}>
                     <View style={styles.hostGroup}>
-                      <Image
-                        source={{
-                          uri:
-                            h.creatorAvatar ||
-                            h.creator?.profile_picture_url ||
-                            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
-                        }}
-                        style={styles.hostAvatar}
-                      />
+                      {creatorAvatar ? (
+                        <Image
+                          source={{ uri: creatorAvatar }}
+                          style={styles.hostAvatar}
+                        />
+                      ) : (
+                        <View style={styles.hostAvatarFallback}>
+                          <MaterialIcons name="person" size={20} color={Colors.tertiary} />
+                        </View>
+                      )}
                       <View>
                         <Text style={styles.hostName}>
                           {h.creatorName || h.creator?.first_name || 'Host'}
                         </Text>
-                        <Text style={styles.hostRole}>created this</Text>
                       </View>
                     </View>
-                    <View style={styles.distanceBadge}>
-                      <MaterialIcons name="near-me" size={14} color={Colors.tertiary} />
-                      <Text style={styles.distanceText}>{h.distanceText || (h.location?.place_name ? h.location.place_name.slice(0, 15) : 'Nearby')}</Text>
+
+                    <View style={styles.headerRightBadges}>
+                      <View style={[styles.hangoutPill, isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest]}>
+                        {isOpen && <View style={styles.openDot} />}
+                        <Text style={[styles.hangoutPillText, isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText]}>
+                          {isOpen ? 'Open Meet' : 'Request to Join'}
+                        </Text>
+                      </View>
+                      <View style={styles.distanceBadge}>
+                        <MaterialIcons name="near-me" size={13} color={Colors.tertiary} />
+                        <Text style={styles.distanceText}>{h.distanceText || (h.location?.place_name ? h.location.place_name.slice(0, 12) : 'Nearby')}</Text>
+                      </View>
                     </View>
                   </View>
 
                   {/* Title & Description */}
                   <Text style={styles.cardTitle}>{h.title}</Text>
-                  <Text style={styles.cardDesc} numberOfLines={2}>
-                    {h.description || "Let's hang out and connect!"}
-                  </Text>
+                  {h.description ? (
+                    <Text style={styles.cardDesc} numberOfLines={2}>
+                      {h.description}
+                    </Text>
+                  ) : null}
 
                   {/* Schedule */}
                   <View style={styles.scheduleRow}>
-                    <MaterialIcons name="schedule" size={16} color={Colors.onSurfaceVariant} />
-                    <Text style={styles.scheduleText}>{h.timeText || (h.starts_at ? new Date(h.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today')}</Text>
+                    <MaterialIcons name="schedule" size={16} color={dateInfo.isPassed ? Colors.outline : Colors.onSurfaceVariant} />
+                    <Text style={[styles.scheduleText, dateInfo.isPassed && styles.textPassed]}>
+                      {dateInfo.isPassed ? 'Ended' : dateInfo.dateText}
+                    </Text>
                   </View>
 
-                  {/* Footer with spots and CTA */}
+                  {/* Footer with spots and 3-state CTA */}
                   <View style={styles.cardFooter}>
                     <Text style={styles.spotsText}>
-                      {h.spotsText || `${h.participantsCount || 1}/${h.maxParticipants || 10} spots`}
+                      {spotsDisplay}
                     </Text>
-                    <TouchableOpacity
-                      style={[
-                        styles.actionBtn,
-                        isOpen ? styles.actionBtnOpen : styles.actionBtnRequest,
-                      ]}
-                      onPress={() => router.push(`/hangout/${h.id}`)}
-                    >
-                      <Text
+                    {!dateInfo.isPassed ? (
+                      <TouchableOpacity
                         style={[
-                          styles.actionBtnText,
-                          isOpen ? styles.actionBtnTextOpen : styles.actionBtnTextRequest,
+                          styles.hangoutActionIconBtn,
+                          isJoined
+                            ? styles.hangoutIconBtnJoined
+                            : isRequested
+                            ? styles.hangoutIconBtnRequested
+                            : styles.hangoutIconBtnOpen,
                         ]}
+                        onPress={(e) => handleToggleJoin(e, h)}
+                        activeOpacity={0.8}
                       >
-                        {isOpen ? 'Join' : 'Request'}
-                      </Text>
-                    </TouchableOpacity>
+                        {isJoined ? (
+                          <MaterialIcons name="directions-walk" size={18} color="#ffffff" />
+                        ) : isRequested ? (
+                          <MaterialIcons name="hourglass-empty" size={15} color={Colors.primary} />
+                        ) : (
+                          <RaisingHandIcon size={18} color={Colors.onPrimaryContainer} />
+                        )}
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.passedPill}>
+                        <Text style={styles.passedPillText}>Ended</Text>
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -185,19 +394,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surface,
   },
+  persistentHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    backgroundColor: Colors.surface,
+  },
   container: {
     flex: 1,
   },
   content: {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.xs,
     paddingBottom: 48,
   },
   statusBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
     marginBottom: Spacing.xs,
   },
   beaconGroup: {
@@ -226,15 +440,31 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
-  filterBtn: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: Colors.tertiaryFixed,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 14,
+    height: 44,
+    marginBottom: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    gap: 8,
   },
-  filterText: {
-    ...Typography.captionMd,
-    color: Colors.secondary,
-    fontWeight: '600',
+  searchInput: {
+    flex: 1,
+    ...Typography.bodyMd,
+    color: Colors.onSurface,
+    paddingVertical: 0,
+  },
+  hostAvatarFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   list: {
     gap: 12,
@@ -247,6 +477,7 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    ...Shadows.sm,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -268,9 +499,44 @@ const styles = StyleSheet.create({
     color: Colors.onSurface,
     fontWeight: '700',
   },
-  hostRole: {
+  headerRightBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  hangoutPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  hangoutPillOpen: {
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+  },
+  hangoutPillRequest: {
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+  },
+  hangoutPillText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  hangoutPillOpenText: {
+    color: '#059669',
+  },
+  hangoutPillRequestText: {
+    ...Typography.captionSm,
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#d97706',
+  },
+  openDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#059669',
   },
   distanceBadge: {
     flexDirection: 'row',
@@ -315,28 +581,52 @@ const styles = StyleSheet.create({
     color: Colors.tertiary,
     fontWeight: '600',
   },
-  actionBtn: {
+  hangoutActionIconBtn: {
+    width: 32,
     height: 32,
-    paddingHorizontal: 16,
-    borderRadius: BorderRadius.full,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    ...Shadows.sm,
   },
-  actionBtnOpen: {
+  hangoutIconBtnOpen: {
     backgroundColor: Colors.primaryContainer,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
-  actionBtnRequest: {
-    backgroundColor: Colors.secondary,
+  hangoutIconBtnRequest: {
+    backgroundColor: Colors.primaryContainer,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
-  actionBtnText: {
+  hangoutIconBtnRequested: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+  },
+  hangoutIconBtnJoined: {
+    backgroundColor: '#059669',
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  cardPassed: {
+    opacity: 0.5,
+  },
+  textPassed: {
+    color: Colors.outline,
+  },
+  passedPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.surfaceVariant,
+  },
+  passedPillText: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  actionBtnTextOpen: {
-    color: Colors.onPrimaryContainer,
-  },
-  actionBtnTextRequest: {
-    color: Colors.surface,
+    fontWeight: '600',
+    color: Colors.onSurfaceVariant,
   },
   emptyContainer: {
     paddingVertical: Spacing.xxl,

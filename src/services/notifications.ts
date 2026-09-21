@@ -31,4 +31,19 @@ export const notificationsService = {
   markAllAsRead(): Promise<{ success: boolean }> {
     return api.patch<{ success: boolean }>('/notifications/read-all').catch(() => ({ success: true }));
   },
+
+  /** GET /notifications/unread-count */
+  getUnreadCount(): Promise<{ count: number; hasUnread: boolean }> {
+    return api.get<{ count: number; hasUnread: boolean }>('/notifications/unread-count').catch(() => ({ count: 0, hasUnread: false }));
+  },
+
+  /** DELETE /notifications/clear-all */
+  clearAll(): Promise<{ success: boolean }> {
+    return api.delete<{ success: boolean }>('/notifications/clear-all').catch(() => ({ success: true }));
+  },
+
+  /** DELETE /notifications/:id */
+  deleteNotification(notificationId: string): Promise<{ success: boolean }> {
+    return api.delete<{ success: boolean }>(`/notifications/${notificationId}`).catch(() => ({ success: true }));
+  },
 };

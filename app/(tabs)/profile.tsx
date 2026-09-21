@@ -980,7 +980,6 @@ export default function ProfileScreen() {
                     h.join_type === 'OPEN' ||
                     h.joinType === 'open' ||
                     h.join_type === 'open';
-                  const coverImg = h.cover_image_url || h.coverImageUrl;
 
                   return (
                     <TouchableOpacity
@@ -992,28 +991,6 @@ export default function ProfileScreen() {
                       activeOpacity={0.85}
                     >
                       <View>
-                        {coverImg ? (
-                          <View style={styles.hangoutCoverWrapper}>
-                            <Image source={{ uri: coverImg }} style={styles.hangoutCover} />
-                            <View
-                              style={[
-                                styles.hangoutCoverPill,
-                                isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
-                              ]}
-                            >
-                              {isOpen && <View style={styles.openDot} />}
-                              <Text
-                                style={[
-                                  styles.hangoutPillText,
-                                  isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                                ]}
-                              >
-                                {isOpen ? 'Open' : 'Request'}
-                              </Text>
-                            </View>
-                          </View>
-                        ) : null}
-
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
                             {h.creatorAvatar || h.creator?.profile_picture_url ? (
@@ -1033,24 +1010,22 @@ export default function ProfileScreen() {
                             </Text>
                           </View>
 
-                          {!coverImg && (
-                            <View
+                          <View
+                            style={[
+                              styles.hangoutPill,
+                              isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
+                            ]}
+                          >
+                            {isOpen && <View style={styles.openDot} />}
+                            <Text
                               style={[
-                                styles.hangoutPill,
-                                isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
+                                styles.hangoutPillText,
+                                isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
                               ]}
                             >
-                              {isOpen && <View style={styles.openDot} />}
-                              <Text
-                                style={[
-                                  styles.hangoutPillText,
-                                  isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                                ]}
-                              >
-                                {isOpen ? 'Open' : 'Request'}
-                              </Text>
-                            </View>
-                          )}
+                              {isOpen ? 'Open' : 'Request'}
+                            </Text>
+                          </View>
                         </View>
 
                         <Text style={styles.hangoutTitle} numberOfLines={2}>
@@ -1129,8 +1104,6 @@ export default function ProfileScreen() {
                     h.join_type === 'OPEN' ||
                     h.joinType === 'open' ||
                     h.join_type === 'open';
-                  const coverImg = h.cover_image_url || h.coverImageUrl;
-
                   return (
                     <TouchableOpacity
                       key={h.id}
@@ -1141,28 +1114,6 @@ export default function ProfileScreen() {
                       activeOpacity={0.85}
                     >
                       <View>
-                        {coverImg ? (
-                          <View style={styles.hangoutCoverWrapper}>
-                            <Image source={{ uri: coverImg }} style={styles.hangoutCover} />
-                            <View
-                              style={[
-                                styles.hangoutCoverPill,
-                                isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
-                              ]}
-                            >
-                              {isOpen && <View style={styles.openDot} />}
-                              <Text
-                                style={[
-                                  styles.hangoutPillText,
-                                  isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                                ]}
-                              >
-                                {isOpen ? 'Open' : 'Request'}
-                              </Text>
-                            </View>
-                          </View>
-                        ) : null}
-
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
                             {h.creatorAvatar || h.creator?.profile_picture_url ? (
@@ -1182,24 +1133,22 @@ export default function ProfileScreen() {
                             </Text>
                           </View>
 
-                          {!coverImg && (
-                            <View
+                          <View
+                            style={[
+                              styles.hangoutPill,
+                              isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
+                            ]}
+                          >
+                            {isOpen && <View style={styles.openDot} />}
+                            <Text
                               style={[
-                                styles.hangoutPill,
-                                isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
+                                styles.hangoutPillText,
+                                isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
                               ]}
                             >
-                              {isOpen && <View style={styles.openDot} />}
-                              <Text
-                                style={[
-                                  styles.hangoutPillText,
-                                  isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                                ]}
-                              >
-                                {isOpen ? 'Open' : 'Request'}
-                              </Text>
-                            </View>
-                          )}
+                              {isOpen ? 'Open' : 'Request'}
+                            </Text>
+                          </View>
                         </View>
 
                         <Text style={styles.hangoutTitle} numberOfLines={2}>
@@ -1929,30 +1878,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Hangout card parts reused in saved grid
-  hangoutCoverWrapper: {
-    height: 72,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    marginBottom: 6,
-    position: 'relative',
-  },
-  hangoutCover: {
-    width: '100%',
-    height: '100%',
-  },
-  hangoutCoverPill: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    ...Shadows.sm,
-  },
   hangoutPill: {
     paddingHorizontal: 8,
     paddingVertical: 2,

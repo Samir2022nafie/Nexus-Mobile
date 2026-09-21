@@ -291,7 +291,7 @@ export default function NewHangoutScreen() {
         await hangoutsService.update(params.hangoutId, {
           title: form.title.trim(),
           description: form.description.trim() || undefined,
-          coverImageUrl: form.coverImageUrl.trim() || undefined,
+          coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : (null as any),
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
           maxParticipants: form.maxParticipants ? parseInt(form.maxParticipants) : undefined,

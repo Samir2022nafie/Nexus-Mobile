@@ -168,7 +168,7 @@ export default function NewPostScreen() {
     setSubmitting(true);
     try {
       // Upload local image if any or use URL directly
-      let mediaUrl: string | undefined = undefined;
+      let mediaUrl: string | null | undefined = undefined;
       const rawUri = imageUrlInput.trim() || (images.length > 0 ? images[0] : undefined);
       const effectiveUri = rawUri ? extractDirectImageUrl(rawUri) : undefined;
       if (effectiveUri) {
@@ -184,20 +184,22 @@ export default function NewPostScreen() {
             mediaUrl = effectiveUri;
           }
         }
+      } else if (isEditing) {
+        mediaUrl = null;
       }
 
       if (isEditing && params.postId) {
         await postsService.update(params.postId, {
           title: title.trim(),
           content: content.trim(),
-          mediaUrl,
+          mediaUrl: (mediaUrl ?? null) as any,
           tags: tags.length > 0 ? tags : [],
         });
       } else if (selectedCommunity) {
         await postsService.create(selectedCommunity.slug, {
           title: title.trim(),
           content: content.trim(),
-          mediaUrl,
+          mediaUrl: (mediaUrl || undefined) as any,
           tags: tags.length > 0 ? tags : undefined,
         });
       }
@@ -320,6 +322,10 @@ export default function NewPostScreen() {
               value={imageUrlInput}
               onChangeText={(text) => {
                 setImageUrlInput(text);
+                if (!text.trim()) {
+                  setImages([]);
+                  return;
+                }
                 const direct = extractDirectImageUrl(text);
                 if (direct.startsWith('http')) {
                   setImages([direct]);

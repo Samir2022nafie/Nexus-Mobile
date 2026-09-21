@@ -359,7 +359,9 @@ export default function NewEventScreen() {
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
         maxParticipants: form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : undefined,
-        coverImageUrl: uploadedCoverUrl || undefined,
+        coverImageUrl: isEditing
+          ? (uploadedCoverUrl ? uploadedCoverUrl : null)
+          : (uploadedCoverUrl || undefined),
       };
 
       if (isEditing && params.eventId) {
@@ -518,7 +520,13 @@ export default function NewEventScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <MaterialIcons name="link" size={20} color={Colors.tertiary} />
+            {coverImage && coverImage.startsWith('http') ? (
+              <TouchableOpacity onPress={() => setCoverImage(null)} style={{ padding: 4 }}>
+                <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+              </TouchableOpacity>
+            ) : (
+              <MaterialIcons name="link" size={20} color={Colors.tertiary} />
+            )}
           </View>
         </View>
 

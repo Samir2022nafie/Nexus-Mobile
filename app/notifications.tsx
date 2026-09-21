@@ -15,6 +15,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,6 +64,27 @@ export default function NotificationsScreen() {
     try {
       await notificationsService.markAllAsRead();
     } catch {}
+  };
+
+  const handleClearAll = () => {
+    if (notifications.length === 0) return;
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to clear and delete all notifications from the database?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            setNotifications([]);
+            try {
+              await notificationsService.clearAll();
+            } catch {}
+          },
+        },
+      ]
+    );
   };
 
   const handlePress = async (notif: any) => {
@@ -152,14 +174,29 @@ export default function NotificationsScreen() {
           <Text style={styles.topBarTitle}>Notifications</Text>
         </View>
 
-        <TouchableOpacity
-          onPress={markAllRead}
-          style={styles.markReadBtn}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="done-all" size={18} color={Colors.secondary} />
-          <Text style={styles.markReadText}>Mark all read</Text>
-        </TouchableOpacity>
+        <View style={styles.topBarActions}>
+          {unreadNotifications.length > 0 && (
+            <TouchableOpacity
+              onPress={markAllRead}
+              style={styles.markReadBtn}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="done-all" size={16} color={Colors.secondary} />
+              <Text style={styles.markReadText}>Mark read</Text>
+            </TouchableOpacity>
+          )}
+
+          {notifications.length > 0 && (
+            <TouchableOpacity
+              onPress={handleClearAll}
+              style={styles.clearAllBtn}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete-sweep" size={17} color={Colors.error} />
+              <Text style={styles.clearAllText}>Clear</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -313,18 +350,40 @@ const styles = StyleSheet.create({
     ...Typography.headlineSm,
     color: Colors.onSurface,
   },
+  topBarActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   markReadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: BorderRadius.full,
+    backgroundColor: Colors.secondaryFixed,
   },
   markReadText: {
     ...Typography.labelMd,
     color: Colors.secondary,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  clearAllText: {
+    ...Typography.labelMd,
+    color: Colors.error,
+    fontWeight: '700',
+    fontSize: 12,
   },
   container: {
     flex: 1,

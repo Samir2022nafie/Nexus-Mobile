@@ -5,7 +5,7 @@
  * Tapping the header area triggers smooth scroll-to-top on the active feed.
  * Slides up completely via translateY without leaving an empty white block.
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing } from '../../constants/theme';
-
+import { notificationsService } from '../../services/notifications';
 import { NexusLogo } from './NexusLogo';
 
 export interface AppHeaderProps {
@@ -44,7 +44,33 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const showUnread = hasUnreadNotification ?? hasUnreadNotifications ?? true;
+  const [internalUnread, setInternalUnread] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnread = () => {
+      notificationsService
+        .getUnreadCount()
+        .then((res) => {
+          if (isMounted) setInternalUnread(Boolean(res?.hasUnread));
+        })
+        .catch(() => {});
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000); // Check every 15s
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const showUnread =
+    hasUnreadNotification !== undefined
+      ? hasUnreadNotification
+      : hasUnreadNotifications !== undefined
+      ? hasUnreadNotifications
+      : internalUnread;
 
   const headerContent = (
     <View style={[styles.container, style]}>

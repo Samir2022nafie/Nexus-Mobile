@@ -50,7 +50,7 @@ export default function EditProfileScreen() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         bio: form.bio.trim(),
-        profilePictureUrl: form.profilePictureUrl.trim() || undefined,
+        profilePictureUrl: form.profilePictureUrl.trim() ? form.profilePictureUrl.trim() : (null as any),
       });
       updateUser(updated);
       router.back();
@@ -64,7 +64,7 @@ export default function EditProfileScreen() {
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
           bio: form.bio.trim(),
-          profile_picture_url: form.profilePictureUrl.trim() || user?.profile_picture_url,
+          profile_picture_url: form.profilePictureUrl.trim() ? form.profilePictureUrl.trim() : null,
         } as any);
         router.back();
       }
@@ -220,7 +220,16 @@ export default function EditProfileScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <MaterialIcons name="link" size={18} color={Colors.tertiary} />
+              {form.profilePictureUrl.length > 0 ? (
+                <TouchableOpacity
+                  onPress={() => setForm((p) => ({ ...p, profilePictureUrl: '' }))}
+                  style={{ padding: 4 }}
+                >
+                  <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+                </TouchableOpacity>
+              ) : (
+                <MaterialIcons name="link" size={18} color={Colors.tertiary} />
+              )}
             </View>
           </View>
 

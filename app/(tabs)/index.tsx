@@ -479,7 +479,6 @@ export default function HomeScreen() {
       <AppHeader
         translateY={headerTranslateY}
         onPressHeader={handleScrollToTop}
-        hasUnreadNotification={true}
       />
 
       <ScrollView
@@ -1098,29 +1097,6 @@ const styles = StyleSheet.create({
   },
   hangoutPillRequestText: {
     color: Colors.secondary,
-  },
-  hangoutCoverWrapper: {
-    height: 72,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    marginBottom: 6,
-    position: 'relative',
-  },
-  hangoutCover: {
-    width: '100%',
-    height: '100%',
-  },
-  hangoutCoverPill: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    ...Shadows.sm,
   },
   hangoutTitle: {
     ...Typography.labelMd,

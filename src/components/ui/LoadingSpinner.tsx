@@ -1,9 +1,7 @@
-/**
- * Loading spinner with optional message.
- */
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { Colors, Typography, Spacing } from '../../constants/theme';
+import { Typography, Spacing } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface LoadingSpinnerProps {
   message?: string;
@@ -16,10 +14,21 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   size = 'large',
   fullScreen = false,
 }) => {
+  const { colors } = useTheme();
+
   return (
-    <View style={[styles.container, fullScreen && styles.fullScreen]}>
-      <ActivityIndicator size={size} color={Colors.primary} />
-      {message && <Text style={styles.message}>{message}</Text>}
+    <View
+      style={[
+        styles.container,
+        fullScreen && [styles.fullScreen, { backgroundColor: colors.surface }],
+      ]}
+    >
+      <ActivityIndicator size={size} color={colors.primary} />
+      {message && (
+        <Text style={[styles.message, { color: colors.onSurfaceVariant }]}>
+          {message}
+        </Text>
+      )}
     </View>
   );
 };
@@ -32,11 +41,10 @@ const styles = StyleSheet.create({
   },
   fullScreen: {
     flex: 1,
-    backgroundColor: Colors.surface,
   },
   message: {
     ...Typography.captionMd,
-    color: Colors.outline,
     marginTop: Spacing.md,
   },
 });
+

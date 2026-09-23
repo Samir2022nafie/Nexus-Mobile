@@ -304,7 +304,7 @@ export default function ThreadDetailScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 8 : 8}
       style={styles.screen}
     >
       <View style={[styles.inner, { paddingTop: insets.top }]}>

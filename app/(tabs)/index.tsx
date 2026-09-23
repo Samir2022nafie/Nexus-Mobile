@@ -138,20 +138,6 @@ export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
 
-  // Swipe right-to-left in posts section navigates to Explore tab
-  const postsPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dx < -30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -50 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) {
-          (navigation as any).navigate('explore');
-        }
-      },
-    })
-  ).current;
-
   const scrollViewRef = useRef<ScrollView>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [hangouts, setHangouts] = useState<HangoutItem[]>([]);
@@ -488,7 +474,7 @@ export default function HomeScreen() {
           left: 0,
           right: 0,
           height: insets.top,
-          backgroundColor: Colors.surface,
+          backgroundColor: colors.surface,
           zIndex: 9999,
         }}
       />
@@ -609,7 +595,7 @@ export default function HomeScreen() {
                         params: { id: event.id, slug: event.community?.slug || event.communitySlug },
                       } as any);
                     }}
-                    activeOpacity={0.85}
+                    activeOpacity={cat.isPassed ? 0.38 : 0.85}
                   >
                     <View style={styles.eventCoverWrapper}>
                       <Image
@@ -727,15 +713,11 @@ export default function HomeScreen() {
                 return (
                   <TouchableOpacity
                     key={hangout.id}
-                    style={[
-                      styles.hangoutCardSquare,
-                      cat.isPassed && styles.itemCardPassed,
-                      cat.isPassed && { elevation: 0, shadowOpacity: 0, shadowColor: 'transparent' },
-                    ]}
+                    style={[styles.hangoutCardSquare, cat.isPassed && styles.itemCardPassed]}
                     onPress={() => {
                       router.push(`/hangout/${hangout.id}`);
                     }}
-                    activeOpacity={0.85}
+                    activeOpacity={cat.isPassed ? 0.38 : 0.85}
                   >
                     <View>
                       <View style={styles.hangoutHeader}>
@@ -829,8 +811,8 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Section 4: What people are saying (swiping right-to-left switches to Explore tab) */}
-        <View style={styles.section} {...postsPanResponder.panHandlers}>
+        {/* Section 4: What people are saying */}
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <MaterialIcons
@@ -1195,9 +1177,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       right: -2,
     },
 
-    // Passed / Grayed-out state
+    // Passed state
     itemCardPassed: {
-      opacity: 0.45,
+      opacity: 0.48,
     },
 
     // Section 4: Discussions

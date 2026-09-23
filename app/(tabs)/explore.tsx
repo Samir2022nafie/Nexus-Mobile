@@ -473,16 +473,7 @@ export default function ExploreScreen() {
           style={styles.pager}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            {
-              useNativeDriver: false,
-              listener: (e: any) => {
-                const x = e.nativeEvent.contentOffset.x;
-                const idx = Math.round(x / screenWidth);
-                if (SUB_TABS[idx] && SUB_TABS[idx] !== activeTab) {
-                  setActiveTab(SUB_TABS[idx]);
-                }
-              },
-            }
+            { useNativeDriver: true }
           )}
           scrollEventThrottle={16}
           onMomentumScrollEnd={(e) => {
@@ -652,9 +643,9 @@ export default function ExploreScreen() {
                   return (
                     <TouchableOpacity
                       key={event.id}
-                      style={[styles.eventCard, dateInfo.isPassed && { opacity: 0.6 }]}
+                      style={[styles.eventCard, dateInfo.isPassed && styles.itemCardPassed]}
                       onPress={() => router.push(`/event/${event.id}`)}
-                      activeOpacity={0.85}
+                      activeOpacity={dateInfo.isPassed ? 0.38 : 0.85}
                     >
                       <View style={styles.eventCoverWrapper}>
                         {(() => {
@@ -1040,6 +1031,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  itemCardPassed: {
+    opacity: 0.48,
   },
   eventCoverWrapper: {
     height: 160,

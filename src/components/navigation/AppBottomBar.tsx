@@ -1,14 +1,10 @@
-/**
- * AppBottomBar — Reusable bottom navigation bar matching the system tab bar.
- * Used on screens like Community Detail where the user desires the bottom
- * navigation bar to persist, with none of the 4 tab buttons highlighted,
- * and passing the community context into the CreateBottomSheet (+) trigger.
- */
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Shadows } from '../../constants/theme';
+import { Shadows } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
+import { useTabBarVisibility } from '../../context/TabBarVisibilityContext';
 import { CreateBottomSheet } from '../CreateBottomSheet';
 
 export type BottomBarTab = 'home' | 'explore' | 'hangouts' | 'profile' | null;
@@ -24,15 +20,30 @@ interface AppBottomBarProps {
 
 export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBarProps) {
   const router = useRouter();
+  const { colors } = useTheme();
+  const { tabBarTranslateY, showTabBar } = useTabBarVisibility();
   const [createModalVisible, setCreateModalVisible] = useState(false);
 
+  useEffect(() => {
+    showTabBar();
+  }, [showTabBar]);
+
   const getTabColor = (tab: BottomBarTab) => {
-    return activeTab === tab ? Colors.tabBarActive : Colors.tabBarInactive;
+    return activeTab === tab ? colors.tabBarActive : colors.tabBarInactive;
   };
 
   return (
     <>
-      <View style={styles.tabBar}>
+      <Animated.View
+        style={[
+          styles.tabBar,
+          {
+            backgroundColor: colors.surfaceContainerLowest,
+            borderTopColor: colors.surfaceContainerHigh,
+            transform: [{ translateY: tabBarTranslateY }],
+          },
+        ]}
+      >
         {/* Tab 1: Home */}
         <TouchableOpacity
           style={styles.tabItem}
@@ -62,8 +73,8 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
           activeOpacity={0.85}
           accessibilityLabel="Create options"
         >
-          <View style={styles.createButton}>
-            <MaterialIcons name="add" size={26} color={Colors.onPrimary} />
+          <View style={[styles.createButton, { backgroundColor: colors.primaryContainer }]}>
+            <MaterialIcons name="add" size={26} color={colors.onPrimary} />
           </View>
         </TouchableOpacity>
 
@@ -88,7 +99,7 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
           <MaterialIcons name="account-circle" size={24} color={getTabColor('profile')} />
           <Text style={[styles.tabLabel, { color: getTabColor('profile') }]}>Profile</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Layered sliding bottom sheet passing current community */}
       <CreateBottomSheet
@@ -102,9 +113,11 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: Colors.surfaceContainerLowest,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     borderTopWidth: 1,
-    borderTopColor: Colors.surfaceContainerHigh,
     height: 68,
     paddingBottom: Platform.OS === 'ios' ? 14 : 8,
     paddingTop: 8,
@@ -112,6 +125,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     ...Shadows.sm,
+    zIndex: 900,
   },
   tabItem: {
     flex: 1,
@@ -134,9 +148,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
   },
 });
+

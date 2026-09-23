@@ -14,7 +14,6 @@ import { useTheme } from '../../src/context/ThemeContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { CreateBottomSheet } from '../../src/components/CreateBottomSheet';
 import {
-  TabBarVisibilityProvider,
   useTabBarVisibility,
 } from '../../src/context/TabBarVisibilityContext';
 
@@ -133,6 +132,7 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
 
 export default function TabLayout() {
   const { isAuthenticated } = useAuth();
+  const { colors } = useTheme();
 
   // If not authenticated, redirect to auth stack
   if (!isAuthenticated) {
@@ -140,23 +140,21 @@ export default function TabLayout() {
   }
 
   return (
-    <TabBarVisibilityProvider>
-      <View style={styles.rootContainer}>
-        <Tabs
-          tabBar={(props) => <AnimatedTabBar {...props} />}
-          screenOptions={{
-            headerShown: false,
-            tabBarHideOnKeyboard: true,
-          }}
-        >
-          <Tabs.Screen name="index" options={{ title: 'Home' }} />
-          <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
-          <Tabs.Screen name="create" options={{ title: '' }} />
-          <Tabs.Screen name="hangouts" options={{ title: 'Hangouts' }} />
-          <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-        </Tabs>
-      </View>
-    </TabBarVisibilityProvider>
+    <View style={[styles.rootContainer, { backgroundColor: colors.surface }]}>
+      <Tabs
+        tabBar={(props) => <AnimatedTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarHideOnKeyboard: true,
+        }}
+      >
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
+        <Tabs.Screen name="create" options={{ title: '' }} />
+        <Tabs.Screen name="hangouts" options={{ title: 'Hangouts' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      </Tabs>
+    </View>
   );
 }
 

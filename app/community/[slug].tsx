@@ -9,7 +9,7 @@
  * 6. Removed 'What's on your mind?' button.
  * 7. Persistent bottom navigation bar with Add button passing community context (activeTab={null}).
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,11 +27,13 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from 
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { AppBottomBar } from '../../src/components/navigation/AppBottomBar';
+import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { communitiesService } from '../../src/services/communities';
 import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
 import { Community, EventItem } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
+import { categorizeItemByDate } from '../../src/utils/dateUtils';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -58,6 +60,27 @@ export default function CommunityDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
+  const { handleTabBarScroll, showTabBar } = useTabBarVisibility();
+
+  useEffect(() => {
+    showTabBar();
+  }, [showTabBar]);
+
+  const lastScrollY = useRef(0);
+  const lastScrollTime = useRef(Date.now());
+
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const currentTime = Date.now();
+    const dy = currentY - lastScrollY.current;
+    const dt = Math.max(1, currentTime - lastScrollTime.current);
+    const velocityY = dy / dt;
+
+    lastScrollY.current = currentY;
+    lastScrollTime.current = currentTime;
+
+    handleTabBarScroll(dy, velocityY, currentY);
+  };
 
   const [community, setCommunity] = useState<Community | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -283,6 +306,8 @@ export default function CommunityDetailScreen() {
           style={styles.container}
           contentContainerStyle={styles.allEventsContent}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           {filteredEvents.length === 0 ? (
             <View style={styles.emptyEventsBox}>
@@ -293,18 +318,20 @@ export default function CommunityDetailScreen() {
               </Text>
             </View>
           ) : (
-            filteredEvents.map((ev) => (
-              <TouchableOpacity
-                key={ev.id}
-                style={styles.verticalEventCard}
-                onPress={() =>
-                  router.push({
-                    pathname: '/event/[id]',
-                    params: { id: ev.id, slug: community.slug },
-                  } as any)
-                }
-                activeOpacity={0.85}
-              >
+            filteredEvents.map((ev) => {
+              const cat = categorizeItemByDate(ev);
+              return (
+                <TouchableOpacity
+                  key={ev.id}
+                  style={[styles.verticalEventCard, cat.isPassed && styles.itemCardPassed]}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/event/[id]',
+                      params: { id: ev.id, slug: community.slug },
+                    } as any)
+                  }
+                  activeOpacity={cat.isPassed ? 0.38 : 0.85}
+                >
                 <Image
                   source={{
                     uri:
@@ -343,8 +370,9 @@ export default function CommunityDetailScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ))
-          )}
+            );
+          })
+        )}
         </ScrollView>
 
         <AppBottomBar
@@ -365,6 +393,8 @@ export default function CommunityDetailScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -564,18 +594,20 @@ export default function CommunityDetailScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.eventsCarousel}
               >
-                {events.map((ev) => (
-                  <TouchableOpacity
-                    key={ev.id}
-                    style={styles.eventCard}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/event/[id]',
-                        params: { id: ev.id, slug: community.slug },
-                      } as any)
-                    }
-                    activeOpacity={0.85}
-                  >
+                {events.map((ev) => {
+                  const cat = categorizeItemByDate(ev);
+                  return (
+                    <TouchableOpacity
+                      key={ev.id}
+                      style={[styles.eventCard, cat.isPassed && styles.itemCardPassed]}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/event/[id]',
+                          params: { id: ev.id, slug: community.slug },
+                        } as any)
+                      }
+                      activeOpacity={cat.isPassed ? 0.38 : 0.85}
+                    >
                     <Image
                       source={{
                         uri:
@@ -608,7 +640,8 @@ export default function CommunityDetailScreen() {
                       </View>
                     </View>
                   </TouchableOpacity>
-                ))}
+                );
+              })}
               </ScrollView>
             )}
           </View>
@@ -983,6 +1016,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.cardBorder,
     ...Shadows.sm,
+  },
+  itemCardPassed: {
+    opacity: 0.48,
   },
   eventCover: {
     width: '100%',

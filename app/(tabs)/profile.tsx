@@ -797,16 +797,7 @@ export default function ProfileScreen() {
           showsHorizontalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: profileScrollX } } }],
-            {
-              useNativeDriver: false,
-              listener: (e: any) => {
-                const x = e.nativeEvent.contentOffset.x;
-                const idx = Math.round(x / screenWidth);
-                if (MAIN_TABS[idx] && MAIN_TABS[idx].id !== activeTab) {
-                  setActiveTab(MAIN_TABS[idx].id);
-                }
-              },
-            }
+            { useNativeDriver: true }
           )}
           scrollEventThrottle={16}
           onMomentumScrollEnd={(e) => {
@@ -993,7 +984,7 @@ export default function ProfileScreen() {
                           params: { id: ev.id, slug: ev.communitySlug || ev.community?.slug },
                         } as any);
                       }}
-                      activeOpacity={0.85}
+                      activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
                       <View style={styles.savedEventCoverWrapper}>
                         <Image
@@ -1081,7 +1072,7 @@ export default function ProfileScreen() {
                       onPress={() => {
                         router.push(`/hangout/${h.id}`);
                       }}
-                      activeOpacity={0.85}
+                      activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
                       <View>
                         <View style={styles.hangoutHeader}>
@@ -1204,7 +1195,7 @@ export default function ProfileScreen() {
                       onPress={() => {
                         router.push(`/hangout/${h.id}`);
                       }}
-                      activeOpacity={0.85}
+                      activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
                       <View>
                         <View style={styles.hangoutHeader}>
@@ -1316,7 +1307,7 @@ export default function ProfileScreen() {
                         params: { id: ev.id, slug: ev.communitySlug || ev.community?.slug },
                       } as any);
                     }}
-                    activeOpacity={0.85}
+                    activeOpacity={cat.isPassed ? 0.38 : 0.85}
                   >
                     <View style={styles.savedEventCoverWrapper}>
                       <Image
@@ -2078,7 +2069,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     fontWeight: '600',
   },
   itemCardPassed: {
-    opacity: 0.45,
+    opacity: 0.48,
   },
 
   // Discussion / Post card styles (exact match to home feed)

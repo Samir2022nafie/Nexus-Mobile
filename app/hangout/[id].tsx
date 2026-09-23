@@ -19,7 +19,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { hangoutsService } from '../../src/services/hangouts';
 import { HangoutItem } from '../../src/types';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
@@ -31,6 +32,8 @@ export default function HangoutDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
 
   const [hangout, setHangout] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -258,7 +261,7 @@ export default function HangoutDetailScreen() {
         ]}
       >
         <View style={styles.notFoundIconBox}>
-          <MaterialIcons name="event-busy" size={40} color={Colors.tertiary} />
+          <MaterialIcons name="event-busy" size={40} color={colors.tertiary} />
         </View>
         <Text style={styles.notFoundTitle}>Hangout not found</Text>
         <Text style={styles.notFoundSub}>
@@ -269,7 +272,7 @@ export default function HangoutDetailScreen() {
           onPress={() => router.back()}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="arrow-back" size={18} color={Colors.onPrimaryContainer} />
+          <MaterialIcons name="arrow-back" size={18} color={colors.onPrimaryContainer} />
           <Text style={styles.backButtonText}>Back to Hangouts</Text>
         </TouchableOpacity>
       </View>
@@ -361,7 +364,7 @@ export default function HangoutDetailScreen() {
               style={styles.navBtn}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="arrow-back" size={20} color={Colors.onSurface} />
+              <MaterialIcons name="arrow-back" size={20} color={colors.onSurface} />
             </TouchableOpacity>
 
             {isHangoutHost && (
@@ -376,7 +379,7 @@ export default function HangoutDetailScreen() {
                   style={styles.navBtn}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons name="edit" size={20} color={Colors.secondary} />
+                  <MaterialIcons name="edit" size={20} color={colors.secondary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -384,7 +387,7 @@ export default function HangoutDetailScreen() {
                   style={styles.navBtn}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons name="delete-outline" size={22} color={Colors.error} />
+                  <MaterialIcons name="delete-outline" size={22} color={colors.error} />
                 </TouchableOpacity>
               </View>
             )}
@@ -426,7 +429,7 @@ export default function HangoutDetailScreen() {
                 />
               ) : (
                 <View style={styles.creatorAvatarFallback}>
-                  <MaterialIcons name="person" size={22} color={Colors.tertiary} />
+                  <MaterialIcons name="person" size={22} color={colors.tertiary} />
                 </View>
               )}
               <View>
@@ -456,7 +459,7 @@ export default function HangoutDetailScreen() {
             {/* When */}
             <View style={styles.infoCard}>
               <View style={styles.cardIconBox}>
-                <MaterialIcons name="schedule" size={22} color={Colors.primaryContainer} />
+                <MaterialIcons name="schedule" size={22} color={colors.primaryContainer} />
               </View>
               <View style={styles.cardTextCol}>
                 <Text style={styles.cardPrimaryText}>{dateText}</Text>
@@ -467,7 +470,7 @@ export default function HangoutDetailScreen() {
             {/* Where */}
             <View style={styles.infoCard}>
               <View style={styles.cardIconBox}>
-                <MaterialIcons name="pin-drop" size={22} color={Colors.primaryContainer} />
+                <MaterialIcons name="pin-drop" size={22} color={colors.primaryContainer} />
               </View>
               <View style={styles.cardTextCol}>
                 <Text style={styles.cardPrimaryText} numberOfLines={1}>
@@ -510,7 +513,7 @@ export default function HangoutDetailScreen() {
                           <Image source={{ uri: rAvatar }} style={styles.requestAvatar} />
                         ) : (
                           <View style={styles.requestAvatarFallback}>
-                            <MaterialIcons name="person" size={18} color={Colors.tertiary} />
+                            <MaterialIcons name="person" size={18} color={colors.tertiary} />
                           </View>
                         )}
                         <View style={styles.requestUserInfo}>
@@ -530,7 +533,7 @@ export default function HangoutDetailScreen() {
                           disabled={isResponding}
                           activeOpacity={0.7}
                         >
-                          <MaterialIcons name="close" size={16} color={Colors.error} />
+                          <MaterialIcons name="close" size={16} color={colors.error} />
                           <Text style={styles.requestDeclineText}>Decline</Text>
                         </TouchableOpacity>
 
@@ -556,7 +559,7 @@ export default function HangoutDetailScreen() {
             <View style={styles.participantsHeaderRow}>
               <View style={styles.participantsTitleGroup}>
                 <View style={styles.participantsIconBox}>
-                  <MaterialIcons name="groups" size={20} color={Colors.primary} />
+                  <MaterialIcons name="groups" size={20} color={colors.primary} />
                 </View>
                 <Text style={styles.participantsMainTitle}>
                   {hasLimit
@@ -582,7 +585,7 @@ export default function HangoutDetailScreen() {
                         <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
                       ) : (
                         <View style={styles.participantAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
                         </View>
                       )}
                       <Text style={styles.participantNameText} numberOfLines={1}>
@@ -619,18 +622,18 @@ export default function HangoutDetailScreen() {
           {isPassed ? (
             isJoined ? (
               <>
-                <MaterialIcons name="check-circle" size={20} color={Colors.tertiary} />
-                <Text style={[styles.joinBtnText, { color: Colors.tertiary }]}>Attended</Text>
+                <MaterialIcons name="check-circle" size={20} color={colors.tertiary} />
+                <Text style={[styles.joinBtnText, { color: colors.tertiary }]}>Attended</Text>
               </>
             ) : (
               <>
-                <MaterialIcons name="event-busy" size={20} color={Colors.outline} />
-                <Text style={[styles.joinBtnText, { color: Colors.outline }]}>Hangout Ended</Text>
+                <MaterialIcons name="event-busy" size={20} color={colors.outline} />
+                <Text style={[styles.joinBtnText, { color: colors.outline }]}>Hangout Ended</Text>
               </>
             )
           ) : isJoined ? (
             <>
-              <MaterialIcons name="directions-walk" size={20} color={Colors.onSurface} />
+              <MaterialIcons name="directions-walk" size={20} color={colors.onSurface} />
               <Text style={[styles.joinBtnText, styles.textJoinedState]}>Joined</Text>
             </>
           ) : isRequested ? (
@@ -642,7 +645,7 @@ export default function HangoutDetailScreen() {
             </>
           ) : (
             <>
-              <RaisingHandIcon size={20} color={Colors.onPrimaryContainer} />
+              <RaisingHandIcon size={20} color={colors.onPrimaryContainer} />
               <Text style={[styles.joinBtnText, styles.textNotJoinedState]}>
                 {isOpen ? 'Join Hangout' : 'Request to Join'}
               </Text>
@@ -658,7 +661,7 @@ export default function HangoutDetailScreen() {
           <MaterialIcons
             name={isBookmarked ? 'bookmark' : 'bookmark-border'}
             size={24}
-            color={isBookmarked ? Colors.primaryContainer : Colors.tertiary}
+            color={isBookmarked ? colors.primaryContainer : colors.tertiary}
           />
         </TouchableOpacity>
       </View>
@@ -666,675 +669,675 @@ export default function HangoutDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  container: {
-    flex: 1,
-  },
-  content: {},
-  notFoundIconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  notFoundTitle: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-    fontWeight: '700',
-    marginBottom: Spacing.xs,
-  },
-  notFoundSub: {
-    ...Typography.bodyMd,
-    color: Colors.tertiary,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.primaryContainer,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: BorderRadius.full,
-  },
-  backButtonText: {
-    ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
-    fontWeight: '700',
-  },
-  coverContainer: {
-    width: '100%',
-    height: 200,
-    position: 'relative',
-    backgroundColor: Colors.surfaceContainerHighest,
-  },
-  coverImage: {
-    width: '100%',
-    height: '100%',
-  },
-  coverGradient: {
-    ...StyleSheet.absoluteFill as any,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  coverNavRow: {
-    position: 'absolute',
-    left: Spacing.md,
-    right: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    zIndex: 10,
-  },
-  navBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(252, 249, 248, 0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  meetupPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(252, 249, 248, 0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  beaconDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.success,
-  },
-  meetupText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  locationChip: {
-    position: 'absolute',
-    bottom: 12,
-    left: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(28, 27, 27, 0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  locationChipText: {
-    fontSize: 12,
-    color: Colors.white,
-    fontWeight: '500',
-  },
-  body: {
-    padding: Spacing.md,
-    gap: Spacing.md,
-  },
-  headerBlock: {
-    gap: 8,
-  },
-  titleText: {
-    ...Typography.headlineMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-    lineHeight: 30,
-  },
-  creatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  creatorAvatarImg: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  creatorAvatarInitials: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.tertiaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  initialsText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onTertiaryContainer,
-  },
-  creatorHandle: {
-    ...Typography.labelMd,
-    color: Colors.secondary,
-    fontWeight: '600',
-  },
-  creatorHostRole: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-  },
-  directDescriptionText: {
-    ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
-    lineHeight: 22,
-    marginTop: 4,
-  },
-  infoMatrix: {
-    gap: 8,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.tertiaryFixed,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  cardIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  cardTextCol: {
-    flex: 1,
-  },
-  cardPrimaryText: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  cardSecondaryText: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-    marginTop: 2,
-  },
-  mapBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  spotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  spotsLeftBadge: {
-    backgroundColor: Colors.primaryFixed,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  spotsLeftText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.onPrimaryFixedVariant,
-  },
-  avatarStackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  miniAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: -6,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
-  },
-  miniAvatarText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  descriptionCard: {
-    backgroundColor: '#ffffff',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  creatorAvatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  participantsUniqueBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    borderWidth: 1.5,
-    borderColor: 'rgba(232, 167, 54, 0.35)',
-    gap: 12,
-  },
-  participantsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  participantsTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  participantsIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(232, 167, 54, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  participantsMainTitle: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  participantAvatarsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    paddingTop: 4,
-  },
-  participantItem: {
-    alignItems: 'center',
-    width: 52,
-    gap: 4,
-  },
-  participantAvatarImg: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  participantAvatarFallback: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  participantNameText: {
-    fontSize: 10,
-    color: Colors.onSurfaceVariant,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  emptyParticipantsText: {
-    ...Typography.bodyMd,
-    color: Colors.tertiary,
-    fontStyle: 'italic',
-    paddingVertical: 4,
-  },
-  aboutCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  aboutHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  aboutTitle: {
-    ...Typography.headlineSm,
-    fontSize: 18,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  aboutBody: {
-    ...Typography.bodyMd,
-    color: Colors.onSurface,
-    lineHeight: 22,
-  },
-  topicTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    paddingTop: 4,
-  },
-  topicPill: {
-    backgroundColor: Colors.surfaceContainer,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.full,
-  },
-  topicText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  rosterCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.xl,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  rosterHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rosterTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  rosterTitle: {
-    ...Typography.labelLg,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  rosterCountPill: {
-    backgroundColor: Colors.secondaryFixed,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-  },
-  rosterCountText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onSecondaryFixed,
-  },
-  recentlyJoinedText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-  },
-  rosterAvatarsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 4,
-  },
-  rosterItem: {
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 48,
-  },
-  hostAvatarBox: {
-    position: 'relative',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.secondaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hostAvatarInitials: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.onSecondaryContainer,
-  },
-  starBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rosterItemName: {
-    ...Typography.captionSm,
-    color: Colors.onSurface,
-    fontWeight: '600',
-    maxWidth: 52,
-  },
-  rosterItemRole: {
-    fontSize: 10,
-    color: Colors.tertiary,
-  },
-  emptyRosterBox: {
-    paddingVertical: Spacing.sm,
-  },
-  emptyRosterText: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-    fontStyle: 'italic',
-  },
-  bottomTray: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(252, 249, 248, 0.95)',
-    borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  joinBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: BorderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  btnNotJoinedState: {
-    backgroundColor: Colors.primaryContainer,
-  },
-  btnJoinedState: {
-    backgroundColor: Colors.surfaceContainerHighest,
-  },
-  joinBtnText: {
-    ...Typography.labelLg,
-    fontWeight: '700',
-  },
-  textNotJoinedState: {
-    color: Colors.onPrimaryContainer,
-  },
-  textJoinedState: {
-    color: Colors.onSurface,
-  },
-  bookmarkBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnRequestedState: {
-    backgroundColor: '#fef3c7',
-    borderWidth: 1,
-    borderColor: '#f59e0b',
-  },
-  textRequestedState: {
-    color: '#92400e',
-  },
-  authorActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  bannerStatusPill: {
-    position: 'absolute',
-    bottom: 12,
-    right: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  bannerStatusPillOpen: {
-    backgroundColor: 'rgba(5, 150, 105, 0.9)',
-  },
-  bannerStatusPillRequest: {
-    backgroundColor: 'rgba(217, 119, 6, 0.9)',
-  },
-  bannerStatusPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.3,
-  },
-  openPillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ffffff',
-  },
-  btnPassedState: {
-    backgroundColor: Colors.surfaceContainerHigh,
-    opacity: 0.85,
-  },
-  requestsSectionCard: {
-    backgroundColor: '#fffbeb',
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: '#fde68a',
-  },
-  requestsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.sm,
-  },
-  requestsTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  requestsTitle: {
-    ...Typography.titleMd,
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#92400e',
-  },
-  requestsCountBadge: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-  },
-  requestsCountText: {
-    ...Typography.labelSm,
-    color: '#ffffff',
-    fontWeight: '700',
-  },
-  requestsList: {
-    gap: Spacing.sm,
-  },
-  requestItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-  },
-  requestUserGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    marginRight: 8,
-  },
-  requestAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  requestAvatarFallback: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surfaceContainerHighest,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  requestUserInfo: {
-    flex: 1,
-  },
-  requestUserName: {
-    ...Typography.labelMd,
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  requestUserHandle: {
-    ...Typography.bodySm,
-    color: Colors.tertiary,
-  },
-  requestActionBtns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  requestDeclineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceContainerHighest,
-  },
-  requestDeclineText: {
-    ...Typography.labelSm,
-    color: Colors.error,
-    fontWeight: '600',
-  },
-  requestApproveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.full,
-    backgroundColor: '#dcfce7',
-  },
-  requestApproveText: {
-    ...Typography.labelSm,
-    color: '#16a34a',
-    fontWeight: '700',
-  },
-});
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    container: {
+      flex: 1,
+    },
+    content: {},
+    notFoundIconBox: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: Spacing.md,
+    },
+    notFoundTitle: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+      fontWeight: '700',
+      marginBottom: Spacing.xs,
+    },
+    notFoundSub: {
+      ...Typography.bodyMd,
+      color: colors.tertiary,
+      textAlign: 'center',
+      marginBottom: Spacing.lg,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.primaryContainer,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: BorderRadius.full,
+    },
+    backButtonText: {
+      ...Typography.labelMd,
+      color: colors.onPrimaryContainer,
+      fontWeight: '700',
+    },
+    coverContainer: {
+      width: '100%',
+      height: 200,
+      position: 'relative',
+      backgroundColor: colors.surfaceContainerHighest,
+    },
+    coverImage: {
+      width: '100%',
+      height: '100%',
+    },
+    coverGradient: {
+      ...StyleSheet.absoluteFill as any,
+      backgroundColor: 'rgba(0,0,0,0.3)',
+    },
+    coverNavRow: {
+      position: 'absolute',
+      left: Spacing.md,
+      right: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      zIndex: 10,
+    },
+    navBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDark ? 'rgba(34, 32, 30, 0.85)' : 'rgba(252, 249, 248, 0.85)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    navRightGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    meetupPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDark ? 'rgba(34, 32, 30, 0.9)' : 'rgba(252, 249, 248, 0.9)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: BorderRadius.full,
+    },
+    beaconDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#16a34a',
+    },
+    meetupText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    locationChip: {
+      position: 'absolute',
+      bottom: 12,
+      left: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(28, 27, 27, 0.7)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: BorderRadius.full,
+    },
+    locationChipText: {
+      fontSize: 12,
+      color: '#ffffff',
+      fontWeight: '500',
+    },
+    body: {
+      padding: Spacing.md,
+      gap: Spacing.md,
+    },
+    headerBlock: {
+      gap: 8,
+    },
+    titleText: {
+      ...Typography.headlineMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+      lineHeight: 30,
+    },
+    creatorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    creatorAvatarImg: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+    },
+    creatorAvatarInitials: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: colors.tertiaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    initialsText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.onTertiaryContainer,
+    },
+    creatorHandle: {
+      ...Typography.labelMd,
+      color: colors.secondary,
+      fontWeight: '600',
+    },
+    creatorHostRole: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+    },
+    directDescriptionText: {
+      ...Typography.bodyMd,
+      color: colors.onSurfaceVariant,
+      lineHeight: 22,
+      marginTop: 4,
+    },
+    infoMatrix: {
+      gap: 8,
+    },
+    infoCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceContainerLow,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.xl,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    cardIconBox: {
+      width: 38,
+      height: 38,
+      borderRadius: BorderRadius.md,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    cardTextCol: {
+      flex: 1,
+    },
+    cardPrimaryText: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    cardSecondaryText: {
+      ...Typography.captionMd,
+      color: colors.tertiary,
+      marginTop: 2,
+    },
+    mapBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    spotsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    spotsLeftBadge: {
+      backgroundColor: colors.primaryFixed,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.sm,
+    },
+    spotsLeftText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.onPrimaryFixedVariant,
+    },
+    avatarStackRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    miniAvatar: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: -6,
+      borderWidth: 1.5,
+      borderColor: colors.surface,
+    },
+    miniAvatarText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    descriptionCard: {
+      backgroundColor: colors.surfaceContainerLow,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    creatorAvatarFallback: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    participantsUniqueBox: {
+      backgroundColor: colors.surface,
+      borderRadius: BorderRadius.xl,
+      padding: Spacing.md,
+      borderWidth: 1.5,
+      borderColor: 'rgba(232, 167, 54, 0.35)',
+      gap: 12,
+    },
+    participantsHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    participantsTitleGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    participantsIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: 'rgba(232, 167, 54, 0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    participantsMainTitle: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    participantAvatarsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      paddingTop: 4,
+    },
+    participantItem: {
+      alignItems: 'center',
+      width: 52,
+      gap: 4,
+    },
+    participantAvatarImg: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+    },
+    participantAvatarFallback: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    participantNameText: {
+      fontSize: 10,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+    emptyParticipantsText: {
+      ...Typography.bodyMd,
+      color: colors.tertiary,
+      fontStyle: 'italic',
+      paddingVertical: 4,
+    },
+    aboutCard: {
+      backgroundColor: colors.surfaceContainerLow,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.xl,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    aboutHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    aboutTitle: {
+      ...Typography.headlineSm,
+      fontSize: 18,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    aboutBody: {
+      ...Typography.bodyMd,
+      color: colors.onSurface,
+      lineHeight: 22,
+    },
+    topicTagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      paddingTop: 4,
+    },
+    topicPill: {
+      backgroundColor: colors.surfaceContainer,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: BorderRadius.full,
+    },
+    topicText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      fontWeight: '600',
+    },
+    rosterCard: {
+      backgroundColor: colors.surfaceContainerLow,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.xl,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    rosterHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    rosterTitleGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    rosterTitle: {
+      ...Typography.labelLg,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    rosterCountPill: {
+      backgroundColor: colors.secondaryFixed,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.full,
+    },
+    rosterCountText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.onSecondaryFixed,
+    },
+    recentlyJoinedText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+    },
+    rosterAvatarsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      paddingVertical: 4,
+    },
+    rosterItem: {
+      alignItems: 'center',
+      gap: 4,
+      minWidth: 48,
+    },
+    hostAvatarBox: {
+      position: 'relative',
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.secondaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hostAvatarInitials: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.onSecondaryContainer,
+    },
+    starBadge: {
+      position: 'absolute',
+      bottom: -2,
+      right: -2,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rosterItemName: {
+      ...Typography.captionSm,
+      color: colors.onSurface,
+      fontWeight: '600',
+      maxWidth: 52,
+    },
+    rosterItemRole: {
+      fontSize: 10,
+      color: colors.tertiary,
+    },
+    emptyRosterBox: {
+      paddingVertical: Spacing.sm,
+    },
+    emptyRosterText: {
+      ...Typography.captionMd,
+      color: colors.tertiary,
+      fontStyle: 'italic',
+    },
+    bottomTray: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: isDark ? 'rgba(21, 19, 18, 0.96)' : 'rgba(252, 249, 248, 0.96)',
+      borderTopWidth: 1,
+      borderTopColor: colors.cardBorder,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.md,
+      paddingTop: Spacing.sm,
+      gap: Spacing.sm,
+    },
+    joinBtn: {
+      flex: 1,
+      height: 48,
+      borderRadius: BorderRadius.full,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    btnNotJoinedState: {
+      backgroundColor: colors.primaryContainer,
+    },
+    btnJoinedState: {
+      backgroundColor: colors.surfaceContainerHighest,
+    },
+    joinBtnText: {
+      ...Typography.labelLg,
+      fontWeight: '700',
+    },
+    textNotJoinedState: {
+      color: colors.onPrimaryContainer,
+    },
+    textJoinedState: {
+      color: colors.onSurface,
+    },
+    bookmarkBtn: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    btnRequestedState: {
+      backgroundColor: isDark ? '#451a03' : '#fef3c7',
+      borderWidth: 1,
+      borderColor: '#f59e0b',
+    },
+    textRequestedState: {
+      color: isDark ? '#fde68a' : '#92400e',
+    },
+    authorActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    bannerStatusPill: {
+      position: 'absolute',
+      bottom: 12,
+      right: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: BorderRadius.full,
+      zIndex: 10,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    bannerStatusPillOpen: {
+      backgroundColor: 'rgba(5, 150, 105, 0.9)',
+    },
+    bannerStatusPillRequest: {
+      backgroundColor: 'rgba(217, 119, 6, 0.9)',
+    },
+    bannerStatusPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#ffffff',
+      letterSpacing: 0.3,
+    },
+    openPillDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#ffffff',
+    },
+    btnPassedState: {
+      backgroundColor: colors.surfaceContainerHigh,
+    },
+    requestsSectionCard: {
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+      borderRadius: BorderRadius.xl,
+      padding: Spacing.md,
+      marginBottom: Spacing.md,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(245, 158, 11, 0.3)' : '#fde68a',
+    },
+    requestsHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: Spacing.sm,
+    },
+    requestsTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    requestsTitle: {
+      ...Typography.titleMd,
+      fontSize: 15,
+      fontWeight: '700',
+      color: isDark ? '#fcd34d' : '#92400e',
+    },
+    requestsCountBadge: {
+      backgroundColor: '#f59e0b',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.full,
+    },
+    requestsCountText: {
+      ...Typography.labelSm,
+      color: '#ffffff',
+      fontWeight: '700',
+    },
+    requestsList: {
+      gap: Spacing.sm,
+    },
+    requestItemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surfaceContainerLow,
+      padding: Spacing.sm,
+      borderRadius: BorderRadius.lg,
+    },
+    requestUserGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+      marginRight: 8,
+    },
+    requestAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+    },
+    requestAvatarFallback: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceContainerHighest,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    requestUserInfo: {
+      flex: 1,
+    },
+    requestUserName: {
+      ...Typography.labelMd,
+      fontWeight: '700',
+      color: colors.onSurface,
+    },
+    requestUserHandle: {
+      ...Typography.bodySm,
+      color: colors.tertiary,
+    },
+    requestActionBtns: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    requestDeclineBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: BorderRadius.full,
+      backgroundColor: colors.surfaceContainerHighest,
+    },
+    requestDeclineText: {
+      ...Typography.labelSm,
+      color: colors.error,
+      fontWeight: '600',
+    },
+    requestApproveBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: BorderRadius.full,
+      backgroundColor: isDark ? 'rgba(22, 163, 74, 0.2)' : '#dcfce7',
+    },
+    requestApproveText: {
+      ...Typography.labelSm,
+      color: isDark ? '#4ade80' : '#16a34a',
+      fontWeight: '700',
+    },
+  });

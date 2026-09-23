@@ -24,7 +24,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
 import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
-import { usersService } from '../src/services/users';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -52,28 +51,7 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action is permanent and cannot be undone. All your posts, events, and data will be permanently removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await usersService.deleteMyAccount();
-              await logout();
-              router.replace('/(auth)/welcome');
-            } catch {
-              router.replace('/(auth)/welcome');
-            }
-          },
-        },
-      ]
-    );
-  };
+
 
   const displayName =
     user?.name ||
@@ -130,45 +108,22 @@ export default function SettingsScreen() {
 
             <View style={styles.hairline} />
 
-            {/* Phone Verification */}
+            {/* Account Settings */}
             <TouchableOpacity
               style={styles.rowItem}
-              onPress={() =>
-                router.push({
-                  pathname: '/(auth)/verify-phone',
-                  params: { phone: user?.phone_number || '+251911234567' },
-                })
-              }
+              onPress={() => router.push('/account-settings')}
               activeOpacity={0.7}
             >
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="phone-iphone" size={18} color={colors.outline} />
+                  <MaterialIcons name="manage-accounts" size={20} color={colors.primary} />
                 </View>
-                <Text style={styles.rowTitle}>Phone Verification</Text>
-              </View>
-              <View style={styles.rowRightBadge}>
-                <View style={styles.verifiedBadge}>
-                  <Text style={styles.verifiedBadgeText}>Verified ✓</Text>
+                <View style={styles.textCol}>
+                  <Text style={styles.rowTitle}>Account Settings</Text>
+                  <Text style={styles.rowSubtitle}>Linked accounts & deletion</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
               </View>
-            </TouchableOpacity>
-
-            <View style={styles.hairline} />
-
-            {/* Linked Accounts */}
-            <TouchableOpacity style={styles.rowItem} activeOpacity={0.7}>
-              <View style={styles.rowLeft}>
-                <View style={styles.iconCircle}>
-                  <MaterialIcons name="link" size={18} color={colors.outline} />
-                </View>
-                <Text style={styles.rowTitle}>Linked Accounts</Text>
-              </View>
-              <View style={styles.rowRightBadge}>
-                <Text style={styles.connectedText}>1 connected</Text>
-                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
-              </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
             </TouchableOpacity>
           </View>
         </View>
@@ -284,26 +239,6 @@ export default function SettingsScreen() {
                 <Text style={[styles.rowTitle, { color: colors.error, fontWeight: '700' }]}>
                   Log Out
                 </Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.hairline} />
-
-            <TouchableOpacity
-              style={styles.rowItem}
-              onPress={handleDeleteAccount}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: 'rgba(186, 26, 26, 0.15)' }]}>
-                  <MaterialIcons name="delete-forever" size={18} color={colors.error} />
-                </View>
-                <View style={styles.textCol}>
-                  <Text style={[styles.rowTitle, { color: colors.error, fontWeight: '700' }]}>
-                    Delete Account
-                  </Text>
-                  <Text style={styles.rowSubtitle}>Permanently remove all your data</Text>
-                </View>
               </View>
             </TouchableOpacity>
           </View>

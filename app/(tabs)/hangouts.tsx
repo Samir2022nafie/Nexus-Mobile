@@ -296,8 +296,8 @@ export default function HangoutsScreen() {
               return (
                 <TouchableOpacity
                   key={h.id}
-                  style={[styles.card, dateInfo.isPassed && styles.cardPassed]}
-                  activeOpacity={0.88}
+                  style={[styles.card, dateInfo.isPassed && styles.itemCardPassed]}
+                  activeOpacity={dateInfo.isPassed ? 0.38 : 0.88}
                   onPress={() => router.push(`/hangout/${h.id}`)}
                 >
                   {/* Header Row */}
@@ -483,6 +483,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
+  itemCardPassed: {
+    opacity: 0.48,
+  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -615,9 +618,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     borderWidth: 0,
     borderColor: 'transparent',
   },
-  cardPassed: {
-    opacity: 0.5,
-  },
+  cardPassed: {},
   textPassed: {
     color: colors.outline,
   },

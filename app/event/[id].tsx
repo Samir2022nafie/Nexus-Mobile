@@ -579,7 +579,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     right: 0,
     bottom: 0,
     height: 60,
-    backgroundColor: 'rgba(252, 249, 248, 0.4)',
+    backgroundColor: isDark ? 'rgba(21, 19, 18, 0.6)' : 'rgba(252, 249, 248, 0.4)',
   },
   heroNavRow: {
     position: 'absolute',
@@ -726,7 +726,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     color: colors.onSurface,
   },
   descriptionCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surfaceContainerLow,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
@@ -744,7 +744,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainerLow,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     gap: 12,
@@ -864,7 +864,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(252, 249, 248, 0.95)',
+    backgroundColor: isDark ? 'rgba(21, 19, 18, 0.96)' : 'rgba(252, 249, 248, 0.96)',
     borderTopWidth: 1,
     borderTopColor: colors.cardBorder,
     flexDirection: 'row',
@@ -900,7 +900,6 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   },
   btnPassedState: {
     backgroundColor: colors.surfaceContainerHigh,
-    opacity: 0.85,
   },
   bookmarkButton: {
     width: 48,

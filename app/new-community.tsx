@@ -17,7 +17,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { Button } from '../src/components/ui/Button';
 import { communitiesService } from '../src/services/communities';
 import { ApiRequestError } from '../src/services/api';
@@ -27,6 +28,8 @@ import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 export default function NewCommunityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const params = useLocalSearchParams<{ slug?: string }>();
   const isEditing = Boolean(params.slug);
 
@@ -150,7 +153,7 @@ export default function NewCommunityScreen() {
           style={styles.closeButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="close" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Community' : 'New Community'}</Text>
         <TouchableOpacity
@@ -173,7 +176,7 @@ export default function NewCommunityScreen() {
       >
         {generalError ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error" size={18} color={Colors.error} />
+            <MaterialIcons name="error" size={18} color={colors.error} />
             <Text style={styles.errorText}>{generalError}</Text>
           </View>
         ) : null}
@@ -185,11 +188,11 @@ export default function NewCommunityScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="e.g. Trail Blazers"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.name}
               onChangeText={(v) => updateField('name', v)}
             />
-            <MaterialIcons name="groups" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="groups" size={20} color={colors.tertiary} />
           </View>
           {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
         </View>
@@ -201,12 +204,12 @@ export default function NewCommunityScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="trail-blazers"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.slug}
               onChangeText={(v) => updateField('slug', v)}
               autoCapitalize="none"
             />
-            <MaterialIcons name="link" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="link" size={20} color={colors.tertiary} />
           </View>
           <Text style={styles.hintText}>nexus.app/community/{form.slug || 'slug'}</Text>
           {errors.slug ? <Text style={styles.errorText}>{errors.slug}</Text> : null}
@@ -245,7 +248,7 @@ export default function NewCommunityScreen() {
             <TextInput
               style={[styles.textInput, styles.textAreaInput]}
               placeholder="What is this community about? Who is it for?"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.description}
               onChangeText={(v) => updateField('description', v)}
               multiline
@@ -262,7 +265,7 @@ export default function NewCommunityScreen() {
             <TextInput
               style={[styles.textInput, styles.textAreaInput]}
               placeholder="Guidelines for members to keep discussions friendly..."
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.rules}
               onChangeText={(v) => updateField('rules', v)}
               multiline
@@ -279,7 +282,7 @@ export default function NewCommunityScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="https://example.com/avatar.jpg"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.profilePictureUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
@@ -295,7 +298,7 @@ export default function NewCommunityScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <MaterialIcons name="image" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="image" size={20} color={colors.tertiary} />
           </View>
           {form.profilePictureUrl.trim().startsWith('http') ? (
             <View style={styles.avatarPreviewBox}>
@@ -312,7 +315,7 @@ export default function NewCommunityScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="https://example.com/banner.jpg"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.bannerUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
@@ -328,7 +331,7 @@ export default function NewCommunityScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <MaterialIcons name="add-photo-alternate" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="add-photo-alternate" size={20} color={colors.tertiary} />
           </View>
           {form.bannerUrl.trim().startsWith('http') ? (
             <View style={styles.bannerPreviewBox}>
@@ -349,8 +352,8 @@ export default function NewCommunityScreen() {
           <Switch
             value={form.isPrivate}
             onValueChange={(v) => updateField('isPrivate', v)}
-            trackColor={{ false: Colors.surfaceVariant, true: Colors.primaryContainer }}
-            thumbColor={Colors.white}
+            trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+            thumbColor={colors.white}
           />
         </View>
 
@@ -367,10 +370,11 @@ export default function NewCommunityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBar: {
     height: 56,
@@ -378,7 +382,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   closeButton: {
     width: 44,
@@ -389,17 +393,17 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   createBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   createText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   container: {
@@ -414,13 +418,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.errorContainer,
+    backgroundColor: colors.errorContainer,
     padding: Spacing.sm,
     borderRadius: BorderRadius.md,
   },
   errorText: {
     ...Typography.captionMd,
-    color: Colors.onErrorContainer,
+    color: colors.onErrorContainer,
   },
   fieldGroup: {
     gap: 6,
@@ -428,7 +432,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.tertiary,
+    color: colors.tertiary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     paddingLeft: 4,
@@ -436,7 +440,7 @@ const styles = StyleSheet.create({
   inputBox: {
     height: 48,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
@@ -444,13 +448,13 @@ const styles = StyleSheet.create({
   },
   inputBoxError: {
     borderWidth: 1.5,
-    borderColor: Colors.error,
+    borderColor: colors.error,
   },
   textInput: {
     flex: 1,
     height: '100%',
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   textAreaBox: {
     height: 96,
@@ -462,7 +466,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     paddingLeft: 4,
   },
   categoryChipsRow: {
@@ -473,25 +477,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
   },
   catChipActive: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     ...Shadows.sm,
   },
   catChipText: {
     ...Typography.captionMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '500',
   },
   catChipTextActive: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   privacyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     gap: Spacing.md,
@@ -499,12 +503,12 @@ const styles = StyleSheet.create({
   },
   privacyTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   privacySubtitle: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 2,
     lineHeight: 16,
   },
@@ -514,7 +518,7 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 8,
     padding: 8,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
   },
   avatarPreviewImg: {
@@ -525,7 +529,7 @@ const styles = StyleSheet.create({
   bannerPreviewBox: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
   },
@@ -536,7 +540,7 @@ const styles = StyleSheet.create({
   },
   previewSuccessText: {
     ...Typography.captionSm,
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
     fontWeight: '600',
     marginTop: 4,
   },

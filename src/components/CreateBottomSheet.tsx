@@ -19,7 +19,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../constants/theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -70,6 +71,8 @@ interface CreateBottomSheetProps {
 export function CreateBottomSheet({ visible, onClose, communityContext }: CreateBottomSheetProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
 
   const [isRendered, setIsRendered] = useState(visible);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -207,7 +210,7 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
             accessibilityLabel="Close sheet"
             activeOpacity={0.7}
           >
-            <MaterialIcons name="close" size={22} color={Colors.tertiary} />
+            <MaterialIcons name="close" size={22} color={colors.tertiary} />
           </TouchableOpacity>
         </View>
 
@@ -222,7 +225,7 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
             >
               {/* Gold Circular Icon */}
               <View style={styles.iconCircle}>
-                <MaterialIcons name={option.icon} size={22} color={Colors.onPrimary} />
+                <MaterialIcons name={option.icon} size={22} color={colors.onPrimary} />
               </View>
 
               {/* Title & Description */}
@@ -234,14 +237,14 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
               </View>
 
               {/* Chevron */}
-              <MaterialIcons name="chevron-right" size={20} color={Colors.outlineVariant} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.outlineVariant} />
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Soft Tactile Cancel Hint */}
         <View style={styles.cancelHint}>
-          <MaterialIcons name="info-outline" size={14} color={Colors.tertiary} />
+          <MaterialIcons name="info-outline" size={14} color={colors.tertiary} />
           <Text style={styles.cancelHintText}>Tap anywhere outside to cancel</Text>
         </View>
       </Animated.View>
@@ -249,107 +252,108 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 9999,
-    elevation: 9999,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill as any,
-    backgroundColor: Colors.scrim,
-  },
-  backdropPressable: {
-    ...StyleSheet.absoluteFill as any,
-  },
-  sheet: {
-    backgroundColor: Colors.surfaceContainerLowest,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    ...Shadows.lg,
-    zIndex: 10000,
-    elevation: 10000,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.outlineVariant,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  title: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surfaceContainerLow,
-  },
-  optionsList: {
-    gap: Spacing.sm,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm + 4,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.surfaceContainerLow,
-    gap: Spacing.md,
-  },
-  iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: Colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.sm,
-  },
-  optionInfo: {
-    flex: 1,
-  },
-  optionTitle: {
-    ...Typography.labelLg,
-    color: Colors.onSurface,
-    fontWeight: '600',
-  },
-  optionDescription: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-    marginTop: 2,
-  },
-  cancelHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.xs,
-  },
-  cancelHintText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-  },
-});
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 9999,
+      elevation: 9999,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...(StyleSheet.absoluteFill as any),
+      backgroundColor: colors.scrim,
+    },
+    backdropPressable: {
+      ...(StyleSheet.absoluteFill as any),
+    },
+    sheet: {
+      backgroundColor: isDark ? colors.surfaceContainer : colors.surfaceContainerLowest,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingTop: Spacing.sm,
+      paddingHorizontal: Spacing.lg,
+      ...Shadows.lg,
+      zIndex: 10000,
+      elevation: 10000,
+    },
+    handleContainer: {
+      alignItems: 'center',
+      paddingVertical: Spacing.xs,
+      marginBottom: Spacing.xs,
+    },
+    dragHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.outlineVariant,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: Spacing.md,
+    },
+    title: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceContainerLow,
+    },
+    optionsList: {
+      gap: Spacing.sm,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: Spacing.sm + 4,
+      borderRadius: BorderRadius.lg,
+      backgroundColor: colors.surfaceContainerLow,
+      gap: Spacing.md,
+    },
+    iconCircle: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Shadows.sm,
+    },
+    optionInfo: {
+      flex: 1,
+    },
+    optionTitle: {
+      ...Typography.labelLg,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    optionDescription: {
+      ...Typography.captionMd,
+      color: colors.tertiary,
+      marginTop: 2,
+    },
+    cancelHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.xs,
+      marginTop: Spacing.lg,
+      paddingTop: Spacing.xs,
+    },
+    cancelHintText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+    },
+  });

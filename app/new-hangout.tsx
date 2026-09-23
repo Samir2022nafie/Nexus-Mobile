@@ -24,7 +24,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { Button } from '../src/components/ui/Button';
 import { hangoutsService } from '../src/services/hangouts';
 import { ApiRequestError } from '../src/services/api';
@@ -46,6 +47,7 @@ function getDaysInMonth(month: number, year: number): number {
 }
 
 function PickerColumn<T>({
+
   data,
   selectedIndex,
   onSelect,
@@ -57,6 +59,7 @@ function PickerColumn<T>({
   renderLabel: (item: T) => string;
 }) {
   const flatListRef = useRef<FlatList>(null);
+  const pickerStyles = useThemedStyles(getPickerStyles);
 
   const handleScrollEnd = (e: any) => {
     const offsetY = e.nativeEvent.contentOffset.y;
@@ -111,6 +114,9 @@ function PickerColumn<T>({
 export default function NewHangoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
+  const pickerStyles = useThemedStyles(getPickerStyles);
   const params = useLocalSearchParams<{ hangoutId?: string }>();
   const isEditing = Boolean(params.hangoutId);
 
@@ -324,8 +330,8 @@ export default function NewHangoutScreen() {
   if (initialLoading) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.primaryContainer} />
-        <Text style={{ marginTop: 12, color: Colors.secondary }}>Loading hangout details...</Text>
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
+        <Text style={{ marginTop: 12, color: colors.secondary }}>Loading hangout details...</Text>
       </View>
     );
   }
@@ -339,7 +345,7 @@ export default function NewHangoutScreen() {
           style={styles.closeButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="close" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Hangout' : 'New Hangout'}</Text>
         <TouchableOpacity
@@ -362,7 +368,7 @@ export default function NewHangoutScreen() {
       >
         {generalError ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error" size={18} color={Colors.error} />
+            <MaterialIcons name="error" size={18} color={colors.error} />
             <Text style={styles.errorText}>{generalError}</Text>
           </View>
         ) : null}
@@ -374,11 +380,11 @@ export default function NewHangoutScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="e.g. Casual Friday Coffee & Code"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.title}
               onChangeText={(v) => updateField('title', v)}
             />
-            <MaterialIcons name="local-cafe" size={20} color={Colors.primaryContainer} />
+            <MaterialIcons name="local-cafe" size={20} color={colors.primaryContainer} />
           </View>
           {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
         </View>
@@ -390,11 +396,11 @@ export default function NewHangoutScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="e.g. Tomoca Coffee, Piazza"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.location}
               onChangeText={(v) => updateField('location', v)}
             />
-            <MaterialIcons name="storefront" size={20} color={Colors.secondary} />
+            <MaterialIcons name="storefront" size={20} color={colors.secondary} />
           </View>
         </View>
 
@@ -421,7 +427,7 @@ export default function NewHangoutScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="Paste cover image URL (https://...)"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.coverImageUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
@@ -437,7 +443,7 @@ export default function NewHangoutScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <MaterialIcons name="image" size={20} color={Colors.primaryContainer} />
+            <MaterialIcons name="image" size={20} color={colors.primaryContainer} />
           </View>
         </View>
 
@@ -454,7 +460,7 @@ export default function NewHangoutScreen() {
                 <MaterialIcons
                   name="lock-open"
                   size={16}
-                  color={form.joinType === 'open' ? Colors.onPrimaryContainer : Colors.tertiary}
+                  color={form.joinType === 'open' ? colors.onPrimaryContainer : colors.tertiary}
                 />
                 <Text
                   style={[
@@ -482,8 +488,8 @@ export default function NewHangoutScreen() {
                   size={16}
                   color={
                     form.joinType === 'request_based'
-                      ? Colors.onPrimaryContainer
-                      : Colors.tertiary
+                      ? colors.onPrimaryContainer
+                      : colors.tertiary
                   }
                 />
                 <Text
@@ -512,7 +518,7 @@ export default function NewHangoutScreen() {
               <Text style={styles.startsAtText} numberOfLines={1}>
                 {formatStartsAtDisplay(form.startsAt)}
               </Text>
-              <MaterialIcons name="schedule" size={18} color={Colors.primaryContainer} />
+              <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
             </TouchableOpacity>
             {errors.startsAt ? <Text style={styles.errorText}>{errors.startsAt}</Text> : null}
           </View>
@@ -522,7 +528,7 @@ export default function NewHangoutScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="No limit"
-                placeholderTextColor={Colors.outline}
+                placeholderTextColor={colors.outline}
                 keyboardType="number-pad"
                 value={form.maxParticipants}
                 onChangeText={(v) => updateField('maxParticipants', v)}
@@ -538,7 +544,7 @@ export default function NewHangoutScreen() {
             <TextInput
               style={[styles.textInput, styles.textAreaInput]}
               placeholder="What are we doing? Tell people what to bring..."
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.description}
               onChangeText={(v) => updateField('description', v)}
               multiline
@@ -637,10 +643,11 @@ export default function NewHangoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBar: {
     height: 56,
@@ -648,7 +655,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   closeButton: {
     width: 44,
@@ -659,17 +666,17 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   createBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   createText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   container: {
@@ -684,13 +691,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.errorContainer,
+    backgroundColor: colors.errorContainer,
     padding: Spacing.sm,
     borderRadius: BorderRadius.md,
   },
   errorText: {
     ...Typography.captionMd,
-    color: Colors.onErrorContainer,
+    color: colors.onErrorContainer,
   },
   fieldGroup: {
     gap: 6,
@@ -698,7 +705,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.tertiary,
+    color: colors.tertiary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     paddingLeft: 4,
@@ -706,7 +713,7 @@ const styles = StyleSheet.create({
   inputBox: {
     height: 48,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
@@ -714,19 +721,19 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputBoxError: {
-    borderColor: Colors.error,
+    borderColor: colors.error,
   },
   startsAtText: {
     flex: 1,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '500',
   },
   textInput: {
     flex: 1,
     height: '100%',
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   textAreaBox: {
     height: 96,
@@ -744,14 +751,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     gap: 4,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   typeOptionActive: {
-    backgroundColor: Colors.tertiaryFixed,
-    borderColor: Colors.primaryContainer,
+    backgroundColor: colors.tertiaryFixed,
+    borderColor: colors.primaryContainer,
   },
   typeIconRow: {
     flexDirection: 'row',
@@ -760,15 +767,15 @@ const styles = StyleSheet.create({
   },
   typeTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   typeTitleActive: {
-    color: Colors.onTertiaryContainer,
+    color: colors.onTertiaryContainer,
     fontWeight: '700',
   },
   typeDesc: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   twoCols: {
     flexDirection: 'row',
@@ -783,7 +790,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     marginBottom: Spacing.xs,
   },
   coverPreviewImage: {
@@ -803,7 +810,8 @@ const styles = StyleSheet.create({
   },
 });
 
-const pickerStyles = StyleSheet.create({
+const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: 0,
@@ -815,13 +823,13 @@ const pickerStyles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFill as any,
-    backgroundColor: Colors.scrim,
+    backgroundColor: colors.scrim,
   },
   backdropPressable: {
     ...StyleSheet.absoluteFill as any,
   },
   sheet: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: Spacing.md,
@@ -842,21 +850,21 @@ const pickerStyles = StyleSheet.create({
   },
   cancelText: {
     ...Typography.bodyMd,
-    color: Colors.outline,
+    color: colors.outline,
   },
   title: {
     ...Typography.titleMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   doneText: {
     ...Typography.bodyMd,
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
     fontWeight: '700',
   },
   preview: {
     ...Typography.titleLg,
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
     textAlign: 'center',
     marginBottom: Spacing.md,
     fontWeight: '700',
@@ -877,7 +885,7 @@ const pickerStyles = StyleSheet.create({
     left: 2,
     right: 2,
     height: ITEM_HEIGHT,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.md,
     zIndex: 0,
   },
@@ -888,11 +896,11 @@ const pickerStyles = StyleSheet.create({
   },
   itemText: {
     ...Typography.bodyMd,
-    color: Colors.outline,
+    color: colors.outline,
   },
   itemTextSelected: {
     ...Typography.titleMd,
-    color: Colors.onTertiaryFixed,
+    color: colors.onTertiaryFixed,
     fontWeight: '700',
   },
 });

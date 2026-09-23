@@ -84,7 +84,82 @@ export const Colors = {
   white: '#ffffff',
   black: '#000000',
   transparent: 'transparent',
-} as const;
+};
+
+export type ThemeColors = typeof Colors;
+
+export const DarkColors: ThemeColors = {
+  surface: '#151312',
+  surfaceDim: '#100f0e',
+  surfaceBright: '#242120',
+  surfaceContainerLowest: '#0d0c0b',
+  surfaceContainerLow: '#1c1a18',
+  surfaceContainer: '#22201e',
+  surfaceContainerHigh: '#2a2725',
+  surfaceContainerHighest: '#33302c',
+  surfaceVariant: '#33302c',
+
+  onSurface: '#ece6e2',
+  onSurfaceVariant: '#d0c2b3',
+  inverseSurface: '#fcf9f8',
+  inverseOnSurface: '#1c1b1b',
+
+  outline: '#998a7a',
+  outlineVariant: '#514535',
+
+  primary: '#feba48',
+  onPrimary: '#442b00',
+  primaryContainer: '#e8a736',
+  onPrimaryContainer: '#2a1700',
+  inversePrimary: '#805600',
+  primaryFixed: '#ffddaf',
+  primaryFixedDim: '#feba48',
+  onPrimaryFixed: '#281800',
+  onPrimaryFixedVariant: '#614000',
+
+  secondary: '#adc8f3',
+  onSecondary: '#133155',
+  secondaryContainer: '#2d486c',
+  onSecondaryContainer: '#d4e3ff',
+  secondaryFixed: '#d4e3ff',
+  secondaryFixedDim: '#adc8f3',
+  onSecondaryFixed: '#001c3a',
+  onSecondaryFixedVariant: '#2d486c',
+
+  tertiary: '#d5c4b4',
+  onTertiary: '#3a3025',
+  tertiaryContainer: '#504539',
+  onTertiaryContainer: '#f1dfcf',
+  tertiaryFixed: '#2a2725',
+  tertiaryFixedDim: '#22201e',
+  onTertiaryFixed: '#ece6e2',
+  onTertiaryFixedVariant: '#d0c2b3',
+
+  error: '#ffb4ab',
+  onError: '#690005',
+  errorContainer: '#93000a',
+  onErrorContainer: '#ffdad6',
+  success: '#4ade80',
+  successContainer: '#064e3b',
+  warning: '#fbbf24',
+  warningContainer: '#78350f',
+
+  background: '#151312',
+  onBackground: '#ece6e2',
+  cardBg: '#22201e',
+  cardBorder: '#383430',
+  scrim: 'rgba(0,0,0,0.65)',
+  backdrop: 'rgba(0,0,0,0.75)',
+
+  tabBarBackground: '#1a1816',
+  tabBarBorder: '#2a2725',
+  tabBarActive: '#e8a736',
+  tabBarInactive: '#998a7a',
+
+  white: '#ffffff',
+  black: '#000000',
+  transparent: 'transparent',
+};
 
 export const Typography = {
   headlineLg: {

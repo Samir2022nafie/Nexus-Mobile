@@ -23,7 +23,8 @@ import {
 import { useRouter, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { hangoutsService } from '../../src/services/hangouts';
 import { useAuth } from '../../src/context/AuthContext';
@@ -39,6 +40,8 @@ export default function HangoutsScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const { handleTabBarScroll } = useTabBarVisibility();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
 
   const lastScrollY = useRef(0);
   const lastScrollTime = useRef(Date.now());
@@ -207,11 +210,11 @@ export default function HangoutsScreen() {
       {/* Persistent Header: Search Bar + Live Beacon */}
       <View style={styles.persistentHeader}>
         <View style={styles.searchContainer}>
-          <MaterialIcons name="search" size={20} color={Colors.tertiary} />
+          <MaterialIcons name="search" size={20} color={colors.tertiary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search hangouts..."
-            placeholderTextColor={Colors.tertiary}
+            placeholderTextColor={colors.tertiary}
             value={search}
             onChangeText={setSearch}
             returnKeyType="search"
@@ -219,7 +222,7 @@ export default function HangoutsScreen() {
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+              <MaterialIcons name="close" size={18} color={colors.tertiary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -246,7 +249,7 @@ export default function HangoutsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.primaryContainer}
+            tintColor={colors.primaryContainer}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -255,7 +258,7 @@ export default function HangoutsScreen() {
           <LoadingSpinner message="Loading hangouts..." />
         ) : hangouts.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="explore" size={56} color={Colors.tertiary} />
+            <MaterialIcons name="explore" size={56} color={colors.tertiary} />
             <Text style={styles.emptyTitle}>No Hangouts Nearby</Text>
             <Text style={styles.emptySubtitle}>
               Nobody has organized a hangout nearby right now. Host a casual meetup, coffee chat, or study session!
@@ -265,7 +268,7 @@ export default function HangoutsScreen() {
               onPress={() => router.push('/new-hangout')}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="add" size={20} color={Colors.onPrimaryContainer} />
+              <MaterialIcons name="add" size={20} color={colors.onPrimaryContainer} />
               <Text style={styles.emptyActionText}>Host a Hangout</Text>
             </TouchableOpacity>
           </View>
@@ -307,7 +310,7 @@ export default function HangoutsScreen() {
                         />
                       ) : (
                         <View style={styles.hostAvatarFallback}>
-                          <MaterialIcons name="person" size={20} color={Colors.tertiary} />
+                          <MaterialIcons name="person" size={20} color={colors.tertiary} />
                         </View>
                       )}
                       <View>
@@ -325,7 +328,7 @@ export default function HangoutsScreen() {
                         </Text>
                       </View>
                       <View style={styles.distanceBadge}>
-                        <MaterialIcons name="near-me" size={13} color={Colors.tertiary} />
+                        <MaterialIcons name="near-me" size={13} color={colors.tertiary} />
                         <Text style={styles.distanceText}>{h.distanceText || (h.location?.place_name ? h.location.place_name.slice(0, 12) : 'Nearby')}</Text>
                       </View>
                     </View>
@@ -341,7 +344,7 @@ export default function HangoutsScreen() {
 
                   {/* Schedule */}
                   <View style={styles.scheduleRow}>
-                    <MaterialIcons name="schedule" size={16} color={dateInfo.isPassed ? Colors.outline : Colors.onSurfaceVariant} />
+                    <MaterialIcons name="schedule" size={16} color={dateInfo.isPassed ? colors.outline : colors.onSurfaceVariant} />
                     <Text style={[styles.scheduleText, dateInfo.isPassed && styles.textPassed]}>
                       {dateInfo.isPassed ? 'Ended' : dateInfo.dateText}
                     </Text>
@@ -368,9 +371,9 @@ export default function HangoutsScreen() {
                         {isJoined ? (
                           <MaterialIcons name="directions-walk" size={18} color="#ffffff" />
                         ) : isRequested ? (
-                          <MaterialIcons name="hourglass-empty" size={15} color={Colors.primary} />
+                          <MaterialIcons name="hourglass-empty" size={15} color={colors.primary} />
                         ) : (
-                          <RaisingHandIcon size={18} color={Colors.onPrimaryContainer} />
+                          <RaisingHandIcon size={18} color={colors.onPrimaryContainer} />
                         )}
                       </TouchableOpacity>
                     ) : (
@@ -389,15 +392,16 @@ export default function HangoutsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   persistentHeader: {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
@@ -431,38 +435,38 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   beaconText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.full,
     paddingHorizontal: 14,
     height: 44,
     marginBottom: Spacing.xs,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     gap: 8,
   },
   searchInput: {
     flex: 1,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     paddingVertical: 0,
   },
   hostAvatarFallback: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -471,12 +475,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   card: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.cardBg,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   cardHeader: {
@@ -496,7 +500,7 @@ const styles = StyleSheet.create({
   },
   hostName: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   headerRightBadges: {
@@ -545,17 +549,17 @@ const styles = StyleSheet.create({
   },
   distanceText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   cardTitle: {
     ...Typography.headlineSm,
     fontSize: 18,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   cardDesc: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     lineHeight: 20,
   },
   scheduleRow: {
@@ -566,7 +570,7 @@ const styles = StyleSheet.create({
   },
   scheduleText: {
     ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -578,7 +582,7 @@ const styles = StyleSheet.create({
   },
   spotsText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   hangoutActionIconBtn: {
@@ -592,17 +596,17 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   hangoutIconBtnOpen: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     borderWidth: 0,
     borderColor: 'transparent',
   },
   hangoutIconBtnRequest: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     borderWidth: 0,
     borderColor: 'transparent',
   },
   hangoutIconBtnRequested: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.22)' : '#fef3c7',
     borderWidth: 1.5,
     borderColor: '#f59e0b',
   },
@@ -615,26 +619,26 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   textPassed: {
-    color: Colors.outline,
+    color: colors.outline,
   },
   passedPill: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceVariant,
+    backgroundColor: colors.surfaceVariant,
   },
   passedPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   emptyContainer: {
     paddingVertical: Spacing.xxl,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -643,12 +647,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     ...Typography.headlineSm,
     fontSize: 20,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   emptySubtitle: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 22,
@@ -658,7 +662,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
@@ -666,6 +670,6 @@ const styles = StyleSheet.create({
   emptyActionText: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
 });

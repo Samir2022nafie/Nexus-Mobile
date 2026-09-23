@@ -23,7 +23,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { useAuth } from '../../src/context/AuthContext';
 import { eventsService } from '../../src/services/events';
@@ -33,6 +34,8 @@ import { formatCategoryName } from '../../src/utils/categories';
 export default function EventDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const { user } = useAuth();
   const { id, slug } = useLocalSearchParams<{ id: string; slug?: string }>();
 
@@ -180,7 +183,7 @@ export default function EventDetailScreen() {
         ]}
       >
         <View style={styles.notFoundIconBox}>
-          <MaterialIcons name="event-busy" size={40} color={Colors.tertiary} />
+          <MaterialIcons name="event-busy" size={40} color={colors.tertiary} />
         </View>
         <Text style={styles.notFoundTitle}>Event not found</Text>
         <Text style={styles.notFoundSub}>
@@ -191,7 +194,7 @@ export default function EventDetailScreen() {
           onPress={() => router.back()}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="arrow-back" size={18} color={Colors.onPrimaryContainer} />
+          <MaterialIcons name="arrow-back" size={18} color={colors.onPrimaryContainer} />
           <Text style={styles.backButtonText}>Back to Events</Text>
         </TouchableOpacity>
       </View>
@@ -312,7 +315,7 @@ export default function EventDetailScreen() {
               style={styles.heroCircleBtn}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="arrow-back" size={24} color={Colors.white} />
+              <MaterialIcons name="arrow-back" size={24} color={colors.white} />
             </TouchableOpacity>
 
             {isEventOrganizer && (
@@ -327,7 +330,7 @@ export default function EventDetailScreen() {
                   style={styles.heroCircleBtn}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons name="edit" size={20} color={Colors.white} />
+                  <MaterialIcons name="edit" size={20} color={colors.white} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -335,7 +338,7 @@ export default function EventDetailScreen() {
                   style={styles.heroCircleBtn}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons name="delete-outline" size={22} color={Colors.error} />
+                  <MaterialIcons name="delete-outline" size={22} color={colors.error} />
                 </TouchableOpacity>
               </View>
             )}
@@ -359,7 +362,7 @@ export default function EventDetailScreen() {
             activeOpacity={0.8}
           >
             <View style={styles.commIconProminent}>
-              <MaterialIcons name="groups" size={20} color={Colors.primary} />
+              <MaterialIcons name="groups" size={20} color={colors.primary} />
             </View>
             <Text style={styles.communityNameProminent} numberOfLines={1}>
               {event.community?.name || 'Nexus Community'}
@@ -378,7 +381,7 @@ export default function EventDetailScreen() {
             {/* Card 1: Date & Time */}
             <View style={styles.infoCard}>
               <View style={styles.cardIconBox}>
-                <MaterialIcons name="calendar-month" size={22} color={Colors.primary} />
+                <MaterialIcons name="calendar-month" size={22} color={colors.primary} />
               </View>
               <View style={styles.cardTextCol}>
                 <Text style={styles.cardPrimaryText}>{dateText}</Text>
@@ -389,7 +392,7 @@ export default function EventDetailScreen() {
             {/* Card 2: Location */}
             <View style={styles.infoCard}>
               <View style={styles.cardIconBox}>
-                <MaterialIcons name="location-on" size={22} color={Colors.secondary} />
+                <MaterialIcons name="location-on" size={22} color={colors.secondary} />
               </View>
               <View style={styles.cardTextCol}>
                 <Text style={styles.cardPrimaryText} numberOfLines={1}>
@@ -407,7 +410,7 @@ export default function EventDetailScreen() {
             <View style={styles.participantsHeaderRow}>
               <View style={styles.participantsTitleGroup}>
                 <View style={styles.participantsIconBox}>
-                  <MaterialIcons name="groups" size={20} color={Colors.primary} />
+                  <MaterialIcons name="groups" size={20} color={colors.primary} />
                 </View>
                 <Text style={styles.participantsMainTitle}>
                   {participantsCount} {isPassed ? 'went' : hasLimit ? `of ${maxSpots} going` : 'going'}
@@ -431,7 +434,7 @@ export default function EventDetailScreen() {
                         <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
                       ) : (
                         <View style={styles.participantAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
                         </View>
                       )}
                       <Text style={styles.participantNameText} numberOfLines={1}>
@@ -466,13 +469,13 @@ export default function EventDetailScreen() {
           {isPassed ? (
             isJoined ? (
               <>
-                <MaterialIcons name="check-circle" size={20} color={Colors.tertiary} />
-                <Text style={[styles.joinButtonText, { color: Colors.tertiary }]}>Attended</Text>
+                <MaterialIcons name="check-circle" size={20} color={colors.tertiary} />
+                <Text style={[styles.joinButtonText, { color: colors.tertiary }]}>Attended</Text>
               </>
             ) : (
               <>
-                <MaterialIcons name="event-busy" size={20} color={Colors.outline} />
-                <Text style={[styles.joinButtonText, { color: Colors.outline }]}>Event Ended</Text>
+                <MaterialIcons name="event-busy" size={20} color={colors.outline} />
+                <Text style={[styles.joinButtonText, { color: colors.outline }]}>Event Ended</Text>
               </>
             )
           ) : (
@@ -480,7 +483,7 @@ export default function EventDetailScreen() {
               <MaterialIcons
                 name={isJoined ? 'check-circle' : 'how-to-reg'}
                 size={20}
-                color={isJoined ? Colors.onSurface : Colors.onPrimaryContainer}
+                color={isJoined ? colors.onSurface : colors.onPrimaryContainer}
               />
               <Text
                 style={[
@@ -502,7 +505,7 @@ export default function EventDetailScreen() {
           <MaterialIcons
             name={isBookmarked ? 'bookmark' : 'bookmark-border'}
             size={24}
-            color={isBookmarked ? Colors.primaryContainer : Colors.tertiary}
+            color={isBookmarked ? colors.primaryContainer : colors.tertiary}
           />
         </TouchableOpacity>
       </View>
@@ -510,10 +513,11 @@ export default function EventDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
@@ -523,20 +527,20 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   notFoundTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginBottom: Spacing.xs,
   },
   notFoundSub: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -544,21 +548,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
   },
   backButtonText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   heroContainer: {
     width: '100%',
     height: 240,
     position: 'relative',
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
   },
   heroImage: {
     width: '100%',
@@ -629,7 +633,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -640,28 +644,28 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   modalTextArea: {
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     height: 100,
   },
   modalButtonsRow: {
@@ -677,18 +681,18 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     ...Typography.labelMd,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
   },
   modalSubmitBtn: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: 10,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   modalSubmitText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   body: {
@@ -697,7 +701,7 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     ...Typography.headlineMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     lineHeight: 30,
   },
@@ -719,18 +723,18 @@ const styles = StyleSheet.create({
   communityNameProminent: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   descriptionCard: {
     backgroundColor: '#ffffff',
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   descriptionText: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 22,
   },
   infoMatrix: {
@@ -740,38 +744,38 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   cardIconBox: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   cardTextCol: {
     flex: 1,
   },
   cardPrimaryText: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   cardSecondaryText: {
     ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     marginTop: 2,
   },
   participantsUniqueBox: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     borderWidth: 1.5,
@@ -799,11 +803,11 @@ const styles = StyleSheet.create({
   },
   participantsMainTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   spotsLeftBadge: {
-    backgroundColor: Colors.primaryFixed,
+    backgroundColor: colors.primaryFixed,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: BorderRadius.sm,
@@ -811,7 +815,7 @@ const styles = StyleSheet.create({
   spotsLeftText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.onPrimaryFixedVariant,
+    color: colors.onPrimaryFixedVariant,
   },
   noLimitBadge: {
     backgroundColor: 'rgba(5, 150, 105, 0.12)',
@@ -839,19 +843,19 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
   participantNameText: {
     fontSize: 10,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     fontWeight: '500',
   },
   emptyParticipantsText: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontStyle: 'italic',
     paddingVertical: 4,
   },
@@ -862,7 +866,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(252, 249, 248, 0.95)',
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
@@ -879,30 +883,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   btnNotJoinedState: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   btnJoinedState: {
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
   },
   joinButtonText: {
     ...Typography.labelLg,
     fontWeight: '700',
   },
   textNotJoinedState: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   textJoinedState: {
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   btnPassedState: {
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     opacity: 0.85,
   },
   bookmarkButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },

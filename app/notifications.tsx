@@ -20,7 +20,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { notificationsService } from '../src/services/notifications';
 import { NotificationItem as NotifType } from '../src/types';
@@ -39,6 +40,8 @@ function formatTimeAgo(rawDate?: string) {
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,20 +119,20 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'post_reaction':
         return (
-          <View style={[styles.iconBox, { backgroundColor: Colors.primaryFixed }]}>
-            <MaterialIcons name="favorite" size={22} color={Colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.primaryFixed }]}>
+            <MaterialIcons name="favorite" size={22} color={colors.primary} />
           </View>
         );
       case 'comment_reply':
         return (
-          <View style={[styles.iconBox, { backgroundColor: Colors.secondaryFixed }]}>
-            <MaterialIcons name="chat-bubble" size={22} color={Colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
+            <MaterialIcons name="chat-bubble" size={22} color={colors.secondary} />
           </View>
         );
       case 'follow':
         return (
-          <View style={[styles.iconBox, { backgroundColor: Colors.secondaryFixed }]}>
-            <MaterialIcons name="person-add" size={22} color={Colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
+            <MaterialIcons name="person-add" size={22} color={colors.secondary} />
           </View>
         );
       case 'hangout_request':
@@ -146,14 +149,14 @@ export default function NotificationsScreen() {
         );
       case 'event_approved':
         return (
-          <View style={[styles.iconBox, { backgroundColor: Colors.secondaryFixed }]}>
-            <MaterialIcons name="event-available" size={22} color={Colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
+            <MaterialIcons name="event-available" size={22} color={colors.secondary} />
           </View>
         );
       default:
         return (
-          <View style={[styles.iconBox, { backgroundColor: Colors.surfaceContainer }]}>
-            <MaterialIcons name="notifications" size={22} color={Colors.tertiary} />
+          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainer }]}>
+            <MaterialIcons name="notifications" size={22} color={colors.tertiary} />
           </View>
         );
     }
@@ -169,7 +172,7 @@ export default function NotificationsScreen() {
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>Notifications</Text>
         </View>
@@ -181,7 +184,7 @@ export default function NotificationsScreen() {
               style={styles.markReadBtn}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="done-all" size={16} color={Colors.secondary} />
+              <MaterialIcons name="done-all" size={16} color={colors.secondary} />
               <Text style={styles.markReadText}>Mark read</Text>
             </TouchableOpacity>
           )}
@@ -192,7 +195,7 @@ export default function NotificationsScreen() {
               style={styles.clearAllBtn}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="delete-sweep" size={17} color={Colors.error} />
+              <MaterialIcons name="delete-sweep" size={17} color={colors.error} />
               <Text style={styles.clearAllText}>Clear</Text>
             </TouchableOpacity>
           )}
@@ -209,7 +212,7 @@ export default function NotificationsScreen() {
               setRefreshing(true);
               fetchNotifications();
             }}
-            tintColor={Colors.primaryContainer}
+            tintColor={colors.primaryContainer}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -218,7 +221,7 @@ export default function NotificationsScreen() {
           <LoadingSpinner message="Checking notifications..." />
         ) : notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="notifications-none" size={56} color={Colors.tertiary} />
+            <MaterialIcons name="notifications-none" size={56} color={colors.tertiary} />
             <Text style={styles.emptyTitle}>You're all caught up!</Text>
             <Text style={styles.emptySubtitle}>
               No notifications right now. Activity and mentions in your communities and hangouts will appear here.
@@ -321,10 +324,11 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBar: {
     height: 56,
@@ -332,7 +336,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBarLeft: {
     flexDirection: 'row',
@@ -348,7 +352,7 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   topBarActions: {
     flexDirection: 'row',
@@ -362,11 +366,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: colors.secondaryFixed,
   },
   markReadText: {
     ...Typography.labelMd,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -381,7 +385,7 @@ const styles = StyleSheet.create({
   },
   clearAllText: {
     ...Typography.labelMd,
-    color: Colors.error,
+    color: colors.error,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -410,11 +414,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   unreadBadge: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
@@ -422,15 +426,15 @@ const styles = StyleSheet.create({
   unreadBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   sectionSub: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   earlierTitle: {
     ...Typography.labelMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   itemsList: {
@@ -443,13 +447,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     gap: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   unreadCard: {
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
   readCard: {
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
   },
   iconBox: {
     width: 44,
@@ -463,13 +467,13 @@ const styles = StyleSheet.create({
   },
   itemTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     lineHeight: 18,
   },
   itemMessage: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 2,
   },
   itemMetaRow: {
@@ -480,33 +484,33 @@ const styles = StyleSheet.create({
   },
   itemTime: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   metaDot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: Colors.outlineVariant,
+    backgroundColor: colors.outlineVariant,
   },
   itemCategory: {
     ...Typography.captionSm,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   unreadBlueDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.secondary,
+    backgroundColor: colors.secondary,
     alignSelf: 'center',
   },
   emptyContainer: {
     paddingVertical: Spacing.xxl,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
@@ -515,12 +519,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     ...Typography.headlineSm,
     fontSize: 20,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   emptySubtitle: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 22,

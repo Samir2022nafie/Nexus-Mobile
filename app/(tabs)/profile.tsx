@@ -24,11 +24,13 @@ import {
   Modal,
   TextInput,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { usersService } from '../../src/services/users';
 import { postsService } from '../../src/services/posts';
@@ -77,8 +79,50 @@ export default function ProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { user, refreshUser } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const scrollViewRef = useRef<ScrollView>(null);
+  const horizontalRef = useRef<any>(null);
+  const profileScrollX = useRef(new Animated.Value(0)).current;
+
+  // Geometry for animated tabs (4 tabs)
+  const profileTrackWidth = screenWidth - Spacing.md * 2;
+  const profileTabWidth = (profileTrackWidth - 8) / 4;
+  const profileIndicatorWidth = profileTabWidth * 0.7;
+  const profileIndicatorOffset = (profileTabWidth - profileIndicatorWidth) / 2;
+
+  const profileIndicatorTranslateX = profileScrollX.interpolate({
+    inputRange: [0, screenWidth, 2 * screenWidth, 3 * screenWidth],
+    outputRange: [
+      4 + profileIndicatorOffset,
+      4 + profileTabWidth + profileIndicatorOffset,
+      4 + 2 * profileTabWidth + profileIndicatorOffset,
+      4 + 3 * profileTabWidth + profileIndicatorOffset,
+    ],
+    extrapolate: 'clamp',
+  });
+
+  const profilePillTranslateX = profileScrollX.interpolate({
+    inputRange: [0, screenWidth, 2 * screenWidth, 3 * screenWidth],
+    outputRange: [
+      4,
+      4 + profileTabWidth,
+      4 + 2 * profileTabWidth,
+      4 + 3 * profileTabWidth,
+    ],
+    extrapolate: 'clamp',
+  });
+
+  const handleSelectMainTab = (tabId: MainTab) => {
+    setActiveTab(tabId);
+    const index = MAIN_TABS.findIndex((t) => t.id === tabId);
+    if (index !== -1) {
+      horizontalRef.current?.scrollTo({ x: index * screenWidth, animated: true });
+    }
+  };
+
   const {
     likedPosts: globalLiked,
     savedPosts: globalSaved,
@@ -569,7 +613,7 @@ export default function ProfileScreen() {
           left: 0,
           right: 0,
           height: insets.top,
-          backgroundColor: Colors.surface,
+          backgroundColor: colors.surface,
           zIndex: 9999,
         }}
       />
@@ -610,7 +654,7 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
             accessibilityLabel="Settings"
           >
-            <MaterialIcons name="settings" size={24} color={Colors.onSurface} />
+            <MaterialIcons name="settings" size={24} color={colors.onSurface} />
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -628,7 +672,7 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.primaryContainer}
+            tintColor={colors.primaryContainer}
             progressViewOffset={Math.max(insets.top, 10) + 40}
           />
         }
@@ -649,11 +693,11 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={[styles.avatarImage, styles.avatarFallback]}>
-                <MaterialIcons name="person" size={54} color={Colors.tertiary} />
+                <MaterialIcons name="person" size={54} color={colors.tertiary} />
               </View>
             )}
             <View style={styles.cameraBadge}>
-              <MaterialIcons name="photo-camera" size={16} color={Colors.onPrimary} />
+              <MaterialIcons name="photo-camera" size={16} color={colors.onPrimary} />
             </View>
           </TouchableOpacity>
 
@@ -690,29 +734,51 @@ export default function ProfileScreen() {
 
           {/* Compact Trust Badge */}
           <View style={styles.trustBadge}>
-            <MaterialIcons name="verified" size={14} color={Colors.primaryContainer} />
+            <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
             <Text style={styles.trustBadgeText}>
               Trust Score: {user?.trust_score ?? 50}
             </Text>
           </View>
         </View>
 
-        {/* 4 Main Tabs with Icons & Selection Pill */}
+        {/* 4 Main Tabs with Animated Underline and Tab Color Highlight */}
         <View style={styles.tabsWrapper}>
           <View style={styles.tabsContainer}>
+            {/* Animated Active Pill Backdrop */}
+            <Animated.View
+              style={[
+                styles.animatedActivePill,
+                {
+                  width: profileTabWidth,
+                  transform: [{ translateX: profilePillTranslateX }],
+                },
+              ]}
+            />
+
+            {/* Animated Underline Bar */}
+            <Animated.View
+              style={[
+                styles.animatedIndicatorBar,
+                {
+                  width: profileIndicatorWidth,
+                  transform: [{ translateX: profileIndicatorTranslateX }],
+                },
+              ]}
+            />
+
             {MAIN_TABS.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <TouchableOpacity
                   key={tab.id}
-                  style={[styles.tabIconPill, isActive && styles.tabIconPillActive]}
-                  onPress={() => setActiveTab(tab.id)}
+                  style={styles.tabIconBtn}
+                  onPress={() => handleSelectMainTab(tab.id)}
                   activeOpacity={0.75}
                 >
                   <MaterialIcons
                     name={tab.icon as any}
-                    size={20}
-                    color={isActive ? Colors.onPrimaryContainer : Colors.secondary}
+                    size={19}
+                    color={isActive ? (isDark ? '#feba48' : colors.primaryContainer) : colors.tertiary}
                   />
                   <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                     {tab.label}
@@ -723,9 +789,36 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Tab 1: Activity (Posts & Comments) */}
-        {activeTab === 'Posts' && (
-          <View style={styles.tabContentArea}>
+        {/* Horizontal Swiping Pager across 4 Profile Tabs */}
+        <Animated.ScrollView
+          ref={horizontalRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: profileScrollX } } }],
+            {
+              useNativeDriver: false,
+              listener: (e: any) => {
+                const x = e.nativeEvent.contentOffset.x;
+                const idx = Math.round(x / screenWidth);
+                if (MAIN_TABS[idx] && MAIN_TABS[idx].id !== activeTab) {
+                  setActiveTab(MAIN_TABS[idx].id);
+                }
+              },
+            }
+          )}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={(e) => {
+            const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+            if (MAIN_TABS[idx] && MAIN_TABS[idx].id !== activeTab) {
+              setActiveTab(MAIN_TABS[idx].id);
+            }
+          }}
+        >
+          {/* Page 0: Activity (Posts & Comments) */}
+          <View style={{ width: screenWidth, paddingHorizontal: Spacing.md }}>
+            <View style={styles.tabContentArea}>
             {/* Sub-tabs: Posts | Comments */}
             <View style={styles.subTabsRow}>
               {POSTS_SUB_TABS.map((sub) => {
@@ -748,7 +841,7 @@ export default function ProfileScreen() {
             {postsSubTab === 'Posts' ? (
               myPosts.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <MaterialIcons name="dynamic-feed" size={36} color={Colors.tertiary} />
+                  <MaterialIcons name="dynamic-feed" size={36} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No Posts Published</Text>
                   <Text style={styles.emptyDesc}>
                     Discussions and updates you share will appear here.
@@ -778,7 +871,7 @@ export default function ProfileScreen() {
               )
             ) : myComments.length === 0 ? (
               <View style={styles.emptyCard}>
-                <MaterialIcons name="chat-bubble-outline" size={36} color={Colors.tertiary} />
+                <MaterialIcons name="chat-bubble-outline" size={36} color={colors.tertiary} />
                 <Text style={styles.emptyTitle}>No Comments Yet</Text>
                 <Text style={styles.emptyDesc}>
                   Comments you add to community discussions will appear here.
@@ -804,7 +897,7 @@ export default function ProfileScreen() {
                     {/* Comment Header with discussion context */}
                     <View style={styles.profileCommentHeader}>
                       <View style={styles.profileCommentContextRow}>
-                        <MaterialIcons name="chat-bubble-outline" size={15} color={Colors.primary} />
+                        <MaterialIcons name="chat-bubble-outline" size={15} color={colors.primary} />
                         <Text style={styles.profileCommentContextText} numberOfLines={1}>
                           {comment.postTitle ? `In: ${comment.postTitle}` : 'In discussion'}
                         </Text>
@@ -824,18 +917,18 @@ export default function ProfileScreen() {
                     {/* Tap prompt */}
                     <View style={styles.profileCommentFooter}>
                       <Text style={styles.profileCommentTapHint}>View discussion</Text>
-                      <MaterialIcons name="arrow-forward" size={13} color={Colors.primary} />
+                      <MaterialIcons name="arrow-forward" size={13} color={colors.primary} />
                     </View>
                   </TouchableOpacity>
                 );
               })
             )}
+            </View>
           </View>
-        )}
 
-        {/* Tab 2: Bookmarks (Saved) */}
-        {activeTab === 'Bookmarks' && (
-          <View style={styles.tabContentArea}>
+          {/* Page 1: Bookmarks (Saved) */}
+          <View style={{ width: screenWidth, paddingHorizontal: Spacing.md }}>
+            <View style={styles.tabContentArea}>
             {/* Sub-tabs: Posts | Events | Hangouts */}
             <View style={styles.subTabsRow}>
               {BOOKMARKS_SUB_TABS.map((sub) => {
@@ -858,7 +951,7 @@ export default function ProfileScreen() {
             {bookmarksSubTab === 'Posts' ? (
               savedPosts.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <MaterialIcons name="bookmark-border" size={36} color={Colors.tertiary} />
+                  <MaterialIcons name="bookmark-border" size={36} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No Saved Posts</Text>
                   <Text style={styles.emptyDesc}>Bookmark posts you want to revisit later.</Text>
                 </View>
@@ -880,7 +973,7 @@ export default function ProfileScreen() {
             ) : bookmarksSubTab === 'Events' ? (
               savedEvents.length === 0 ? (
                 <View style={styles.emptyCard}>
-                  <MaterialIcons name="event" size={36} color={Colors.tertiary} />
+                  <MaterialIcons name="event" size={36} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No Saved Events</Text>
                   <Text style={styles.emptyDesc}>Bookmark events you plan to attend.</Text>
                 </View>
@@ -925,7 +1018,7 @@ export default function ProfileScreen() {
                           }}
                           activeOpacity={0.8}
                         >
-                          <MaterialIcons name="bookmark" size={18} color={Colors.primaryContainer} />
+                          <MaterialIcons name="bookmark" size={18} color={colors.primaryContainer} />
                         </TouchableOpacity>
                       </View>
                       <View style={styles.eventBody}>
@@ -942,19 +1035,19 @@ export default function ProfileScreen() {
                             <MaterialIcons
                               name="calendar-today"
                               size={13}
-                              color={cat.isPassed ? Colors.tertiary : Colors.primary}
+                              color={cat.isPassed ? colors.tertiary : colors.primary}
                             />
                             <Text
                               style={[
                                 styles.metaText,
-                                cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                                cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                               ]}
                             >
                               {cat.dateText}
                             </Text>
                           </View>
                           <View style={styles.metaItem}>
-                            <MaterialIcons name="group" size={13} color={Colors.secondary} />
+                            <MaterialIcons name="group" size={13} color={colors.secondary} />
                             <Text style={styles.metaTextSec}>
                               {`${ev.participantsCount ?? ev.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
                             </Text>
@@ -967,7 +1060,7 @@ export default function ProfileScreen() {
               )
             ) : savedHangouts.length === 0 ? (
               <View style={styles.emptyCard}>
-                <MaterialIcons name="groups" size={36} color={Colors.tertiary} />
+                <MaterialIcons name="groups" size={36} color={colors.tertiary} />
                 <Text style={styles.emptyTitle}>No Saved Hangouts</Text>
                 <Text style={styles.emptyDesc}>Bookmark meetups and co-working sessions.</Text>
               </View>
@@ -1002,7 +1095,7 @@ export default function ProfileScreen() {
                               />
                             ) : (
                               <View style={styles.hangoutAvatarFallback}>
-                                <MaterialIcons name="person" size={15} color={Colors.tertiary} />
+                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
                               </View>
                             )}
                             <Text style={styles.hangoutCreatorName} numberOfLines={1}>
@@ -1036,12 +1129,12 @@ export default function ProfileScreen() {
                           <MaterialIcons
                             name="schedule"
                             size={13}
-                            color={cat.status === 'today' ? Colors.primary : Colors.onSurfaceVariant}
+                            color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
                           />
                           <Text
                             style={[
                               styles.hangoutScheduleText,
-                              cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                             ]}
                           >
                             {cat.dateText}
@@ -1069,7 +1162,7 @@ export default function ProfileScreen() {
                           activeOpacity={0.7}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
-                          <MaterialIcons name="bookmark" size={18} color={Colors.primaryContainer} />
+                          <MaterialIcons name="bookmark" size={18} color={colors.primaryContainer} />
                         </TouchableOpacity>
                       </View>
                     </TouchableOpacity>
@@ -1077,19 +1170,19 @@ export default function ProfileScreen() {
                 })}
               </View>
             )}
+            </View>
           </View>
-        )}
 
-        {/* Tab 3: Hangouts */}
-        {activeTab === 'Hangouts' && (
-          <View style={styles.tabContentArea}>
+          {/* Page 2: Hangouts */}
+          <View style={{ width: screenWidth, paddingHorizontal: Spacing.md }}>
+            <View style={styles.tabContentArea}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Hosted by You</Text>
             </View>
 
             {myHangouts.length === 0 ? (
               <View style={styles.emptyCard}>
-                <MaterialIcons name="groups" size={36} color={Colors.tertiary} />
+                <MaterialIcons name="groups" size={36} color={colors.tertiary} />
                 <Text style={styles.emptyTitle}>No Hangouts Hosted</Text>
                 <Text style={styles.emptyDesc}>
                   Host a spontaneous hangout, study session, or coffee meetup!
@@ -1125,7 +1218,7 @@ export default function ProfileScreen() {
                               />
                             ) : (
                               <View style={styles.hangoutAvatarFallback}>
-                                <MaterialIcons name="person" size={15} color={Colors.tertiary} />
+                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
                               </View>
                             )}
                             <Text style={styles.hangoutCreatorName} numberOfLines={1}>
@@ -1159,12 +1252,12 @@ export default function ProfileScreen() {
                           <MaterialIcons
                             name="schedule"
                             size={13}
-                            color={cat.status === 'today' ? Colors.primary : Colors.onSurfaceVariant}
+                            color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
                           />
                           <Text
                             style={[
                               styles.hangoutScheduleText,
-                              cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                             ]}
                           >
                             {cat.dateText}
@@ -1189,19 +1282,19 @@ export default function ProfileScreen() {
                 })}
               </View>
             )}
+            </View>
           </View>
-        )}
 
-        {/* Tab 4: Events */}
-        {activeTab === 'Events' && (
-          <View style={styles.tabContentArea}>
+          {/* Page 3: Events */}
+          <View style={{ width: screenWidth, paddingHorizontal: Spacing.md }}>
+            <View style={styles.tabContentArea}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Organized by You</Text>
             </View>
 
             {myEvents.length === 0 ? (
               <View style={styles.emptyCard}>
-                <MaterialIcons name="event" size={36} color={Colors.tertiary} />
+                <MaterialIcons name="event" size={36} color={colors.tertiary} />
                 <Text style={styles.emptyTitle}>No Events Organized</Text>
                 <Text style={styles.emptyDesc}>
                   Propose or host workshops, meetups, and community gatherings.
@@ -1255,19 +1348,19 @@ export default function ProfileScreen() {
                           <MaterialIcons
                             name="calendar-today"
                             size={13}
-                            color={cat.isPassed ? Colors.tertiary : Colors.primary}
+                            color={cat.isPassed ? colors.tertiary : colors.primary}
                           />
                           <Text
                             style={[
                               styles.metaText,
-                              cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                             ]}
                           >
                             {cat.dateText}
                           </Text>
                         </View>
                         <View style={styles.metaItem}>
-                          <MaterialIcons name="group" size={13} color={Colors.secondary} />
+                          <MaterialIcons name="group" size={13} color={colors.secondary} />
                           <Text style={styles.metaTextSec}>
                             {`${ev.participantsCount ?? ev.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
                           </Text>
@@ -1278,8 +1371,9 @@ export default function ProfileScreen() {
                 );
               })
             )}
+            </View>
           </View>
-        )}
+        </Animated.ScrollView>
       </ScrollView>
 
       {/* Edit Modal */}
@@ -1291,7 +1385,7 @@ export default function ProfileScreen() {
                 Edit {editModal?.type === 'post' ? 'Post' : editModal?.type === 'comment' ? 'Comment' : editModal?.type === 'hangout' ? 'Hangout' : 'Event'}
               </Text>
               <TouchableOpacity onPress={() => setEditModal(null)}>
-                <MaterialIcons name="close" size={22} color={Colors.tertiary} />
+                <MaterialIcons name="close" size={22} color={colors.tertiary} />
               </TouchableOpacity>
             </View>
 
@@ -1299,7 +1393,7 @@ export default function ProfileScreen() {
               <TextInput
                 style={styles.modalInput}
                 placeholder="Title"
-                placeholderTextColor={Colors.tertiary}
+                placeholderTextColor={colors.tertiary}
                 value={editModal?.title}
                 onChangeText={(text) =>
                   setEditModal((prev) => (prev ? { ...prev, title: text } : null))
@@ -1310,7 +1404,7 @@ export default function ProfileScreen() {
             <TextInput
               style={[styles.modalInput, styles.modalTextArea]}
               placeholder={editModal?.type === 'comment' ? 'Your comment...' : 'Description / content...'}
-              placeholderTextColor={Colors.tertiary}
+              placeholderTextColor={colors.tertiary}
               value={editModal?.content}
               onChangeText={(text) =>
                 setEditModal((prev) => (prev ? { ...prev, content: text } : null))
@@ -1344,17 +1438,18 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   slidingHeader: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: 48,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     zIndex: 9998,
     borderBottomWidth: 0,
   },
@@ -1383,14 +1478,14 @@ const styles = StyleSheet.create({
     ...Typography.headlineSm,
     fontSize: 17,
     fontWeight: '700',
-    color: Colors.onSurface,
+    color: colors.onSurface,
     textAlign: 'center',
   },
   settingsButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1398,7 +1493,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: Spacing.md,
     paddingBottom: 48,
   },
 
@@ -1407,6 +1501,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 0,
     paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   avatarWrapper: {
     position: 'relative',
@@ -1417,7 +1512,7 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     borderWidth: 3,
-    borderColor: Colors.surfaceContainerHigh,
+    borderColor: colors.surfaceContainerHigh,
   },
   cameraBadge: {
     position: 'absolute',
@@ -1426,20 +1521,20 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
   },
   displayNameText: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginTop: 2,
   },
   usernameText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 1,
   },
   statsMatrix: {
@@ -1458,22 +1553,22 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     height: 20,
-    backgroundColor: Colors.cardBorder,
+    backgroundColor: colors.cardBorder,
   },
   statValue: {
     ...Typography.headlineSm,
     fontSize: 18,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   statLabel: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 2,
   },
   bioText: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: Spacing.xs,
     maxWidth: 300,
@@ -1481,61 +1576,77 @@ const styles = StyleSheet.create({
   },
   addBioPrompt: {
     ...Typography.captionMd,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
     marginTop: Spacing.xs,
   },
   trustBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
     gap: 4,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   trustBadgeText: {
     ...Typography.captionSm,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
   },
 
-  // 4 Main Tabs — Segmented Icon Pills
+  // 4 Main Tabs with Animated Underline and Color Highlight
   tabsWrapper: {
     marginTop: Spacing.xs,
     marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
   tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: BorderRadius.full,
+    alignItems: 'center',
+    backgroundColor: isDark ? colors.surfaceContainerLow : '#F0ECE8',
+    borderRadius: BorderRadius.xl,
     padding: 4,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
+    position: 'relative',
+    height: 46,
   },
-  tabIconPill: {
+  animatedActivePill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surface,
+    ...Shadows.sm,
+  },
+  animatedIndicatorBar: {
+    position: 'absolute',
+    bottom: 5,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primaryContainer,
+    zIndex: 2,
+  },
+  tabIconBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.full,
-  },
-  tabIconPillActive: {
-    backgroundColor: Colors.primaryContainer,
-    ...Shadows.sm,
+    height: '100%',
+    zIndex: 3,
   },
   tabLabel: {
     fontSize: 12,
-    color: Colors.secondary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   tabLabelActive: {
-    color: Colors.onPrimaryContainer,
+    color: isDark ? '#feba48' : colors.primaryContainer,
     fontWeight: '700',
   },
 
@@ -1554,29 +1665,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
   },
   subTabBtnActive: {
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: colors.secondaryFixed,
   },
   subTabTxt: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '500',
   },
   subTabTxtActive: {
-    color: Colors.onSecondaryFixed,
+    color: colors.onSecondaryFixed,
     fontWeight: '700',
   },
 
   // Cards
   itemCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   cardHeaderRow: {
@@ -1585,7 +1696,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   commBadge: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
@@ -1593,10 +1704,10 @@ const styles = StyleSheet.create({
   commBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   hangoutBadge: {
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: colors.secondaryFixed,
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
@@ -1604,7 +1715,7 @@ const styles = StyleSheet.create({
   hangoutBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.onSecondaryFixed,
+    color: colors.onSecondaryFixed,
   },
   cardActionsRow: {
     flexDirection: 'row',
@@ -1621,26 +1732,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   unsaveText: {
     ...Typography.captionSm,
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
     fontWeight: '700',
   },
   itemTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   itemContent: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
   },
   commentMetaText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   metaFooterRow: {
     flexDirection: 'row',
@@ -1650,7 +1761,7 @@ const styles = StyleSheet.create({
   },
   metaFooterText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -1660,14 +1771,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   createSmallBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: BorderRadius.full,
@@ -1675,36 +1786,36 @@ const styles = StyleSheet.create({
   createSmallBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
 
   // Empty state
   emptyCard: {
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
   },
   emptyTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginTop: 4,
   },
   emptyDesc: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     maxWidth: 260,
   },
   emptyActionBtn: {
     marginTop: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
@@ -1712,7 +1823,7 @@ const styles = StyleSheet.create({
   emptyActionBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
 
   // Modal
@@ -1725,7 +1836,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: Spacing.md,
@@ -1738,18 +1849,18 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   modalInput: {
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   modalTextArea: {
     minHeight: 90,
@@ -1766,17 +1877,17 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     ...Typography.labelMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   modalSaveBtn: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
   },
   modalSaveText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
 
@@ -1790,12 +1901,12 @@ const styles = StyleSheet.create({
   savedHangoutCard: {
     width: '48.5%',
     minHeight: 185,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     padding: Spacing.sm,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   savedCardUnsaveIcon: {
@@ -1803,11 +1914,11 @@ const styles = StyleSheet.create({
   },
   savedEventCardFull: {
     width: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: isDark ? colors.surfaceContainerLow : '#ffffff',
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: 12,
     ...Shadows.sm,
   },
@@ -1833,7 +1944,7 @@ const styles = StyleSheet.create({
   eventCategoryBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   eventUnsaveTopBtn: {
     position: 'absolute',
@@ -1850,12 +1961,12 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   eventCommunityNameText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 1,
   },
   eventMetaRow: {
@@ -1870,11 +1981,11 @@ const styles = StyleSheet.create({
   },
   metaText: {
     ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   metaTextSec: {
     ...Typography.captionMd,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
   },
 
@@ -1887,11 +1998,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   hangoutPillOpen: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     ...Shadows.sm,
   },
   hangoutPillRequest: {
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: colors.secondaryFixed,
   },
   openDot: {
     width: 6,
@@ -1904,14 +2015,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   hangoutPillOpenText: {
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   hangoutPillRequestText: {
-    color: Colors.secondary,
+    color: colors.secondary,
   },
   hangoutTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   hangoutHeader: {
@@ -1935,13 +2046,13 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
   hangoutCreatorName: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
     flex: 1,
   },
@@ -1953,7 +2064,7 @@ const styles = StyleSheet.create({
   },
   hangoutScheduleText: {
     ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   hangoutFooter: {
     flexDirection: 'row',
@@ -1963,7 +2074,7 @@ const styles = StyleSheet.create({
   },
   hangoutSpotsText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   itemCardPassed: {
@@ -1972,18 +2083,18 @@ const styles = StyleSheet.create({
 
   // Discussion / Post card styles (exact match to home feed)
   discussionCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: 12,
     ...Shadows.sm,
   },
   postCommunityHeader: {
     ...Typography.captionSm,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
     marginBottom: 2,
     letterSpacing: 0.3,
@@ -2008,13 +2119,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
   authorName: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '600',
   },
   postTagsWrapper: {
@@ -2035,16 +2146,16 @@ const styles = StyleSheet.create({
   postTagBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   postTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   postContent: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginTop: 2,
   },
@@ -2068,28 +2179,28 @@ const styles = StyleSheet.create({
   },
   counterText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   iconOnly: {
     padding: 2,
   },
   postTimestampBelow: {
     fontSize: 11,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 2,
   },
   avatarFallback: {
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileCommentCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   profileCommentHeader: {
@@ -2106,24 +2217,24 @@ const styles = StyleSheet.create({
   },
   profileCommentContextText: {
     ...Typography.captionSm,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
     flex: 1,
   },
   profileCommentTime: {
     fontSize: 11,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   profileCommentQuoteBox: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.sm,
     borderRadius: BorderRadius.md,
     borderLeftWidth: 3,
-    borderLeftColor: Colors.primary,
+    borderLeftColor: colors.primary,
   },
   profileCommentBody: {
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     lineHeight: 20,
     fontStyle: 'italic',
   },
@@ -2137,6 +2248,6 @@ const styles = StyleSheet.create({
   profileCommentTapHint: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
 });

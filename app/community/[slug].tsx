@@ -23,7 +23,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { AppBottomBar } from '../../src/components/navigation/AppBottomBar';
 import { communitiesService } from '../../src/services/communities';
@@ -55,6 +56,8 @@ export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
 
   const [community, setCommunity] = useState<Community | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -193,7 +196,7 @@ export default function CommunityDetailScreen() {
         ]}
       >
         <View style={styles.notFoundIconBox}>
-          <MaterialIcons name="groups" size={40} color={Colors.tertiary} />
+          <MaterialIcons name="groups" size={36} color={colors.primary} />
         </View>
         <Text style={styles.notFoundTitle}>Community not found</Text>
         <Text style={styles.notFoundSub}>
@@ -204,7 +207,7 @@ export default function CommunityDetailScreen() {
           onPress={() => router.back()}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="arrow-back" size={18} color={Colors.onPrimaryContainer} />
+          <MaterialIcons name="arrow-back" size={18} color={colors.onPrimaryContainer} />
           <Text style={styles.backButtonText}>Back to Communities</Text>
         </TouchableOpacity>
       </View>
@@ -251,7 +254,7 @@ export default function CommunityDetailScreen() {
             style={styles.backIconButton}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
           </TouchableOpacity>
           <Text style={styles.searchHeaderTitle}>Community Events</Text>
           <View style={{ width: 40 }} />
@@ -259,18 +262,18 @@ export default function CommunityDetailScreen() {
 
         {/* Search Input Box */}
         <View style={styles.eventSearchBox}>
-          <MaterialIcons name="search" size={20} color={Colors.tertiary} />
+          <MaterialIcons name="search" size={20} color={colors.tertiary} />
           <TextInput
             style={styles.eventSearchInput}
             placeholder="Search events..."
-            placeholderTextColor={Colors.tertiary}
+            placeholderTextColor={colors.tertiary}
             value={eventSearch}
             onChangeText={setEventSearch}
             returnKeyType="search"
           />
           {eventSearch ? (
             <TouchableOpacity onPress={() => setEventSearch('')}>
-              <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+              <MaterialIcons name="close" size={18} color={colors.tertiary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -283,7 +286,7 @@ export default function CommunityDetailScreen() {
         >
           {filteredEvents.length === 0 ? (
             <View style={styles.emptyEventsBox}>
-              <MaterialIcons name="event-busy" size={40} color={Colors.tertiary} />
+              <MaterialIcons name="event-busy" size={40} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No events found</Text>
               <Text style={styles.emptyFeedSubtitle}>
                 Try adjusting your search terms or check back later.
@@ -320,7 +323,7 @@ export default function CommunityDetailScreen() {
                   </Text>
                   <View style={styles.verticalEventMeta}>
                     <View style={styles.metaItem}>
-                      <MaterialIcons name="calendar-today" size={14} color={Colors.primary} />
+                      <MaterialIcons name="calendar-today" size={14} color={colors.primary} />
                       <Text style={styles.metaText}>
                         {(ev as any).starts_at
                           ? new Date((ev as any).starts_at).toLocaleDateString()
@@ -328,7 +331,7 @@ export default function CommunityDetailScreen() {
                       </Text>
                     </View>
                     <View style={styles.metaItem}>
-                      <MaterialIcons name="group" size={14} color={Colors.secondary} />
+                      <MaterialIcons name="group" size={14} color={colors.secondary} />
                       <Text style={styles.metaTextSec}>
                         {(() => {
                           const evDate = (ev as any).ends_at || (ev as any).endsAt || (ev as any).starts_at || (ev as any).startsAt;
@@ -366,8 +369,8 @@ export default function CommunityDetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[Colors.primaryContainer]}
-            tintColor={Colors.primaryContainer}
+            colors={[colors.primaryContainer]}
+            tintColor={colors.primaryContainer}
           />
         }
       >
@@ -390,7 +393,7 @@ export default function CommunityDetailScreen() {
               style={styles.navCircleBtn}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="arrow-back" size={22} color={Colors.onSurface} />
+              <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
             </TouchableOpacity>
 
             {Boolean(
@@ -405,7 +408,7 @@ export default function CommunityDetailScreen() {
                 style={styles.navCircleBtn}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="edit" size={20} color={Colors.onSurface} />
+                <MaterialIcons name="edit" size={20} color={colors.onSurface} />
               </TouchableOpacity>
             )}
           </View>
@@ -422,7 +425,7 @@ export default function CommunityDetailScreen() {
                   />
                 ) : (
                   <View style={styles.communityAvatarFallback}>
-                    <MaterialIcons name="groups" size={32} color={Colors.primary} />
+                    <MaterialIcons name="groups" size={32} color={colors.primary} />
                   </View>
                 )}
                 <View style={styles.onlineRing}>
@@ -443,7 +446,7 @@ export default function CommunityDetailScreen() {
                 <MaterialIcons
                   name={community.isMember ? 'check' : 'add'}
                   size={18}
-                  color={community.isMember ? '#2e7d32' : Colors.onPrimaryContainer}
+                  color={community.isMember ? '#2e7d32' : colors.onPrimaryContainer}
                 />
                 <Text
                   style={[
@@ -473,7 +476,7 @@ export default function CommunityDetailScreen() {
                 </Text>
               </View>
               <View style={styles.memberCountRow}>
-                <MaterialIcons name="group" size={14} color={Colors.tertiary} />
+                <MaterialIcons name="group" size={14} color={colors.tertiary} />
                 <Text style={styles.memberCountText}>
                   {community.memberCount || 0} members
                 </Text>
@@ -502,13 +505,13 @@ export default function CommunityDetailScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.rulesTitleGroup}>
-                  <MaterialIcons name="gavel" size={16} color={Colors.secondary} />
+                  <MaterialIcons name="gavel" size={16} color={colors.secondary} />
                   <Text style={styles.rulesHeaderText}>Rules of this Community</Text>
                 </View>
                 <MaterialIcons
                   name={rulesExpanded ? 'keyboard-arrow-down' : 'chevron-right'}
                   size={20}
-                  color={Colors.tertiary}
+                  color={colors.tertiary}
                 />
               </TouchableOpacity>
 
@@ -543,13 +546,13 @@ export default function CommunityDetailScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={styles.seeAllText}>more</Text>
-                <MaterialIcons name="chevron-right" size={16} color={Colors.secondary} />
+                <MaterialIcons name="chevron-right" size={16} color={colors.secondary} />
               </TouchableOpacity>
             </View>
 
             {events.length === 0 ? (
               <View style={styles.emptySectionCard}>
-                <MaterialIcons name="event" size={28} color={Colors.tertiary} />
+                <MaterialIcons name="event" size={28} color={colors.tertiary} />
                 <Text style={styles.emptyFeedTitle}>No upcoming events</Text>
                 <Text style={styles.emptyFeedSubtitle}>
                   Events scheduled in this community will appear here.
@@ -588,7 +591,7 @@ export default function CommunityDetailScreen() {
                       </Text>
                       <View style={styles.eventMetaRow}>
                         <View style={styles.metaItem}>
-                          <MaterialIcons name="calendar-today" size={13} color={Colors.primary} />
+                          <MaterialIcons name="calendar-today" size={13} color={colors.primary} />
                           <Text style={styles.metaText}>
                             {(ev as any).starts_at
                               ? new Date((ev as any).starts_at).toLocaleDateString()
@@ -618,7 +621,7 @@ export default function CommunityDetailScreen() {
 
             {posts.length === 0 ? (
               <View style={styles.emptySectionCard}>
-                <MaterialIcons name="forum" size={28} color={Colors.tertiary} />
+                <MaterialIcons name="forum" size={28} color={colors.tertiary} />
                 <Text style={styles.emptyFeedTitle}>No discussions yet</Text>
                 <Text style={styles.emptyFeedSubtitle}>
                   Share thoughts, ask questions, or start a discussion.
@@ -662,10 +665,10 @@ export default function CommunityDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   container: {
     flex: 1,
@@ -677,20 +680,20 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   notFoundTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginBottom: Spacing.xs,
   },
   notFoundSub: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -698,22 +701,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
   },
   backButtonText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
 
   // Hero Card with Narrow Cover Banner (~125 height)
   heroCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: Spacing.sm,
   },
   heroBanner: {
@@ -738,7 +741,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(252, 249, 248, 0.9)',
+    backgroundColor: isDark ? 'rgba(30, 26, 23, 0.9)' : 'rgba(252, 249, 248, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
@@ -758,7 +761,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 20,
     elevation: 5,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: 34,
     padding: 2,
   },
@@ -767,16 +770,16 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     borderWidth: 2,
-    borderColor: Colors.surface,
-    backgroundColor: Colors.surface,
+    borderColor: colors.surface,
+    backgroundColor: colors.surface,
   },
   communityAvatarFallback: {
     width: 60,
     height: 60,
     borderRadius: 30,
     borderWidth: 2,
-    borderColor: Colors.surface,
-    backgroundColor: '#fffbeb',
+    borderColor: colors.surface,
+    backgroundColor: isDark ? colors.surfaceContainerHigh : '#fffbeb',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -787,7 +790,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -795,7 +798,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   membershipBtn: {
     height: 36,
@@ -807,24 +810,24 @@ const styles = StyleSheet.create({
     ...Shadows.sm,
   },
   btnJoinedState: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: isDark ? 'rgba(76, 175, 80, 0.2)' : '#e8f5e9',
   },
   btnJoinState: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   membershipBtnText: {
     fontSize: 13,
     fontWeight: '700',
   },
   textJoinedState: {
-    color: '#2e7d32',
+    color: isDark ? '#81c784' : '#2e7d32',
   },
   textJoinState: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   communityTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginTop: 4,
     marginBottom: 4,
@@ -840,7 +843,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryPill: {
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     paddingHorizontal: 10,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
@@ -848,14 +851,14 @@ const styles = StyleSheet.create({
   },
   categoryPillText: {
     ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontWeight: '600',
   },
   publicPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(61, 168, 107, 0.15)',
+    backgroundColor: isDark ? 'rgba(61, 168, 107, 0.25)' : 'rgba(61, 168, 107, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
@@ -864,12 +867,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.success,
+    backgroundColor: colors.success,
   },
   publicPillText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1b5e20',
+    color: isDark ? '#81c784' : '#1b5e20',
   },
   memberCountRow: {
     flexDirection: 'row',
@@ -879,7 +882,7 @@ const styles = StyleSheet.create({
   },
   memberCountText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
 
   // Row 2: Bio
@@ -888,13 +891,13 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 19,
   },
 
   // Row 3: Rules Section
   rulesSection: {
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.lg,
     padding: Spacing.sm,
     gap: 8,
@@ -912,7 +915,7 @@ const styles = StyleSheet.create({
   },
   rulesHeaderText: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   rulesPillsWrap: {
@@ -922,21 +925,21 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   rulePill: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   rulePillText: {
     fontSize: 11,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontWeight: '500',
   },
   noRulesText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontStyle: 'italic',
     paddingVertical: 2,
   },
@@ -957,7 +960,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   seeAllRow: {
     flexDirection: 'row',
@@ -965,7 +968,7 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     ...Typography.labelMd,
-    color: Colors.secondary,
+    color: colors.secondary,
   },
   eventsCarousel: {
     paddingHorizontal: Spacing.md,
@@ -974,11 +977,11 @@ const styles = StyleSheet.create({
   eventCard: {
     width: 220,
     height: 160,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   eventCover: {
@@ -992,7 +995,7 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   eventMetaRow: {
@@ -1007,11 +1010,11 @@ const styles = StyleSheet.create({
   },
   metaText: {
     ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
   },
   metaTextSec: {
     ...Typography.captionSm,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
   },
 
@@ -1020,23 +1023,23 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
   },
   emptyFeedTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginTop: 2,
   },
   emptyFeedSubtitle: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     maxWidth: 240,
   },
@@ -1047,17 +1050,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   discussionCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   postCommunityHeader: {
     ...Typography.captionSm,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
     marginBottom: 2,
     letterSpacing: 0.3,
@@ -1082,13 +1085,13 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
   authorName: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '600',
   },
   postTagsWrapper: {
@@ -1101,7 +1104,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   postTagBadge: {
-    backgroundColor: 'rgba(232, 167, 54, 0.12)',
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.2)' : 'rgba(232, 167, 54, 0.12)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
@@ -1109,16 +1112,16 @@ const styles = StyleSheet.create({
   postTagBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   postTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   postContent: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
     marginTop: 2,
   },
@@ -1128,7 +1131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(105, 92, 80, 0.15)',
+    borderTopColor: colors.cardBorder,
   },
   postActionGroup: {
     flexDirection: 'row',
@@ -1142,14 +1145,14 @@ const styles = StyleSheet.create({
   },
   counterText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   iconOnly: {
     padding: 2,
   },
   postTimestampBelow: {
     fontSize: 11,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: 2,
   },
 
@@ -1170,27 +1173,27 @@ const styles = StyleSheet.create({
   },
   searchHeaderTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   eventSearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainer,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.sm,
     height: 44,
     borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   eventSearchInput: {
     flex: 1,
     height: '100%',
     marginLeft: Spacing.sm,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   allEventsContent: {
     paddingHorizontal: Spacing.md,
@@ -1198,11 +1201,11 @@ const styles = StyleSheet.create({
     paddingBottom: 90,
   },
   verticalEventCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainer,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     ...Shadows.sm,
   },
   verticalEventCover: {
@@ -1215,12 +1218,12 @@ const styles = StyleSheet.create({
   },
   verticalEventTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   verticalEventDesc: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
   },
   verticalEventMeta: {

@@ -26,7 +26,8 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { useAuth } from '../../src/context/AuthContext';
@@ -40,6 +41,8 @@ import { formatCategoryName } from '../../src/utils/categories';
 export default function ThreadDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const { id, highlightCommentId } = useLocalSearchParams<{ id: string; highlightCommentId?: string }>();
   const { user } = useAuth();
   const { setPostLiked, setPostSaved, setPostCommentCount, updatePostCommentCount } = usePostState();
@@ -270,7 +273,7 @@ export default function ThreadDetailScreen() {
         ]}
       >
         <View style={styles.notFoundIconBox}>
-          <MaterialIcons name="article" size={40} color={Colors.tertiary} />
+          <MaterialIcons name="article" size={40} color={colors.tertiary} />
         </View>
         <Text style={styles.notFoundTitle}>Post not found</Text>
         <Text style={styles.notFoundSub}>
@@ -281,7 +284,7 @@ export default function ThreadDetailScreen() {
           onPress={() => router.back()}
           activeOpacity={0.85}
         >
-          <MaterialIcons name="arrow-back" size={18} color={Colors.onPrimaryContainer} />
+          <MaterialIcons name="arrow-back" size={18} color={colors.onPrimaryContainer} />
           <Text style={styles.backBtnPillText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -312,7 +315,7 @@ export default function ThreadDetailScreen() {
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle} numberOfLines={1}>
             {post.community?.name || 'Discussion'}
@@ -324,14 +327,14 @@ export default function ThreadDetailScreen() {
                 style={styles.authorActionBtn}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="edit" size={18} color={Colors.secondary} />
+                <MaterialIcons name="edit" size={18} color={colors.secondary} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleDeletePost}
                 style={styles.authorActionBtn}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="delete-outline" size={19} color={Colors.error} />
+                <MaterialIcons name="delete-outline" size={19} color={colors.error} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -357,7 +360,7 @@ export default function ThreadDetailScreen() {
                 activeOpacity={0.8}
               >
                 <View style={styles.commIconCircle}>
-                  <MaterialIcons name="groups" size={16} color={Colors.primary} />
+                  <MaterialIcons name="groups" size={16} color={colors.primary} />
                 </View>
                 <Text style={styles.commLinkText} numberOfLines={1}>
                   {post.community?.name || 'Nexus Community'}
@@ -375,7 +378,7 @@ export default function ThreadDetailScreen() {
                 />
               ) : (
                 <View style={styles.authorAvatarFallback}>
-                  <MaterialIcons name="person" size={20} color={Colors.tertiary} />
+                  <MaterialIcons name="person" size={20} color={colors.tertiary} />
                 </View>
               )}
               <View style={styles.authorDetails}>
@@ -442,12 +445,12 @@ export default function ThreadDetailScreen() {
                   <MaterialIcons
                     name={hasLiked ? 'favorite' : 'favorite-border'}
                     size={22}
-                    color={hasLiked ? Colors.primaryContainer : Colors.tertiary}
+                    color={hasLiked ? colors.primaryContainer : colors.tertiary}
                   />
                   <Text
                     style={[
                       styles.reactionCountText,
-                      hasLiked && { color: Colors.primaryContainer, fontWeight: '700' },
+                      hasLiked && { color: colors.primaryContainer, fontWeight: '700' },
                     ]}
                   >
                     {likesCount}
@@ -455,7 +458,7 @@ export default function ThreadDetailScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.reactionBtn}>
-                  <MaterialIcons name="chat-bubble-outline" size={22} color={Colors.tertiary} />
+                  <MaterialIcons name="chat-bubble-outline" size={22} color={colors.tertiary} />
                   <Text style={styles.reactionCountText}>{comments.length}</Text>
                 </View>
               </View>
@@ -465,11 +468,11 @@ export default function ThreadDetailScreen() {
                   <MaterialIcons
                     name={hasSaved ? 'bookmark' : 'bookmark-border'}
                     size={24}
-                    color={hasSaved ? Colors.primaryContainer : Colors.tertiary}
+                    color={hasSaved ? colors.primaryContainer : colors.tertiary}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7}>
-                  <MaterialIcons name="share" size={24} color={Colors.tertiary} />
+                  <MaterialIcons name="share" size={24} color={colors.tertiary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -521,7 +524,7 @@ export default function ThreadDetailScreen() {
                         />
                       ) : (
                         <View style={styles.commentAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
                         </View>
                       )}
                       <View style={styles.commentBody}>
@@ -545,14 +548,14 @@ export default function ThreadDetailScreen() {
                                 style={styles.editCommentIconBtn}
                                 activeOpacity={0.7}
                               >
-                                <MaterialIcons name="edit" size={14} color={Colors.secondary} />
+                                <MaterialIcons name="edit" size={14} color={colors.secondary} />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 onPress={() => handleDeleteComment(comment.id)}
                                 style={styles.deleteCommentIconBtn}
                                 activeOpacity={0.7}
                               >
-                                <MaterialIcons name="delete-outline" size={15} color={Colors.error} />
+                                <MaterialIcons name="delete-outline" size={15} color={colors.error} />
                               </TouchableOpacity>
                             </View>
                           )}
@@ -611,14 +614,14 @@ export default function ThreadDetailScreen() {
               />
             ) : (
               <View style={styles.composerAvatarFallback}>
-                <MaterialIcons name="person" size={16} color={Colors.tertiary} />
+                <MaterialIcons name="person" size={16} color={colors.tertiary} />
               </View>
             )}
             <View style={styles.composerInputWrapper}>
               <TextInput
                 style={styles.composerInput}
                 placeholder="Add a comment..."
-                placeholderTextColor={Colors.tertiary}
+                placeholderTextColor={colors.tertiary}
                 value={newComment}
                 onChangeText={setNewComment}
               />
@@ -635,7 +638,7 @@ export default function ThreadDetailScreen() {
               <MaterialIcons
                 name="send"
                 size={20}
-                color={newComment.trim() ? Colors.onPrimaryContainer : Colors.tertiary}
+                color={newComment.trim() ? colors.onPrimaryContainer : colors.tertiary}
               />
             </TouchableOpacity>
           </View>
@@ -645,10 +648,11 @@ export default function ThreadDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   inner: {
     flex: 1,
@@ -657,20 +661,20 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
   notFoundTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginBottom: Spacing.xs,
   },
   notFoundSub: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -678,14 +682,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: BorderRadius.full,
   },
   backBtnPillText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   topBar: {
@@ -694,9 +698,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   backButton: {
     width: 44,
@@ -707,7 +711,7 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     maxWidth: 200,
   },
@@ -720,11 +724,11 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   postCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.cardBg,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     gap: 12,
   },
   affiliationRow: {
@@ -742,21 +746,21 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.secondaryFixed,
+    backgroundColor: colors.secondaryFixed,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commLinkText: {
     ...Typography.labelMd,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '700',
     maxWidth: 120,
   },
   dotSeparator: {
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   categoryPill: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
@@ -765,11 +769,11 @@ const styles = StyleSheet.create({
   categoryPillText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.onTertiaryContainer,
+    color: colors.onTertiaryContainer,
   },
   timeAgoText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   authorRow: {
     flexDirection: 'row',
@@ -780,7 +784,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
   },
   authorDetails: {
     flex: 1,
@@ -792,22 +796,22 @@ const styles = StyleSheet.create({
   },
   authorFullName: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   authorHandle: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   authorBadge: {
     fontSize: 11,
-    color: Colors.secondary,
+    color: colors.secondary,
     fontWeight: '600',
   },
   postTitle: {
     ...Typography.headlineSm,
     fontSize: 18,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     lineHeight: 24,
   },
@@ -816,7 +820,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     marginVertical: Spacing.sm,
   },
   postMediaImage: {
@@ -825,7 +829,7 @@ const styles = StyleSheet.create({
   },
   postBody: {
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     lineHeight: 22,
   },
   reactionBar: {
@@ -834,7 +838,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
   },
   reactionLeft: {
     flexDirection: 'row',
@@ -848,7 +852,7 @@ const styles = StyleSheet.create({
   },
   reactionCountText: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   reactionRight: {
     flexDirection: 'row',
@@ -860,7 +864,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.cardBorder,
+    backgroundColor: colors.cardBorder,
     marginVertical: Spacing.md,
   },
   commentsHeaderRow: {
@@ -876,14 +880,14 @@ const styles = StyleSheet.create({
   },
   commentsHeading: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   goldDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   composerBox: {
     flexDirection: 'row',
@@ -900,15 +904,15 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     justifyContent: 'center',
     paddingHorizontal: Spacing.md,
   },
   composerInput: {
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   sendBtn: {
     width: 42,
@@ -918,20 +922,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnActive: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   sendBtnDisabled: {
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
   },
   commentsStream: {
     gap: 14,
   },
   commentItem: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     gap: 10,
   },
   commentTopRow: {
@@ -942,7 +946,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
   },
   commentBody: {
     flex: 1,
@@ -954,16 +958,16 @@ const styles = StyleSheet.create({
   },
   commentAuthorName: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   commentTimeText: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   commentContent: {
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     lineHeight: 20,
     marginTop: 2,
   },
@@ -971,7 +975,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -979,7 +983,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -987,7 +991,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1009,7 +1013,7 @@ const styles = StyleSheet.create({
   tagPillText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.primary,
+    color: colors.primary,
   },
   expandTagsBtn: {
     paddingHorizontal: 8,
@@ -1018,11 +1022,11 @@ const styles = StyleSheet.create({
   expandTagsText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.secondary,
+    color: colors.secondary,
   },
   commentItemHighlighted: {
     backgroundColor: 'rgba(232, 167, 54, 0.12)',
-    borderColor: Colors.primaryContainer,
+    borderColor: colors.primaryContainer,
     borderWidth: 1.5,
   },
   commentActionBtnsRow: {
@@ -1043,12 +1047,12 @@ const styles = StyleSheet.create({
   },
   editCommentInput: {
     ...Typography.bodyMd,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    color: Colors.onSurface,
+    borderColor: colors.cardBorder,
+    color: colors.onSurface,
   },
   editCommentActionsRow: {
     flexDirection: 'row',
@@ -1062,18 +1066,18 @@ const styles = StyleSheet.create({
   },
   editCommentCancelText: {
     fontSize: 12,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   editCommentSaveBtn: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
   },
   editCommentSaveText: {
     fontSize: 12,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   authorActionsRow: {
@@ -1087,16 +1091,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
   },
   fixedCommentBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
     paddingTop: 8,
     paddingHorizontal: Spacing.md,
     elevation: 8,
@@ -1112,7 +1116,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   modalContent: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     gap: 12,
@@ -1129,26 +1133,26 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   editTitleInput: {
     ...Typography.labelMd,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    color: Colors.onSurface,
+    borderColor: colors.cardBorder,
+    color: colors.onSurface,
   },
   editBodyInput: {
     ...Typography.bodyMd,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    color: Colors.onSurface,
+    borderColor: colors.cardBorder,
+    color: colors.onSurface,
     minHeight: 100,
     textAlignVertical: 'top',
   },
@@ -1165,18 +1169,18 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     ...Typography.labelMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '600',
   },
   modalSaveBtn: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: BorderRadius.full,
   },
   modalSaveText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
 });

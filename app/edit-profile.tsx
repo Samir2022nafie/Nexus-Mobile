@@ -22,7 +22,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
 import { usersService } from '../src/services/users';
 import { ApiRequestError } from '../src/services/api';
@@ -31,6 +32,8 @@ import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const { user, updateUser, logout } = useAuth();
 
   const [form, setForm] = useState({
@@ -134,11 +137,11 @@ export default function EditProfileScreen() {
               style={styles.avatarImage}
             />
             <View style={styles.cameraOverlay}>
-              <MaterialIcons name="photo-camera" size={20} color={Colors.white} />
+              <MaterialIcons name="photo-camera" size={20} color={colors.white} />
               <Text style={styles.changePhotoText}>Change Photo</Text>
             </View>
             <View style={styles.editIconBadge}>
-              <MaterialIcons name="edit" size={14} color={Colors.onPrimary} />
+              <MaterialIcons name="edit" size={14} color={colors.onPrimary} />
             </View>
           </View>
           <Text style={styles.avatarHint}>Tap photo to select a new portrait</Text>
@@ -146,7 +149,7 @@ export default function EditProfileScreen() {
 
         {error ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error" size={18} color={Colors.error} />
+            <MaterialIcons name="error" size={18} color={colors.error} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
@@ -162,7 +165,7 @@ export default function EditProfileScreen() {
                 value={form.firstName}
                 onChangeText={(v) => setForm((p) => ({ ...p, firstName: v }))}
               />
-              <MaterialIcons name="badge" size={18} color={Colors.tertiary} />
+              <MaterialIcons name="badge" size={18} color={colors.tertiary} />
             </View>
           </View>
 
@@ -175,7 +178,7 @@ export default function EditProfileScreen() {
                 value={form.lastName}
                 onChangeText={(v) => setForm((p) => ({ ...p, lastName: v }))}
               />
-              <MaterialIcons name="person" size={18} color={Colors.tertiary} />
+              <MaterialIcons name="person" size={18} color={colors.tertiary} />
             </View>
           </View>
 
@@ -204,7 +207,7 @@ export default function EditProfileScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="https://example.com/avatar.jpg"
-                placeholderTextColor={Colors.outline}
+                placeholderTextColor={colors.outline}
                 value={form.profilePictureUrl}
                 onChangeText={(v) => {
                   const direct = extractDirectImageUrl(v);
@@ -225,17 +228,17 @@ export default function EditProfileScreen() {
                   onPress={() => setForm((p) => ({ ...p, profilePictureUrl: '' }))}
                   style={{ padding: 4 }}
                 >
-                  <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+                  <MaterialIcons name="close" size={18} color={colors.tertiary} />
                 </TouchableOpacity>
               ) : (
-                <MaterialIcons name="link" size={18} color={Colors.tertiary} />
+                <MaterialIcons name="link" size={18} color={colors.tertiary} />
               )}
             </View>
           </View>
 
           {/* Additional Tactile Context Chip */}
           <View style={styles.infoChip}>
-            <MaterialIcons name="info" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="info" size={20} color={colors.tertiary} />
             <Text style={styles.infoChipText}>
               Your verified badge and meetup organizer status are linked to this profile handle.
             </Text>
@@ -249,7 +252,7 @@ export default function EditProfileScreen() {
             onPress={handleDeleteAccount}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="delete-forever" size={18} color={Colors.error} />
+            <MaterialIcons name="delete-forever" size={18} color={colors.error} />
             <Text style={styles.deleteBtnText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
@@ -258,10 +261,11 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBar: {
     height: 56,
@@ -269,7 +273,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   cancelButton: {
     minWidth: 50,
@@ -277,11 +281,11 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   topBarTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   saveButton: {
     minWidth: 50,
@@ -290,7 +294,7 @@ const styles = StyleSheet.create({
   },
   saveText: {
     ...Typography.labelLg,
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
     fontWeight: '700',
   },
   container: {
@@ -326,7 +330,7 @@ const styles = StyleSheet.create({
   changePhotoText: {
     fontSize: 10,
     fontWeight: '600',
-    color: Colors.white,
+    color: colors.white,
     marginTop: 2,
   },
   editIconBadge: {
@@ -336,28 +340,28 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
   },
   avatarHint: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginTop: Spacing.sm,
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.errorContainer,
+    backgroundColor: colors.errorContainer,
     padding: Spacing.sm,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.md,
   },
   errorText: {
     ...Typography.captionMd,
-    color: Colors.onErrorContainer,
+    color: colors.onErrorContainer,
   },
   form: {
     gap: Spacing.md,
@@ -368,7 +372,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.tertiary,
+    color: colors.tertiary,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     paddingLeft: 4,
@@ -376,7 +380,7 @@ const styles = StyleSheet.create({
   inputBox: {
     height: 48,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
@@ -386,7 +390,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%',
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   bioLabelRow: {
     flexDirection: 'row',
@@ -396,7 +400,7 @@ const styles = StyleSheet.create({
   },
   bioCounter: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   bioBox: {
     height: 96,
@@ -407,25 +411,25 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   readOnlyBox: {
-    backgroundColor: Colors.surfaceContainer,
+    backgroundColor: colors.surfaceContainer,
   },
   readOnlyText: {
     flex: 1,
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   infoChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    backgroundColor: Colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLow,
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
     marginTop: 4,
   },
   infoChipText: {
     ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     flex: 1,
     lineHeight: 16,
   },
@@ -444,7 +448,7 @@ const styles = StyleSheet.create({
   },
   deleteBtnText: {
     ...Typography.labelMd,
-    color: Colors.error,
+    color: colors.error,
     fontWeight: '600',
   },
 });

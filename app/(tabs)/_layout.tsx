@@ -9,7 +9,8 @@ import { Tabs, Redirect } from 'expo-router';
 import { View, StyleSheet, TouchableOpacity, Platform, Animated, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Shadows } from '../../src/constants/theme';
+import { Colors, Typography, Shadows } from '../../src/constants/theme';
+import { useTheme } from '../../src/context/ThemeContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { CreateBottomSheet } from '../../src/components/CreateBottomSheet';
 import {
@@ -17,8 +18,35 @@ import {
   useTabBarVisibility,
 } from '../../src/context/TabBarVisibilityContext';
 
+function TabBarItem({ iconName, label, isFocused, onPress, color }: any) {
+  const scaleAnim = React.useRef(new Animated.Value(isFocused ? 1.06 : 1)).current;
+
+  React.useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: isFocused ? 1.08 : 1,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 120,
+    }).start();
+  }, [isFocused]);
+
+  return (
+    <TouchableOpacity
+      style={styles.tabItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Animated.View style={{ alignItems: 'center', transform: [{ scale: scaleAnim }] }}>
+        <MaterialIcons name={iconName} size={24} color={color} />
+        <Text style={[styles.tabLabel, { color, fontWeight: isFocused ? '700' : '500' }]}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function AnimatedTabBar({ state, descriptors, navigation }: any) {
   const { tabBarTranslateY } = useTabBarVisibility();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [createModalVisible, setCreateModalVisible] = useState(false);
 
@@ -28,6 +56,8 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
         style={[
           styles.tabBarAnimatedWrapper,
           {
+            backgroundColor: colors.surfaceContainerLowest,
+            borderTopColor: colors.surfaceContainerHigh,
             paddingBottom: Platform.OS === 'ios' ? Math.max(insets.bottom, 12) : 8,
             transform: [{ translateY: tabBarTranslateY }],
           },
@@ -36,7 +66,7 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
         <View style={styles.tabBarRow}>
           {state.routes.map((route: any, index: number) => {
             const isFocused = state.index === index;
-            const color = isFocused ? Colors.tabBarActive : Colors.tabBarInactive;
+            const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
 
             if (route.name === 'create') {
               return (
@@ -47,8 +77,8 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
                   activeOpacity={0.85}
                   accessibilityLabel="Create options"
                 >
-                  <View style={styles.createButton}>
-                    <MaterialIcons name="add" size={26} color={Colors.onPrimary} />
+                  <View style={[styles.createButton, { backgroundColor: colors.primaryContainer }]}>
+                    <MaterialIcons name="add" size={26} color={colors.onPrimary} />
                   </View>
                 </TouchableOpacity>
               );
@@ -80,15 +110,14 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
             };
 
             return (
-              <TouchableOpacity
+              <TabBarItem
                 key={route.key}
-                style={styles.tabItem}
+                iconName={iconName}
+                label={label}
+                isFocused={isFocused}
+                color={color}
                 onPress={onPress}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name={iconName} size={24} color={color} />
-                <Text style={[styles.tabLabel, { color }]}>{label}</Text>
-              </TouchableOpacity>
+              />
             );
           })}
         </View>

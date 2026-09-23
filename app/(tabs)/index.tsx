@@ -19,11 +19,13 @@ import {
   TouchableOpacity,
   Animated,
   Alert,
+  PanResponder,
 } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { useAuth } from '../../src/context/AuthContext';
@@ -133,6 +135,22 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
+
+  // Swipe right-to-left in posts section navigates to Explore tab
+  const postsPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dx < -30 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -50 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.5) {
+          (navigation as any).navigate('explore');
+        }
+      },
+    })
+  ).current;
 
   const scrollViewRef = useRef<ScrollView>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -494,7 +512,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={Colors.primaryContainer}
+            tintColor={colors.primaryContainer}
             progressViewOffset={Math.max(insets.top, 10) + 40}
           />
         }
@@ -511,7 +529,7 @@ export default function HomeScreen() {
                 }
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="add" size={32} color={Colors.primary} />
+                <MaterialIcons name="add" size={32} color={colors.primary} />
               </TouchableOpacity>
               <Text style={styles.storyName} numberOfLines={1}>
                 Explore
@@ -535,7 +553,7 @@ export default function HomeScreen() {
                       <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
                     ) : (
                       <View style={styles.storyAvatarFallback}>
-                        <MaterialIcons name="groups" size={34} color={Colors.primary} />
+                        <MaterialIcons name="groups" size={34} color={colors.primary} />
                       </View>
                     )}
                   </View>
@@ -558,13 +576,13 @@ export default function HomeScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.seeAllText}>more</Text>
-              <MaterialIcons name="chevron-right" size={16} color={Colors.secondary} />
+              <MaterialIcons name="chevron-right" size={16} color={colors.secondary} />
             </TouchableOpacity>
           </View>
 
           {events.length === 0 ? (
             <View style={styles.emptyFeedCard}>
-              <MaterialIcons name="event" size={32} color={Colors.tertiary} />
+              <MaterialIcons name="event" size={32} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No upcoming events</Text>
               <Text style={styles.emptyFeedSubtitle}>
                 Join communities to see their scheduled meetups and events here.
@@ -623,19 +641,19 @@ export default function HomeScreen() {
                           <MaterialIcons
                             name="calendar-today"
                             size={13}
-                            color={cat.isPassed ? Colors.tertiary : Colors.primary}
+                            color={cat.isPassed ? colors.tertiary : colors.primary}
                           />
                           <Text
                             style={[
                               styles.metaText,
-                              cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                             ]}
                           >
                             {cat.dateText}
                           </Text>
                         </View>
                         <View style={styles.metaItem}>
-                          <MaterialIcons name="group" size={13} color={Colors.secondary} />
+                          <MaterialIcons name="group" size={13} color={colors.secondary} />
                           <Text style={styles.metaTextSec}>
                             {`${event.participantsCount ?? event.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
                           </Text>
@@ -659,13 +677,13 @@ export default function HomeScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.seeAllText}>more</Text>
-              <MaterialIcons name="chevron-right" size={16} color={Colors.secondary} />
+              <MaterialIcons name="chevron-right" size={16} color={colors.secondary} />
             </TouchableOpacity>
           </View>
 
           {hangouts.length === 0 ? (
             <View style={styles.emptyFeedCard}>
-              <MaterialIcons name="local-cafe" size={32} color={Colors.tertiary} />
+              <MaterialIcons name="local-cafe" size={32} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No hangouts active nearby</Text>
               <Text style={styles.emptyFeedSubtitle}>
                 Host a spontaneous meetup, coffee chat, or co-working session!
@@ -731,7 +749,7 @@ export default function HomeScreen() {
                             />
                           ) : (
                             <View style={styles.hangoutAvatarFallback}>
-                              <MaterialIcons name="person" size={15} color={Colors.tertiary} />
+                              <MaterialIcons name="person" size={15} color={colors.tertiary} />
                             </View>
                           )}
                           <Text style={styles.hangoutCreatorName} numberOfLines={1}>
@@ -754,12 +772,12 @@ export default function HomeScreen() {
                         <MaterialIcons
                           name="schedule"
                           size={13}
-                          color={cat.status === 'today' ? Colors.primary : Colors.onSurfaceVariant}
+                          color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
                         />
                         <Text
                           style={[
                             styles.hangoutScheduleText,
-                            cat.status === 'today' && { color: Colors.primary, fontWeight: '700' },
+                            cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
                           ]}
                         >
                           {cat.dateText}
@@ -798,9 +816,9 @@ export default function HomeScreen() {
                         {isJoined ? (
                           <MaterialIcons name="directions-walk" size={18} color="#ffffff" />
                         ) : isRequested ? (
-                          <MaterialIcons name="hourglass-empty" size={15} color={Colors.primary} />
+                          <MaterialIcons name="hourglass-empty" size={15} color={colors.primary} />
                         ) : (
-                          <RaisingHandIcon size={18} color={Colors.onPrimaryContainer} />
+                          <RaisingHandIcon size={18} color={colors.onPrimaryContainer} />
                         )}
                       </TouchableOpacity>
                     </View>
@@ -811,14 +829,14 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Section 4: What people are saying (renamed from Trending Discussions + rising arrow icon) */}
-        <View style={styles.section}>
+        {/* Section 4: What people are saying (swiping right-to-left switches to Explore tab) */}
+        <View style={styles.section} {...postsPanResponder.panHandlers}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <MaterialIcons
                 name="trending-up"
                 size={22}
-                color={Colors.primaryContainer}
+                color={colors.primaryContainer}
                 style={{ marginRight: 6 }}
               />
               <Text style={styles.sectionTitle}>What people are saying</Text>
@@ -827,7 +845,7 @@ export default function HomeScreen() {
 
           {posts.length === 0 ? (
             <View style={styles.emptyFeedCard}>
-              <MaterialIcons name="forum" size={32} color={Colors.tertiary} />
+              <MaterialIcons name="forum" size={32} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No discussions yet</Text>
               <Text style={styles.emptyFeedSubtitle}>
                 Join a community to share your thoughts and participate in discussions.
@@ -855,477 +873,478 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingBottom: 40,
-  },
-  section: {
-    marginTop: Spacing.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-  },
-  seeAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  seeAllText: {
-    ...Typography.labelMd,
-    color: Colors.secondary,
-  },
-  carousel: {
-    paddingHorizontal: Spacing.md,
-    gap: 12,
-  },
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingBottom: 40,
+    },
+    section: {
+      marginTop: Spacing.lg,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+      marginBottom: Spacing.sm,
+    },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    sectionTitle: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+    },
+    seeAllRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    seeAllText: {
+      ...Typography.labelMd,
+      color: colors.secondary,
+    },
+    carousel: {
+      paddingHorizontal: Spacing.md,
+      gap: 12,
+    },
 
-  // Section 1: Communities (Stories) — Enlarged 76x76, no yellow ring
-  storiesSection: {
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.xs,
-  },
-  storiesCarousel: {
-    paddingHorizontal: Spacing.md,
-    gap: 16,
-    alignItems: 'center',
-  },
-  storyItem: {
-    alignItems: 'center',
-    width: 82,
-  },
-  storyRing: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surfaceContainerLow,
-  },
-  storyAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  storyAvatarFallback: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(232, 167, 54, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storyName: {
-    ...Typography.captionSm,
-    color: Colors.onSurface,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: 6,
-    width: 82,
-  },
-  emptyStoryWrap: {
-    paddingHorizontal: Spacing.md,
-    alignItems: 'flex-start',
-  },
-  singleExploreCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
-  },
+    // Section 1: Communities (Stories) — Enlarged 76x76, no yellow ring
+    storiesSection: {
+      paddingTop: Spacing.xs,
+      paddingBottom: Spacing.xs,
+    },
+    storiesCarousel: {
+      paddingHorizontal: Spacing.md,
+      gap: 16,
+      alignItems: 'center',
+    },
+    storyItem: {
+      alignItems: 'center',
+      width: 82,
+    },
+    storyRing: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceContainerLow,
+    },
+    storyAvatar: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+    },
+    storyAvatarFallback: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.16)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    storyName: {
+      ...Typography.captionSm,
+      color: colors.onSurface,
+      fontWeight: '600',
+      textAlign: 'center',
+      marginTop: 6,
+      width: 82,
+    },
+    emptyStoryWrap: {
+      paddingHorizontal: Spacing.md,
+      alignItems: 'flex-start',
+    },
+    singleExploreCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      borderColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
 
-  // Section 2: Events — White background, category badge, community name beneath title
-  eventCard: {
-    width: 260,
-    height: 205,
-    backgroundColor: '#ffffff',
-    borderRadius: BorderRadius.xl,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    ...Shadows.sm,
-  },
-  eventCoverWrapper: {
-    height: 104,
-    width: '100%',
-    position: 'relative',
-  },
-  eventCover: {
-    width: '100%',
-    height: '100%',
-  },
-  eventCategoryBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(252, 249, 248, 0.94)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.md,
-    ...Shadows.sm,
-  },
-  eventCategoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  eventBody: {
-    padding: Spacing.sm,
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  eventTitle: {
-    ...Typography.labelLg,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  eventCommunityNameText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    marginTop: 1,
-  },
-  eventMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
-  },
-  metaTextSec: {
-    ...Typography.captionMd,
-    color: Colors.secondary,
-    fontWeight: '600',
-  },
+    // Section 2: Events — Dynamic card background, category badge, community name beneath title
+    eventCard: {
+      width: 260,
+      height: 205,
+      backgroundColor: isDark ? colors.surfaceContainer : '#ffffff',
+      borderRadius: BorderRadius.xl,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      ...Shadows.sm,
+    },
+    eventCoverWrapper: {
+      height: 104,
+      width: '100%',
+      position: 'relative',
+    },
+    eventCover: {
+      width: '100%',
+      height: '100%',
+    },
+    eventCategoryBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      backgroundColor: isDark ? 'rgba(42, 39, 37, 0.94)' : 'rgba(252, 249, 248, 0.94)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: BorderRadius.md,
+      ...Shadows.sm,
+    },
+    eventCategoryBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.onSurface,
+    },
+    eventBody: {
+      padding: Spacing.sm,
+      flex: 1,
+      justifyContent: 'space-between',
+    },
+    eventTitle: {
+      ...Typography.labelLg,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    eventCommunityNameText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      marginTop: 1,
+    },
+    eventMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    metaItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metaText: {
+      ...Typography.captionMd,
+      color: colors.onSurfaceVariant,
+    },
+    metaTextSec: {
+      ...Typography.captionMd,
+      color: colors.secondary,
+      fontWeight: '600',
+    },
 
-  // Section 3: Hangouts — Square cards (~180x180)
-  hangoutCardSquare: {
-    width: 180,
-    height: 180,
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    ...Shadows.sm,
-  },
-  hangoutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  hangoutCreatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  hangoutCreatorAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-  },
-  hangoutAvatarFallback: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hangoutCreatorName: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  hangoutPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  hangoutPillOpen: {
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
-  },
-  hangoutPillRequest: {
-    backgroundColor: Colors.secondaryFixed,
-  },
-  openDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#059669',
-  },
-  hangoutPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  hangoutPillOpenText: {
-    color: Colors.onSurface,
-  },
-  hangoutPillRequestText: {
-    color: Colors.secondary,
-  },
-  hangoutTitle: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  hangoutScheduleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  hangoutScheduleText: {
-    ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
-  },
-  hangoutFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 4,
-  },
-  hangoutSpotsText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  hangoutActionIconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0,
-    borderColor: 'transparent',
-    ...Shadows.sm,
-  },
-  hangoutActionIconBtnPassed: {
-    elevation: 0,
-    shadowOpacity: 0,
-    shadowColor: 'transparent',
-    backgroundColor: '#e2e8f0',
-    opacity: 0.5,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  hangoutIconBtnOpen: {
-    backgroundColor: Colors.primaryContainer,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  hangoutIconBtnRequest: {
-    backgroundColor: Colors.primaryContainer,
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  hangoutIconBtnRequested: {
-    backgroundColor: '#fef3c7',
-    borderWidth: 1.5,
-    borderColor: '#f59e0b',
-  },
-  hangoutIconBtnJoined: {
-    backgroundColor: '#059669',
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  raisingHandContainer: {
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  raisingHandPlusBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-  },
+    // Section 3: Hangouts — Square cards (~180x180)
+    hangoutCardSquare: {
+      width: 180,
+      height: 180,
+      backgroundColor: isDark ? colors.surfaceContainer : colors.tertiaryFixed,
+      borderRadius: BorderRadius.xl,
+      padding: Spacing.md,
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      ...Shadows.sm,
+    },
+    hangoutHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    hangoutCreatorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    hangoutCreatorAvatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+    },
+    hangoutAvatarFallback: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hangoutCreatorName: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      fontWeight: '600',
+    },
+    hangoutPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.full,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    hangoutPillOpen: {
+      backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surface,
+      ...Shadows.sm,
+    },
+    hangoutPillRequest: {
+      backgroundColor: colors.secondaryFixed,
+    },
+    openDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#059669',
+    },
+    hangoutPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    hangoutPillOpenText: {
+      color: colors.onSurface,
+    },
+    hangoutPillRequestText: {
+      color: colors.secondary,
+    },
+    hangoutTitle: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    hangoutScheduleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 4,
+    },
+    hangoutScheduleText: {
+      ...Typography.captionSm,
+      color: colors.onSurfaceVariant,
+    },
+    hangoutFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 4,
+    },
+    hangoutSpotsText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      fontWeight: '600',
+    },
+    hangoutActionIconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 0,
+      borderColor: 'transparent',
+      ...Shadows.sm,
+    },
+    hangoutActionIconBtnPassed: {
+      elevation: 0,
+      shadowOpacity: 0,
+      shadowColor: 'transparent',
+      backgroundColor: isDark ? '#33302c' : '#e2e8f0',
+      opacity: 0.5,
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    hangoutIconBtnOpen: {
+      backgroundColor: colors.primaryContainer,
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    hangoutIconBtnRequest: {
+      backgroundColor: colors.primaryContainer,
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    hangoutIconBtnRequested: {
+      backgroundColor: isDark ? '#451a03' : '#fef3c7',
+      borderWidth: 1.5,
+      borderColor: '#f59e0b',
+    },
+    hangoutIconBtnJoined: {
+      backgroundColor: '#059669',
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    raisingHandContainer: {
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    raisingHandPlusBadge: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+    },
 
-  // Passed / Grayed-out state
-  itemCardPassed: {
-    opacity: 0.45,
-  },
+    // Passed / Grayed-out state
+    itemCardPassed: {
+      opacity: 0.45,
+    },
 
-  // Section 4: Discussions
-  discussionsList: {
-    paddingHorizontal: Spacing.md,
-    gap: 12,
-  },
-  discussionCard: {
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    ...Shadows.sm,
-  },
-  postCommunityHeader: {
-    ...Typography.captionSm,
-    color: Colors.primary,
-    fontWeight: '700',
-    marginBottom: 2,
-    letterSpacing: 0.3,
-  },
-  postAuthorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  authorAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  authorAvatarFallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  authorName: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '600',
-  },
-  postTagsWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    maxWidth: '52%',
-    maxHeight: 46,
-    gap: 4,
-    overflow: 'hidden',
-  },
-  postTagBadge: {
-    backgroundColor: 'rgba(232, 167, 54, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  postTagBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  postTitle: {
-    ...Typography.labelLg,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  postContent: {
-    ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
-    lineHeight: 20,
-    marginTop: 2,
-  },
-  postActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(105, 92, 80, 0.15)',
-  },
-  postActionGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  iconCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  counterText: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-  },
-  iconOnly: {
-    padding: 2,
-  },
-  postTimestampBelow: {
-    fontSize: 11,
-    color: Colors.tertiary,
-    marginTop: 2,
-  },
-  emptyFeedCard: {
-    marginHorizontal: Spacing.md,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  emptyFeedTitle: {
-    ...Typography.labelLg,
-    color: Colors.onSurface,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  emptyFeedSubtitle: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  emptyActionBtn: {
-    marginTop: 8,
-    backgroundColor: Colors.primaryContainer,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.full,
-  },
-  emptyActionBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onPrimaryContainer,
-  },
-});
+    // Section 4: Discussions
+    discussionsList: {
+      paddingHorizontal: Spacing.md,
+      gap: 12,
+    },
+    discussionCard: {
+      backgroundColor: isDark ? colors.surfaceContainer : colors.tertiaryFixed,
+      borderRadius: BorderRadius.xl,
+      padding: Spacing.md,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      ...Shadows.sm,
+    },
+    postCommunityHeader: {
+      ...Typography.captionSm,
+      color: colors.primary,
+      fontWeight: '700',
+      marginBottom: 2,
+      letterSpacing: 0.3,
+    },
+    postAuthorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    authorInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    authorAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    authorAvatarFallback: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    authorName: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    postTagsWrapper: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      maxWidth: '52%',
+      maxHeight: 46,
+      gap: 4,
+      overflow: 'hidden',
+    },
+    postTagBadge: {
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.12)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.sm,
+    },
+    postTagBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    postTitle: {
+      ...Typography.labelLg,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    postContent: {
+      ...Typography.bodyMd,
+      color: colors.onSurfaceVariant,
+      lineHeight: 20,
+      marginTop: 2,
+    },
+    postActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 6,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(105, 92, 80, 0.15)',
+    },
+    postActionGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    iconCounter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    counterText: {
+      ...Typography.captionMd,
+      color: colors.tertiary,
+    },
+    iconOnly: {
+      padding: 2,
+    },
+    postTimestampBelow: {
+      fontSize: 11,
+      color: colors.tertiary,
+      marginTop: 2,
+    },
+    emptyFeedCard: {
+      marginHorizontal: Spacing.md,
+      paddingVertical: Spacing.lg,
+      paddingHorizontal: Spacing.md,
+      backgroundColor: isDark ? colors.surfaceContainer : colors.tertiaryFixed,
+      borderRadius: BorderRadius.xl,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    emptyFeedTitle: {
+      ...Typography.labelLg,
+      color: colors.onSurface,
+      fontWeight: '700',
+      marginTop: 4,
+    },
+    emptyFeedSubtitle: {
+      ...Typography.captionMd,
+      color: colors.tertiary,
+      textAlign: 'center',
+      maxWidth: 280,
+    },
+    emptyActionBtn: {
+      marginTop: 8,
+      backgroundColor: colors.primaryContainer,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: BorderRadius.full,
+    },
+    emptyActionBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.onPrimaryContainer,
+    },
+  });

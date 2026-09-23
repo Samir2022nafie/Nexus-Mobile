@@ -21,7 +21,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
 import { usersService } from '../src/services/users';
 
@@ -29,6 +30,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
+  const { themeMode, setThemeMode, isDark, colors } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const [pushEnabled, setPushEnabled] = useState(true);
 
   const handleLogout = () => {
@@ -87,7 +90,7 @@ export default function SettingsScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>Settings</Text>
         <View style={{ width: 44 }} />
@@ -122,7 +125,7 @@ export default function SettingsScreen() {
                   <Text style={styles.rowSubtitle}>{displayName}</Text>
                 </View>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
             </TouchableOpacity>
 
             <View style={styles.hairline} />
@@ -140,7 +143,7 @@ export default function SettingsScreen() {
             >
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="phone-iphone" size={18} color={Colors.outline} />
+                  <MaterialIcons name="phone-iphone" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>Phone Verification</Text>
               </View>
@@ -148,7 +151,7 @@ export default function SettingsScreen() {
                 <View style={styles.verifiedBadge}>
                   <Text style={styles.verifiedBadgeText}>Verified ✓</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
               </View>
             </TouchableOpacity>
 
@@ -158,13 +161,13 @@ export default function SettingsScreen() {
             <TouchableOpacity style={styles.rowItem} activeOpacity={0.7}>
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="link" size={18} color={Colors.outline} />
+                  <MaterialIcons name="link" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>Linked Accounts</Text>
               </View>
               <View style={styles.rowRightBadge}>
                 <Text style={styles.connectedText}>1 connected</Text>
-                <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+                <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
               </View>
             </TouchableOpacity>
           </View>
@@ -177,15 +180,49 @@ export default function SettingsScreen() {
             <View style={styles.rowItem}>
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="notifications" size={18} color={Colors.outline} />
+                  <MaterialIcons name="notifications" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>Push Notifications</Text>
               </View>
               <Switch
                 value={pushEnabled}
                 onValueChange={setPushEnabled}
-                trackColor={{ false: Colors.surfaceVariant, true: Colors.primaryContainer }}
-                thumbColor={Colors.white}
+                trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                thumbColor={colors.white}
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* APPEARANCE SECTION */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeading}>Appearance</Text>
+          <View style={styles.sectionCard}>
+            <View style={styles.rowItem}>
+              <View style={styles.rowLeft}>
+                <View style={styles.iconCircle}>
+                  <MaterialIcons
+                    name={isDark ? 'dark-mode' : 'light-mode'}
+                    size={18}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.textCol}>
+                  <Text style={styles.rowTitle}>Dark Mode</Text>
+                  <Text style={styles.rowSubtitle}>
+                    {themeMode === 'system'
+                      ? 'System mode'
+                      : isDark
+                      ? 'Dark theme active'
+                      : 'Light theme active'}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={(val) => setThemeMode(val ? 'dark' : 'light')}
+                trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                thumbColor={colors.white}
               />
             </View>
           </View>
@@ -198,11 +235,11 @@ export default function SettingsScreen() {
             <TouchableOpacity style={styles.rowItem} activeOpacity={0.7}>
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="info" size={18} color={Colors.outline} />
+                  <MaterialIcons name="info" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>About Nexus</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
             </TouchableOpacity>
 
             <View style={styles.hairline} />
@@ -210,11 +247,11 @@ export default function SettingsScreen() {
             <TouchableOpacity style={styles.rowItem} activeOpacity={0.7}>
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="description" size={18} color={Colors.outline} />
+                  <MaterialIcons name="description" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>Terms of Service</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
             </TouchableOpacity>
 
             <View style={styles.hairline} />
@@ -222,18 +259,18 @@ export default function SettingsScreen() {
             <TouchableOpacity style={styles.rowItem} activeOpacity={0.7}>
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="shield" size={18} color={Colors.outline} />
+                  <MaterialIcons name="shield" size={18} color={colors.outline} />
                 </View>
                 <Text style={styles.rowTitle}>Privacy Policy</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.outline} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* DANGER ZONE SECTION */}
         <View style={styles.section}>
-          <Text style={[styles.sectionHeading, { color: Colors.error }]}>Danger Zone</Text>
+          <Text style={[styles.sectionHeading, { color: colors.error }]}>Danger Zone</Text>
           <View style={styles.sectionCard}>
             <TouchableOpacity
               style={styles.rowItem}
@@ -242,9 +279,9 @@ export default function SettingsScreen() {
             >
               <View style={styles.rowLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(186, 26, 26, 0.15)' }]}>
-                  <MaterialIcons name="logout" size={18} color={Colors.error} />
+                  <MaterialIcons name="logout" size={18} color={colors.error} />
                 </View>
-                <Text style={[styles.rowTitle, { color: Colors.error, fontWeight: '700' }]}>
+                <Text style={[styles.rowTitle, { color: colors.error, fontWeight: '700' }]}>
                   Log Out
                 </Text>
               </View>
@@ -259,10 +296,10 @@ export default function SettingsScreen() {
             >
               <View style={styles.rowLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(186, 26, 26, 0.15)' }]}>
-                  <MaterialIcons name="delete-forever" size={18} color={Colors.error} />
+                  <MaterialIcons name="delete-forever" size={18} color={colors.error} />
                 </View>
                 <View style={styles.textCol}>
-                  <Text style={[styles.rowTitle, { color: Colors.error, fontWeight: '700' }]}>
+                  <Text style={[styles.rowTitle, { color: colors.error, fontWeight: '700' }]}>
                     Delete Account
                   </Text>
                   <Text style={styles.rowSubtitle}>Permanently remove all your data</Text>
@@ -276,118 +313,119 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  topBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-  },
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: 48,
-    gap: Spacing.lg,
-  },
-  section: {
-    gap: 6,
-  },
-  sectionHeading: {
-    ...Typography.captionMd,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    color: Colors.outline,
-    paddingHorizontal: 4,
-    fontWeight: '700',
-  },
-  sectionCard: {
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: BorderRadius.xl,
-    overflow: 'hidden',
-    ...Shadows.sm,
-  },
-  rowItem: {
-    minHeight: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    flex: 1,
-  },
-  userRowAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceVariant,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  textCol: {
-    flex: 1,
-  },
-  rowTitle: {
-    ...Typography.bodyMd,
-    color: Colors.onSurface,
-  },
-  rowSubtitle: {
-    ...Typography.captionSm,
-    color: Colors.outline,
-    marginTop: 2,
-  },
-  rowRightBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  verifiedBadge: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    ...Shadows.sm,
-  },
-  verifiedBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  connectedText: {
-    ...Typography.captionMd,
-    color: Colors.outline,
-  },
-  hairline: {
-    height: 1,
-    backgroundColor: Colors.surfaceVariant,
-    marginHorizontal: Spacing.md,
-  },
-});
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+      backgroundColor: colors.surface,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    topBarTitle: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+    },
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: Spacing.md,
+      paddingBottom: 48,
+      gap: Spacing.lg,
+    },
+    section: {
+      gap: 6,
+    },
+    sectionHeading: {
+      ...Typography.captionMd,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: colors.outline,
+      paddingHorizontal: 4,
+      fontWeight: '700',
+    },
+    sectionCard: {
+      backgroundColor: colors.surfaceContainerLow,
+      borderRadius: BorderRadius.xl,
+      overflow: 'hidden',
+      ...Shadows.sm,
+    },
+    rowItem: {
+      minHeight: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+    },
+    rowLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.md,
+      flex: 1,
+    },
+    userRowAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    iconCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceVariant,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    textCol: {
+      flex: 1,
+    },
+    rowTitle: {
+      ...Typography.bodyMd,
+      color: colors.onSurface,
+    },
+    rowSubtitle: {
+      ...Typography.captionSm,
+      color: colors.outline,
+      marginTop: 2,
+    },
+    rowRightBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    verifiedBadge: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.full,
+      ...Shadows.sm,
+    },
+    verifiedBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    connectedText: {
+      ...Typography.captionMd,
+      color: colors.outline,
+    },
+    hairline: {
+      height: 1,
+      backgroundColor: colors.surfaceVariant,
+      marginHorizontal: Spacing.md,
+    },
+  });

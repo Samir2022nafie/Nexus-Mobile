@@ -15,8 +15,8 @@ import 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { PostStateProvider } from '../src/context/PostStateContext';
+import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
-import { Colors } from '../src/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -24,6 +24,7 @@ SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { isLoading } = useAuth();
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     if (!isLoading) {
@@ -36,42 +37,47 @@ function RootNavigator() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: Colors.surface },
-        animation: 'slide_from_right',
-        animationDuration: 250,
-      }}
-    >
-      <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
-      <Stack.Screen name="community/[slug]" options={{ headerShown: false }} />
-      <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="hangout/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="new-post" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="new-hangout" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="new-event" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="new-community" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="hangout/[id]/requests" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.surface },
+          animation: 'slide_from_right',
+          animationDuration: 250,
+        }}
+      >
+        <Stack.Screen name="(auth)" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="community/[slug]" options={{ headerShown: false }} />
+        <Stack.Screen name="post/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="event/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="hangout/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="new-post" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="select-community" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="new-hangout" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="new-event" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="new-community" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="edit-profile" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="hangout/[id]/requests" options={{ headerShown: false }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      </Stack>
+    </>
   );
 }
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <PostStateProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </PostStateProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <PostStateProvider>
+            <RootNavigator />
+          </PostStateProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

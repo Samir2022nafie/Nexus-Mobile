@@ -12,7 +12,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../constants/theme';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { formatCategoryName } from '../utils/categories';
 import { usePostState } from '../context/PostStateContext';
 import { extractDirectImageUrl } from '../utils/imageUrl';
@@ -59,6 +60,8 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
   style,
 }) => {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const { likedPosts, savedPosts, commentCounts, likesCounts, toggleLike, toggleSave } = usePostState();
 
   // State-aware likes calculation with reversible increment/decrement
@@ -234,12 +237,12 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
             <MaterialIcons
               name={currentLiked ? 'favorite' : 'favorite-border'}
               size={20}
-              color={currentLiked ? Colors.primaryContainer : Colors.tertiary}
+              color={currentLiked ? colors.primaryContainer : colors.tertiary}
             />
             <Text
               style={[
                 styles.counterText,
-                currentLiked && { color: Colors.primaryContainer, fontWeight: '700' },
+                currentLiked && { color: colors.primaryContainer, fontWeight: '700' },
               ]}
             >
               {likes}
@@ -255,7 +258,7 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
             <MaterialIcons
               name="chat-bubble-outline"
               size={18}
-              color={Colors.tertiary}
+              color={colors.tertiary}
             />
             <Text style={styles.counterText}>{commentsCount}</Text>
           </TouchableOpacity>
@@ -271,7 +274,7 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
             <MaterialIcons
               name={currentSaved ? 'bookmark' : 'bookmark-border'}
               size={20}
-              color={currentSaved ? Colors.primaryContainer : Colors.tertiary}
+              color={currentSaved ? colors.primaryContainer : colors.tertiary}
             />
           </TouchableOpacity>
 
@@ -281,7 +284,7 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
             onPress={handleShare}
             activeOpacity={0.7}
           >
-            <MaterialIcons name="share" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="share" size={20} color={colors.tertiary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -294,146 +297,147 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    ...Shadows.sm,
-  },
-  topHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  communityLinkPressable: {
-    flex: 1,
-    marginRight: Spacing.sm,
-  },
-  communityHeaderText: {
-    ...Typography.captionSm,
-    color: Colors.primary,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  categoryPill: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    alignSelf: 'flex-start',
-  },
-  categoryPillText: {
-    fontSize: 10,
-    color: Colors.onSurfaceVariant,
-    fontWeight: '700',
-  },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  authorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  authorAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-  },
-  authorAvatarFallback: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  authorName: {
-    ...Typography.captionMd,
-    color: Colors.onSurface,
-    fontWeight: '600',
-    flex: 1,
-  },
-  tagsWrapper: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    justifyContent: 'flex-end',
-    maxWidth: 160,
-  },
-  tagBadge: {
-    backgroundColor: 'rgba(232, 167, 54, 0.12)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: BorderRadius.full,
-  },
-  tagBadgeText: {
-    fontSize: 10,
-    color: Colors.secondary,
-    fontWeight: '600',
-  },
-  postTitle: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  postMediaContainer: {
-    height: 180,
-    width: '100%',
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: Colors.surfaceContainerHigh,
-    marginVertical: Spacing.xs,
-  },
-  postMediaImage: {
-    width: '100%',
-    height: '100%',
-  },
-  postContent: {
-    ...Typography.bodySm,
-    color: Colors.onSurfaceVariant,
-    lineHeight: 18,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 2,
-  },
-  actionGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  iconCounter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  counterText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  iconOnly: {
-    padding: 2,
-  },
-  timestampText: {
-    ...Typography.captionSm,
-    color: Colors.tertiary,
-    fontSize: 11,
-    marginTop: -2,
-  },
-});
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: isDark ? colors.surfaceContainer : colors.tertiaryFixed,
+      borderRadius: BorderRadius.xl,
+      padding: Spacing.md,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      ...Shadows.sm,
+    },
+    topHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 2,
+    },
+    communityLinkPressable: {
+      flex: 1,
+      marginRight: Spacing.sm,
+    },
+    communityHeaderText: {
+      ...Typography.captionSm,
+      color: colors.primary,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    categoryPill: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: BorderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      alignSelf: 'flex-start',
+    },
+    categoryPillText: {
+      fontSize: 10,
+      color: colors.onSurfaceVariant,
+      fontWeight: '700',
+    },
+    authorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    authorInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    authorAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+    },
+    authorAvatarFallback: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    authorName: {
+      ...Typography.captionMd,
+      color: colors.onSurface,
+      fontWeight: '600',
+      flex: 1,
+    },
+    tagsWrapper: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+      justifyContent: 'flex-end',
+      maxWidth: 160,
+    },
+    tagBadge: {
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.12)',
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: BorderRadius.full,
+    },
+    tagBadgeText: {
+      fontSize: 10,
+      color: colors.secondary,
+      fontWeight: '600',
+    },
+    postTitle: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    postMediaContainer: {
+      height: 180,
+      width: '100%',
+      borderRadius: BorderRadius.lg,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainerHigh,
+      marginVertical: Spacing.xs,
+    },
+    postMediaImage: {
+      width: '100%',
+      height: '100%',
+    },
+    postContent: {
+      ...Typography.bodySm,
+      color: colors.onSurfaceVariant,
+      lineHeight: 18,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 2,
+    },
+    actionGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    iconCounter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    counterText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      fontWeight: '600',
+    },
+    iconOnly: {
+      padding: 2,
+    },
+    timestampText: {
+      ...Typography.captionSm,
+      color: colors.tertiary,
+      fontSize: 11,
+      marginTop: -2,
+    },
+  });

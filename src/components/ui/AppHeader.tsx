@@ -20,6 +20,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing } from '../../constants/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { notificationsService } from '../../services/notifications';
 import { NexusLogo } from './NexusLogo';
 
@@ -44,6 +45,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const [internalUnread, setInternalUnread] = useState(false);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       : internalUnread;
 
   const headerContent = (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { backgroundColor: colors.surface }, style]}>
       <View style={styles.content}>
         {/* Tappable Header Area (scrolls feed back to top) */}
         <TouchableOpacity
@@ -98,8 +100,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.7}
             accessibilityLabel="Notifications"
           >
-            <MaterialIcons name="notifications-none" size={24} color={Colors.onSurface} />
-            {showUnread && <View style={styles.unreadDot} />}
+            <MaterialIcons name="notifications-none" size={24} color={colors.onSurface} />
+            {showUnread && <View style={[styles.unreadDot, { borderColor: colors.surface }]} />}
           </TouchableOpacity>
         </View>
       </View>

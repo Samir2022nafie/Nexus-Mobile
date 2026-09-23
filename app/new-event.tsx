@@ -28,7 +28,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
+import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { Button } from '../src/components/ui/Button';
 import { usersService } from '../src/services/users';
 import { eventsService } from '../src/services/events';
@@ -65,6 +66,7 @@ function PickerColumn<T>({
   renderLabel: (item: T) => string;
 }) {
   const flatListRef = useRef<FlatList>(null);
+  const pickerStyles = useThemedStyles(getPickerStyles);
 
   const handleScrollEnd = (e: any) => {
     const offsetY = e.nativeEvent.contentOffset.y;
@@ -119,6 +121,9 @@ function PickerColumn<T>({
 export default function NewEventScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
+  const pickerStyles = useThemedStyles(getPickerStyles);
   const params = useLocalSearchParams<{ eventId?: string; slug?: string }>();
   const isEditing = Boolean(params.eventId);
 
@@ -390,8 +395,8 @@ export default function NewEventScreen() {
   if (initialLoading) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.primaryContainer} />
-        <Text style={{ marginTop: 12, color: Colors.secondary }}>Loading event details...</Text>
+        <ActivityIndicator size="large" color={colors.primaryContainer} />
+        <Text style={{ marginTop: 12, color: colors.secondary }}>Loading event details...</Text>
       </View>
     );
   }
@@ -405,7 +410,7 @@ export default function NewEventScreen() {
           style={styles.closeButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="close" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Event' : 'New Event'}</Text>
         <TouchableOpacity
@@ -428,7 +433,7 @@ export default function NewEventScreen() {
       >
         {generalError ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error" size={18} color={Colors.error} />
+            <MaterialIcons name="error" size={18} color={colors.error} />
             <Text style={styles.errorText}>{generalError}</Text>
           </View>
         ) : null}
@@ -453,7 +458,7 @@ export default function NewEventScreen() {
                   <MaterialIcons
                     name="groups"
                     size={16}
-                    color={isSelected ? Colors.onPrimaryContainer : Colors.tertiary}
+                    color={isSelected ? colors.onPrimaryContainer : colors.tertiary}
                   />
                   <Text style={[styles.commChipText, isSelected && styles.commChipTextActive]}>
                     {c.name}
@@ -493,7 +498,7 @@ export default function NewEventScreen() {
               onPress={handlePickCoverImage}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="add-photo-alternate" size={28} color={Colors.primaryContainer} />
+              <MaterialIcons name="add-photo-alternate" size={28} color={colors.primaryContainer} />
               <Text style={styles.coverUploadTitle}>Upload Event Banner</Text>
               <Text style={styles.coverUploadSubtitle}>16:9 ratio recommended (JPG, PNG)</Text>
             </TouchableOpacity>
@@ -504,7 +509,7 @@ export default function NewEventScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="Or paste banner image URL (https://...)"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={coverImage && coverImage.startsWith('http') ? coverImage : ''}
               onChangeText={(text) => {
                 const direct = extractDirectImageUrl(text);
@@ -522,10 +527,10 @@ export default function NewEventScreen() {
             />
             {coverImage && coverImage.startsWith('http') ? (
               <TouchableOpacity onPress={() => setCoverImage(null)} style={{ padding: 4 }}>
-                <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+                <MaterialIcons name="close" size={18} color={colors.tertiary} />
               </TouchableOpacity>
             ) : (
-              <MaterialIcons name="link" size={20} color={Colors.tertiary} />
+              <MaterialIcons name="link" size={20} color={colors.tertiary} />
             )}
           </View>
         </View>
@@ -537,7 +542,7 @@ export default function NewEventScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="e.g. Summit Ridge Sunrise Hike"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.title}
               onChangeText={(v) => updateField('title', v)}
             />
@@ -552,11 +557,11 @@ export default function NewEventScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="e.g. Entoto Park Trailhead"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.location}
               onChangeText={(v) => updateField('location', v)}
             />
-            <MaterialIcons name="location-on" size={20} color={Colors.secondary} />
+            <MaterialIcons name="location-on" size={20} color={colors.secondary} />
           </View>
         </View>
 
@@ -572,7 +577,7 @@ export default function NewEventScreen() {
               <Text style={styles.dateTimeText} numberOfLines={1}>
                 {formatDisplay(form.startsAt)}
               </Text>
-              <MaterialIcons name="schedule" size={18} color={Colors.primaryContainer} />
+              <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
             </TouchableOpacity>
             {errors.startsAt ? <Text style={styles.errorText}>{errors.startsAt}</Text> : null}
           </View>
@@ -587,7 +592,7 @@ export default function NewEventScreen() {
               <Text style={styles.dateTimeText} numberOfLines={1}>
                 {formatDisplay(form.endsAt)}
               </Text>
-              <MaterialIcons name="schedule" size={18} color={Colors.primaryContainer} />
+              <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
             </TouchableOpacity>
           </View>
         </View>
@@ -599,12 +604,12 @@ export default function NewEventScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="No limit (unlimited attendees)"
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               keyboardType="number-pad"
               value={form.maxParticipants}
               onChangeText={(v) => updateField('maxParticipants', v)}
             />
-            <MaterialIcons name="group" size={20} color={Colors.tertiary} />
+            <MaterialIcons name="group" size={20} color={colors.tertiary} />
           </View>
         </View>
 
@@ -615,7 +620,7 @@ export default function NewEventScreen() {
             <TextInput
               style={[styles.textInput, styles.textAreaInput]}
               placeholder="Describe the activity, difficulty level, and what members should pack..."
-              placeholderTextColor={Colors.outline}
+              placeholderTextColor={colors.outline}
               value={form.description}
               onChangeText={(v) => updateField('description', v)}
               multiline
@@ -719,10 +724,11 @@ export default function NewEventScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   topBar: {
     height: 56,
@@ -730,7 +736,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   closeButton: {
     width: 44,
@@ -741,17 +747,17 @@ const styles = StyleSheet.create({
   },
   topBarTitle: {
     ...Typography.headlineSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   createBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   createText: {
     ...Typography.labelMd,
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   container: {
@@ -772,7 +778,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...Typography.captionSm,
-    color: Colors.error,
+    color: colors.error,
     marginTop: 2,
   },
   fieldGroup: {
@@ -780,13 +786,13 @@ const styles = StyleSheet.create({
   },
   label: {
     ...Typography.labelSm,
-    color: Colors.secondary,
+    color: colors.secondary,
     letterSpacing: 0.8,
   },
   inputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceContainerHighest,
+    backgroundColor: colors.surfaceContainerHighest,
     borderRadius: BorderRadius.lg,
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
@@ -794,18 +800,18 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputBoxError: {
-    borderColor: Colors.error,
+    borderColor: colors.error,
   },
   textInput: {
     flex: 1,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     padding: 0,
   },
   dateTimeText: {
     flex: 1,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   twoCols: {
     flexDirection: 'row',
@@ -834,25 +840,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
   commChipActive: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   commChipText: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   commChipTextActive: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   coverUploadBox: {
     height: 130,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderWidth: 1.5,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -861,19 +867,19 @@ const styles = StyleSheet.create({
   },
   coverUploadTitle: {
     ...Typography.labelMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   coverUploadSubtitle: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   coverPreviewContainer: {
     height: 150,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
   coverPreviewImage: {
     width: '100%',
@@ -909,7 +915,8 @@ const styles = StyleSheet.create({
   },
 });
 
-const pickerStyles = StyleSheet.create({
+const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: 0,
@@ -944,7 +951,7 @@ const pickerStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: Spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   headerBtn: {
     paddingVertical: 6,
@@ -952,18 +959,18 @@ const pickerStyles = StyleSheet.create({
   },
   cancelText: {
     ...Typography.labelMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   doneText: {
     ...Typography.labelMd,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   title: {
     ...Typography.headlineSm,
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   pickersContainer: {
     flexDirection: 'row',
@@ -994,12 +1001,12 @@ const pickerStyles = StyleSheet.create({
   },
   itemText: {
     fontSize: 14,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     fontWeight: '400',
   },
   itemTextSelected: {
     fontSize: 15,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
 });

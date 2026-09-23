@@ -22,11 +22,13 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  Animated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { communitiesService } from '../../src/services/communities';
 import { postsService } from '../../src/services/posts';
@@ -48,6 +50,8 @@ export default function ExploreScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const params = useLocalSearchParams<{ tab?: string }>();
 
   const [activeTab, setActiveTab] = useState<SubTab>(
@@ -77,10 +81,33 @@ export default function ExploreScreen() {
   const lastScrollY = useRef(0);
   const lastScrollTime = useRef(Date.now());
 
-  const horizontalScrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const horizontalScrollRef = useRef<any>(null);
   const communitiesScrollRef = useRef<ScrollView>(null);
   const eventsScrollRef = useRef<ScrollView>(null);
   const postsScrollRef = useRef<ScrollView>(null);
+
+  // Synchronized Tab Indicator Geometry
+  const trackWidth = screenWidth - Spacing.md * 2;
+  const tabSlotWidth = (trackWidth - 8) / 3;
+  const indicatorWidth = tabSlotWidth * 0.7;
+  const indicatorOffset = (tabSlotWidth - indicatorWidth) / 2;
+
+  const indicatorTranslateX = scrollX.interpolate({
+    inputRange: [0, screenWidth, 2 * screenWidth],
+    outputRange: [
+      4 + indicatorOffset,
+      4 + tabSlotWidth + indicatorOffset,
+      4 + 2 * tabSlotWidth + indicatorOffset,
+    ],
+    extrapolate: 'clamp',
+  });
+
+  const pillTranslateX = scrollX.interpolate({
+    inputRange: [0, screenWidth, 2 * screenWidth],
+    outputRange: [4, 4 + tabSlotWidth, 4 + 2 * tabSlotWidth],
+    extrapolate: 'clamp',
+  });
 
   const onExploreScroll = (event: any) => {
     const currentY = event.nativeEvent.contentOffset.y;
@@ -125,10 +152,23 @@ export default function ExploreScreen() {
     else if (params.tab === 'communities') handleSelectTab('Communities');
   }, [params.tab]);
 
+  // Sync horizontal scroll on mount if initialized with Events or Posts tab
+  useEffect(() => {
+    const idx = SUB_TABS.indexOf(activeTab);
+    if (idx > 0) {
+      setTimeout(() => {
+        horizontalScrollRef.current?.scrollTo({ x: idx * screenWidth, animated: false });
+        scrollX.setValue(idx * screenWidth);
+      }, 60);
+    }
+  }, []);
+
   // Decoupled fetch: fetch base communities, events, and posts without wiping on query
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (!isRefresh && communities.length === 0) {
+        setLoading(true);
+      }
       const commData = await communitiesService.list({ limit: 50 }).catch(() => []);
       const realComms = commData || [];
       setCommunities(realComms);
@@ -189,7 +229,7 @@ export default function ExploreScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [communities.length]);
 
   useEffect(() => {
     fetchData();
@@ -197,7 +237,7 @@ export default function ExploreScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchData();
+    fetchData(true);
   };
 
   const toggleCommunityJoin = async (comm: any) => {
@@ -333,6 +373,28 @@ export default function ExploreScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Sub-tab Navigation Row */}
       <View style={styles.subTabRow}>
+        {/* Animated Active Pill Backdrop */}
+        <Animated.View
+          style={[
+            styles.animatedActivePill,
+            {
+              width: tabSlotWidth,
+              transform: [{ translateX: pillTranslateX }],
+            },
+          ]}
+        />
+
+        {/* Animated Underline Bar */}
+        <Animated.View
+          style={[
+            styles.animatedIndicatorBar,
+            {
+              width: indicatorWidth,
+              transform: [{ translateX: indicatorTranslateX }],
+            },
+          ]}
+        />
+
         {SUB_TABS.map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -340,12 +402,11 @@ export default function ExploreScreen() {
               key={tab}
               style={styles.subTabButton}
               onPress={() => handleSelectTab(tab)}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
             >
               <Text style={[styles.subTabText, isActive && styles.subTabTextActive]}>
                 {tab}
               </Text>
-              {isActive && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           );
         })}
@@ -353,11 +414,11 @@ export default function ExploreScreen() {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={20} color={Colors.tertiary} />
+        <MaterialIcons name="search" size={20} color={colors.tertiary} />
         <TextInput
           style={styles.searchInput}
           placeholder={`Search ${activeTab.toLowerCase()}...`}
-          placeholderTextColor={Colors.tertiary}
+          placeholderTextColor={colors.tertiary}
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"
@@ -365,7 +426,7 @@ export default function ExploreScreen() {
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <MaterialIcons name="close" size={18} color={Colors.tertiary} />
+            <MaterialIcons name="close" size={18} color={colors.tertiary} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -401,15 +462,29 @@ export default function ExploreScreen() {
       </View>
 
       {/* Horizontal Swiping Pager */}
-      {loading ? (
+      {loading && communities.length === 0 ? (
         <LoadingSpinner message="Discovering..." />
       ) : (
-        <ScrollView
+        <Animated.ScrollView
           ref={horizontalScrollRef}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           style={styles.pager}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+            {
+              useNativeDriver: false,
+              listener: (e: any) => {
+                const x = e.nativeEvent.contentOffset.x;
+                const idx = Math.round(x / screenWidth);
+                if (SUB_TABS[idx] && SUB_TABS[idx] !== activeTab) {
+                  setActiveTab(SUB_TABS[idx]);
+                }
+              },
+            }
+          )}
+          scrollEventThrottle={16}
           onMomentumScrollEnd={(e) => {
             const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
             if (SUB_TABS[idx] && SUB_TABS[idx] !== activeTab) {
@@ -428,7 +503,7 @@ export default function ExploreScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={Colors.primaryContainer}
+                tintColor={colors.primaryContainer}
               />
             }
             showsVerticalScrollIndicator={false}
@@ -436,7 +511,7 @@ export default function ExploreScreen() {
             <View style={styles.cardsFeed}>
               {filteredCommunities.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <MaterialIcons name="groups" size={48} color={Colors.tertiary} />
+                  <MaterialIcons name="groups" size={48} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No communities found</Text>
                   <Text style={styles.emptySubtitle}>
                     {selectedCategory !== 'All'
@@ -482,7 +557,7 @@ export default function ExploreScreen() {
                             />
                           ) : (
                             <View style={styles.commAvatarFallback}>
-                              <MaterialIcons name="groups" size={24} color={Colors.primary} />
+                              <MaterialIcons name="groups" size={24} color={colors.primary} />
                             </View>
                           )}
                           <View style={styles.commTextGroup}>
@@ -511,7 +586,7 @@ export default function ExploreScreen() {
                           <MaterialIcons
                             name={isJoined ? 'check' : 'add'}
                             size={16}
-                            color={isJoined ? Colors.primaryContainer : Colors.onPrimaryContainer}
+                            color={isJoined ? colors.primaryContainer : colors.onPrimaryContainer}
                           />
                           <Text
                             style={[
@@ -547,7 +622,7 @@ export default function ExploreScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={Colors.primaryContainer}
+                tintColor={colors.primaryContainer}
               />
             }
             showsVerticalScrollIndicator={false}
@@ -555,7 +630,7 @@ export default function ExploreScreen() {
             <View style={styles.cardsFeed}>
               {filteredEvents.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <MaterialIcons name="event" size={48} color={Colors.tertiary} />
+                  <MaterialIcons name="event" size={48} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No events found</Text>
                   <Text style={styles.emptySubtitle}>
                     {selectedCategory !== 'All'
@@ -604,14 +679,14 @@ export default function ExploreScreen() {
                               styles.accessDot,
                               {
                                 backgroundColor:
-                                  event.isPublic !== false ? Colors.success : Colors.secondary,
+                                  event.isPublic !== false ? colors.success : colors.secondary,
                               },
                             ]}
                           />
                           <Text
                             style={[
                               styles.accessText,
-                              { color: event.isPublic !== false ? Colors.success : Colors.secondary },
+                              { color: event.isPublic !== false ? colors.success : colors.secondary },
                             ]}
                           >
                             {event.isPublic !== false ? 'Public' : 'Community'}
@@ -636,7 +711,7 @@ export default function ExploreScreen() {
                                 <Image source={{ uri: commAvatar }} style={styles.eventCommunityAvatar} />
                               ) : (
                                 <View style={styles.eventCommunityAvatarFallback}>
-                                  <MaterialIcons name="groups" size={14} color={Colors.primary} />
+                                  <MaterialIcons name="groups" size={14} color={colors.primary} />
                                 </View>
                               )}
                               <Text style={styles.eventCommunityName} numberOfLines={1}>
@@ -647,13 +722,13 @@ export default function ExploreScreen() {
                         })()}
 
                         <Text style={styles.eventTitle}>{event.title}</Text>
-                        <Text style={[styles.eventDateTime, dateInfo.isPassed && { color: Colors.outline }]}>
+                        <Text style={[styles.eventDateTime, dateInfo.isPassed && { color: colors.outline }]}>
                           {dateInfo.dateText}
                         </Text>
 
                         {(event.location?.place_name || event.location) && (
                           <View style={styles.locationRow}>
-                            <MaterialIcons name="location-on" size={16} color={Colors.secondary} />
+                            <MaterialIcons name="location-on" size={16} color={colors.secondary} />
                             <Text style={styles.locationText} numberOfLines={1}>
                               {event.location?.place_name || event.location}
                             </Text>
@@ -662,7 +737,7 @@ export default function ExploreScreen() {
 
                         <View style={styles.eventBottomRow}>
                           <View style={styles.goingRow}>
-                            <MaterialIcons name="group" size={18} color={Colors.onSurfaceVariant} />
+                            <MaterialIcons name="group" size={18} color={colors.onSurfaceVariant} />
                             <Text style={styles.goingText}>
                               {`${event.participantsCount ?? event.participantCount ?? 0} ${dateInfo.isPassed ? 'went' : 'going'}`}
                             </Text>
@@ -678,7 +753,7 @@ export default function ExploreScreen() {
                             <MaterialIcons
                               name={isSaved ? 'bookmark' : 'bookmark-border'}
                               size={22}
-                              color={isSaved ? Colors.primaryContainer : Colors.tertiary}
+                              color={isSaved ? colors.primaryContainer : colors.tertiary}
                             />
                           </TouchableOpacity>
                         </View>
@@ -701,7 +776,7 @@ export default function ExploreScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={Colors.primaryContainer}
+                tintColor={colors.primaryContainer}
               />
             }
             showsVerticalScrollIndicator={false}
@@ -709,7 +784,7 @@ export default function ExploreScreen() {
             <View style={styles.discussionsFeed}>
               {filteredPosts.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <MaterialIcons name="forum" size={48} color={Colors.tertiary} />
+                  <MaterialIcons name="forum" size={48} color={colors.tertiary} />
                   <Text style={styles.emptyTitle}>No posts found</Text>
                   <Text style={styles.emptySubtitle}>
                     {selectedCategory !== 'All'
@@ -742,16 +817,17 @@ export default function ExploreScreen() {
               )}
             </View>
           </ScrollView>
-        </ScrollView>
+        </Animated.ScrollView>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
   },
   pager: {
     flex: 1,
@@ -762,55 +838,66 @@ const styles = StyleSheet.create({
   subTabRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F0ECE8',
+    backgroundColor: isDark ? colors.surfaceContainerLow : '#F0ECE8',
     marginHorizontal: Spacing.md,
     marginTop: Spacing.sm,
     borderRadius: BorderRadius.xl,
     padding: 4,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
+    position: 'relative',
+    height: 46,
+  },
+  animatedActivePill: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surface,
+    ...Shadows.sm,
+  },
+  animatedIndicatorBar: {
+    position: 'absolute',
+    bottom: 5,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.primaryContainer,
+    zIndex: 2,
   },
   subTabButton: {
     flex: 1,
-    paddingVertical: 10,
+    height: '100%',
     alignItems: 'center',
-    position: 'relative',
+    justifyContent: 'center',
+    zIndex: 3,
   },
   subTabText: {
     ...Typography.labelMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
+    fontWeight: '600',
   },
   subTabTextActive: {
-    color: Colors.primaryContainer,
+    color: isDark ? '#feba48' : colors.primaryContainer,
     fontWeight: '700',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    width: 36,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: Colors.primaryContainer,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainerLow,
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     height: 44,
     borderRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   searchInput: {
     flex: 1,
     height: '100%',
     marginLeft: Spacing.sm,
     ...Typography.bodyMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
   },
   categoryChipsWrapper: {
     height: 48,
@@ -824,23 +911,23 @@ const styles = StyleSheet.create({
     height: 32,
     paddingHorizontal: 14,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.surfaceContainerLow,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   categoryChipActive: {
-    backgroundColor: Colors.primaryContainer,
-    borderColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primaryContainer,
   },
   categoryChipText: {
     ...Typography.captionMd,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '500',
   },
   categoryChipTextActive: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
     fontWeight: '700',
   },
   cardsFeed: {
@@ -851,12 +938,12 @@ const styles = StyleSheet.create({
 
   // Communities
   communityCard: {
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.cardBg,
     borderRadius: BorderRadius.xl,
     padding: Spacing.md,
     gap: 10,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   commTopRow: {
     flexDirection: 'row',
@@ -873,7 +960,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
   commAvatarFallback: {
     width: 48,
@@ -888,7 +975,7 @@ const styles = StyleSheet.create({
   },
   commName: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
   },
   commBadgeRow: {
@@ -898,21 +985,21 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   commCategoryPill: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   commCategoryText: {
     ...Typography.captionSm,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '600',
   },
   commMemberCount: {
     ...Typography.captionSm,
-    color: Colors.tertiary,
+    color: colors.tertiary,
   },
   joinToggleBtn: {
     height: 32,
@@ -923,36 +1010,36 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   btnJoined: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   btnNotJoined: {
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
   },
   joinToggleText: {
     fontSize: 12,
     fontWeight: '700',
   },
   btnJoinedText: {
-    color: Colors.primaryContainer,
+    color: colors.primaryContainer,
   },
   btnNotJoinedText: {
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
   commDescription: {
     ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     lineHeight: 20,
   },
 
   // Events
   eventCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   eventCoverWrapper: {
     height: 160,
@@ -970,12 +1057,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   accessDot: {
     width: 8,
@@ -999,7 +1086,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.surfaceContainerHigh,
+    backgroundColor: colors.surfaceContainerHigh,
   },
   eventCommunityAvatarFallback: {
     width: 20,
@@ -1011,17 +1098,17 @@ const styles = StyleSheet.create({
   },
   eventCommunityName: {
     ...Typography.labelMd,
-    color: Colors.secondary,
+    color: colors.secondary,
   },
   eventTitle: {
     ...Typography.labelLg,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginBottom: 4,
   },
   eventDateTime: {
     ...Typography.captionMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     marginBottom: 6,
   },
   locationRow: {
@@ -1032,7 +1119,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     ...Typography.captionMd,
-    color: Colors.secondary,
+    color: colors.secondary,
   },
   eventBottomRow: {
     flexDirection: 'row',
@@ -1049,7 +1136,7 @@ const styles = StyleSheet.create({
   },
   goingText: {
     ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
+    color: colors.onSurfaceVariant,
     fontWeight: '600',
   },
   bookmarkBtn: {
@@ -1068,10 +1155,10 @@ const styles = StyleSheet.create({
   emptyContainer: {
     paddingVertical: Spacing.xl,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.tertiaryFixed,
+    backgroundColor: colors.tertiaryFixed,
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
@@ -1080,20 +1167,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     ...Typography.headlineSm,
     fontSize: 18,
-    color: Colors.onSurface,
+    color: colors.onSurface,
     fontWeight: '700',
     marginTop: 4,
   },
   emptySubtitle: {
     ...Typography.bodyMd,
-    color: Colors.tertiary,
+    color: colors.tertiary,
     textAlign: 'center',
     maxWidth: 280,
     lineHeight: 20,
   },
   emptyActionBtn: {
     marginTop: 8,
-    backgroundColor: Colors.primaryContainer,
+    backgroundColor: colors.primaryContainer,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: BorderRadius.full,
@@ -1101,6 +1188,6 @@ const styles = StyleSheet.create({
   emptyActionBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.onPrimaryContainer,
+    color: colors.onPrimaryContainer,
   },
 });

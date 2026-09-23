@@ -53,8 +53,19 @@ export default function EventDetailScreen() {
       setLoading(true);
       let targetSlug = communitySlug;
 
-      // If slug was not provided in route params, look up the community
+      // If slug was not provided in route params, look up the event directly
       if (!targetSlug) {
+        const directEv = await eventsService.getByIdDirect(id).catch(() => null);
+        if (directEv) {
+          const directSlug = (directEv as any).community?.slug || (directEv as any).communitySlug;
+          if (directSlug) setCommunitySlug(directSlug);
+          setEvent(directEv);
+          setIsJoined(directEv.isParticipant || false);
+          setIsBookmarked(directEv.isSaved || false);
+          setParticipantsCount((directEv as any).participants?.length ?? (directEv.participantsCount || 0));
+          return;
+        }
+
         const comms = await communitiesService.list({ limit: 20 }).catch(() => []);
         for (const c of comms) {
           const ev = await eventsService.getById(c.slug, id).catch(() => null);

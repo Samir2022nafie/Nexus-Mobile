@@ -176,18 +176,27 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
 
       {/* Author & Right-aligned Tags Row */}
       <View style={styles.authorRow}>
-        <View style={styles.authorInfo}>
+        <TouchableOpacity
+          style={styles.authorInfo}
+          onPress={() => {
+            const authorId = post.authorId || post.author_id || post.author?.id;
+            if (authorId) {
+              router.push(`/user/${authorId}`);
+            }
+          }}
+          activeOpacity={0.7}
+        >
           {authorPic ? (
             <Image source={{ uri: authorPic }} style={styles.authorAvatar} />
           ) : (
             <View style={styles.authorAvatarFallback}>
-              <MaterialIcons name="person" size={18} color={Colors.tertiary} />
+              <MaterialIcons name="person" size={18} color={colors.tertiary} />
             </View>
           )}
           <Text style={styles.authorName} numberOfLines={1}>
             {authorDisplayName}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         {tagsList.length > 0 && (
           <View style={styles.tagsWrapper}>

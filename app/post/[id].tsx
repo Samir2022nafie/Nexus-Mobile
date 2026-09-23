@@ -517,21 +517,39 @@ export default function ThreadDetailScreen() {
                     ]}
                   >
                     <View style={styles.commentTopRow}>
-                      {comment.author?.profile_picture_url ? (
-                        <Image
-                          source={{ uri: comment.author.profile_picture_url }}
-                          style={styles.commentAvatar}
-                        />
-                      ) : (
-                        <View style={styles.commentAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
-                        </View>
-                      )}
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (comment.author?.id) {
+                            router.push(`/user/${comment.author.id}`);
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        {comment.author?.profile_picture_url ? (
+                          <Image
+                            source={{ uri: comment.author.profile_picture_url }}
+                            style={styles.commentAvatar}
+                          />
+                        ) : (
+                          <View style={styles.commentAvatarFallback}>
+                            <MaterialIcons name="person" size={16} color={colors.tertiary} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
                       <View style={styles.commentBody}>
                         <View style={styles.commentAuthorLine}>
-                          <Text style={styles.commentAuthorName}>
-                            {comment.author?.first_name} {comment.author?.last_name || ''}
-                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              if (comment.author?.id) {
+                                router.push(`/user/${comment.author.id}`);
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.commentAuthorName}>
+                              {comment.author?.first_name} {comment.author?.last_name || ''}
+                            </Text>
+                          </TouchableOpacity>
                           <Text style={styles.commentTimeText}>
                             ·{' '}
                             {comment.created_at || comment.createdAt

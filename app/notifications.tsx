@@ -109,6 +109,10 @@ export default function NotificationsScreen() {
       router.push(`/event/${entityId}`);
     } else if (entityType === 'hangout' && entityId) {
       router.push(`/hangout/${entityId}`);
+    } else if (entityType === 'community' && entityId) {
+      router.push(`/community/${entityId}`);
+    } else if (entityType === 'user' && entityId) {
+      router.push(`/user/${entityId}`);
     }
   };
 
@@ -151,6 +155,12 @@ export default function NotificationsScreen() {
         return (
           <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
             <MaterialIcons name="event-available" size={22} color={colors.secondary} />
+          </View>
+        );
+      case 'mention':
+        return (
+          <View style={[styles.iconBox, { backgroundColor: colors.primaryFixed }]}>
+            <MaterialIcons name="groups" size={22} color={colors.primary} />
           </View>
         );
       default:

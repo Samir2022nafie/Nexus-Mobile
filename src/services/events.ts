@@ -15,6 +15,11 @@ export const eventsService = {
     return api.get<EventItem>(`/communities/${slug}/events/${eventId}`);
   },
 
+  /** GET /events/:eventId — Direct lookup without knowing slug */
+  getByIdDirect(eventId: string): Promise<EventItem> {
+    return api.get<EventItem>(`/events/${eventId}`);
+  },
+
   /** POST /communities/:slug/events */
   create(slug: string, dto: CreateEventDto): Promise<EventItem> {
     return api.post<EventItem>(`/communities/${slug}/events`, dto);

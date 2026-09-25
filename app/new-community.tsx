@@ -156,16 +156,7 @@ export default function NewCommunityScreen() {
           <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Community' : 'New Community'}</Text>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={loading}
-          style={styles.createBtn}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.createText}>
-            {loading ? 'Saving...' : isEditing ? 'Save' : 'Create'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView

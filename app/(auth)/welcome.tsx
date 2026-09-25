@@ -2,13 +2,15 @@
  * Welcome Screen — Matches Stitch screen_1_welcome picture-perfect.
  * Tactile hero image with presence tag, goldenrod Nexus brand emblem,
  * editorial tagline, pill CTAs, and tonal social auth buttons.
+ * Fully themed for dark mode support.
  */
 import React from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { Button } from '../../src/components/ui/Button';
 
 const WELCOME_HERO =
@@ -17,6 +19,8 @@ const WELCOME_HERO =
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
 
   return (
     <ScrollView
@@ -28,14 +32,14 @@ export default function WelcomeScreen() {
       <View style={styles.heroWrapper}>
         <View style={styles.heroContainer}>
           <Image source={{ uri: WELCOME_HERO }} style={styles.heroImage} />
-          {/* Gentle ambient gradient mask at bottom */}
-          <View style={styles.heroGradient} />
+          {/* Ambient gradient mask at bottom */}
+          <View
+            style={[
+              styles.heroGradient,
+              { backgroundColor: isDark ? 'rgba(20,19,18,0.45)' : 'rgba(252,249,248,0.35)' },
+            ]}
+          />
 
-          {/* Presence tag overlay */}
-          <View style={styles.presenceTag}>
-            <View style={styles.presenceDot} />
-            <Text style={styles.presenceText}>340+ local meetups</Text>
-          </View>
         </View>
       </View>
 
@@ -43,7 +47,7 @@ export default function WelcomeScreen() {
       <View style={styles.brandSection}>
         <View style={styles.logoRow}>
           <View style={styles.logoBadge}>
-            <MaterialIcons name="groups" size={20} color={Colors.onPrimaryContainer} />
+            <MaterialIcons name="groups" size={20} color={colors.onPrimaryContainer} />
           </View>
           <Text style={styles.brandTitle}>Nexus</Text>
         </View>
@@ -69,164 +73,82 @@ export default function WelcomeScreen() {
           size="lg"
           fullWidth
         />
-
-        {/* Social Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>Continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Social Authentication Tonal Buttons */}
-        <View style={styles.socialRow}>
-          <TouchableOpacity
-            style={styles.socialButton}
-            activeOpacity={0.8}
-            accessibilityLabel="Continue with Google"
-          >
-            <FontAwesome5 name="google" size={18} color="#EA4335" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.socialButton}
-            activeOpacity={0.8}
-            accessibilityLabel="Continue with Apple"
-          >
-            <FontAwesome5 name="apple" size={20} color={Colors.onSurface} />
-          </TouchableOpacity>
-        </View>
       </View>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  content: {
-    paddingHorizontal: Spacing.margin,
-    paddingTop: Spacing.xs,
-  },
-  heroWrapper: {
-    marginBottom: Spacing.md,
-  },
-  heroContainer: {
-    height: 360,
-    borderRadius: BorderRadius.xxl,
-    overflow: 'hidden',
-    backgroundColor: Colors.surfaceContainerLow,
-    position: 'relative',
-    ...Shadows.sm,
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  heroGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 56,
-    backgroundColor: 'rgba(252,249,248,0.3)',
-  },
-  presenceTag: {
-    position: 'absolute',
-    top: Spacing.md,
-    right: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: BorderRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    ...Shadows.sm,
-  },
-  presenceDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primaryContainer,
-  },
-  presenceText: {
-    ...Typography.captionSm,
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  brandSection: {
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.lg,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs + 2,
-    marginBottom: Spacing.xs,
-  },
-  logoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.sm,
-  },
-  brandTitle: {
-    ...Typography.headlineLg,
-    color: Colors.primaryContainer,
-    fontWeight: '700',
-    letterSpacing: -0.6,
-  },
-  tagline: {
-    ...Typography.bodyLg,
-    color: Colors.tertiary,
-    textAlign: 'center',
-    maxWidth: 290,
-    lineHeight: 24,
-  },
-  actionsSection: {
-    gap: Spacing.sm + 4,
-    width: '100%',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    marginVertical: Spacing.xs,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.surfaceContainerHighest,
-  },
-  dividerText: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  socialButton: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.tertiaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.sm,
-  },
-});
+const getStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    content: {
+      paddingHorizontal: Spacing.margin,
+      paddingTop: Spacing.xs,
+    },
+    heroWrapper: {
+      marginBottom: Spacing.md,
+    },
+    heroContainer: {
+      height: 360,
+      borderRadius: BorderRadius.xxl,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainerLow,
+      position: 'relative',
+      ...Shadows.sm,
+    },
+    heroImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    heroGradient: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 56,
+    },
 
+    brandSection: {
+      alignItems: 'center',
+      paddingHorizontal: Spacing.sm,
+      marginTop: Spacing.xs,
+      marginBottom: Spacing.lg,
+    },
+    logoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.xs + 2,
+      marginBottom: Spacing.xs,
+    },
+    logoBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Shadows.sm,
+    },
+    brandTitle: {
+      ...Typography.headlineLg,
+      color: colors.primaryContainer,
+      fontWeight: '700',
+      letterSpacing: -0.6,
+    },
+    tagline: {
+      ...Typography.bodyLg,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      maxWidth: 290,
+      lineHeight: 24,
+    },
+    actionsSection: {
+      gap: Spacing.sm + 4,
+      width: '100%',
+    },
+  });

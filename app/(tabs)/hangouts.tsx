@@ -20,7 +20,8 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -34,7 +35,7 @@ import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 
 export default function HangoutsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -322,7 +323,7 @@ export default function HangoutsScreen() {
 
                     <View style={styles.headerRightBadges}>
                       <View style={[styles.hangoutPill, isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest]}>
-                        {isOpen && <View style={styles.openDot} />}
+                        <View style={isOpen ? styles.openDot : styles.requestDot} />
                         <Text style={[styles.hangoutPillText, isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText]}>
                           {isOpen ? 'Open Meet' : 'Request to Join'}
                         </Text>
@@ -520,10 +521,14 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     gap: 4,
   },
   hangoutPillOpen: {
-    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+    backgroundColor: isDark ? 'rgba(5, 150, 105, 0.20)' : 'rgba(5, 150, 105, 0.12)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(5, 150, 105, 0.35)' : 'rgba(5, 150, 105, 0.20)',
   },
   hangoutPillRequest: {
-    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.22)',
   },
   hangoutPillText: {
     ...Typography.captionSm,
@@ -531,19 +536,25 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     fontWeight: '700',
   },
   hangoutPillOpenText: {
-    color: '#059669',
+    color: isDark ? '#34d399' : '#059669',
   },
   hangoutPillRequestText: {
     ...Typography.captionSm,
     fontSize: 10,
     fontWeight: '700',
-    color: '#d97706',
+    color: isDark ? '#fbbf24' : '#d97706',
   },
   openDot: {
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#059669',
+    backgroundColor: isDark ? '#34d399' : '#059669',
+  },
+  requestDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: isDark ? '#fbbf24' : '#d97706',
   },
   distanceBadge: {
     flexDirection: 'row',

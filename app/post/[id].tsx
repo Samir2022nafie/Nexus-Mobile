@@ -22,8 +22,10 @@ import {
   Alert,
   Modal,
   Animated,
+  Pressable,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -39,7 +41,7 @@ import { Post, Comment } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
 
 export default function ThreadDetailScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
@@ -58,6 +60,7 @@ export default function ThreadDetailScreen() {
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState('');
+  const [commentActionTarget, setCommentActionTarget] = useState<any | null>(null);
 
   // Fixed bottom comment bar scroll animation
   const commentBarTranslateY = useRef(new Animated.Value(0)).current;
@@ -299,7 +302,21 @@ export default function ThreadDetailScreen() {
       })
     : '';
 
+  const isPostEdited = Boolean(
+    (post as any)?.isEdited ||
+    (post as any)?.is_edited ||
+    (post.updatedAt && post.createdAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 2000) ||
+    ((post as any).updated_at && (post as any).created_at && new Date((post as any).updated_at).getTime() - new Date((post as any).created_at).getTime() > 2000)
+  );
+
   const postMedia = extractDirectImageUrl(post.mediaUrl || post.media_url);
+
+  const communityPfp =
+    post.community?.profile_picture_url ||
+    post.community?.profilePictureUrl ||
+    post.community?.avatar_url ||
+    post.community?.avatarUrl ||
+    post.community?.logo_url;
 
   return (
     <KeyboardAvoidingView
@@ -308,7 +325,7 @@ export default function ThreadDetailScreen() {
       style={styles.screen}
     >
       <View style={[styles.inner, { paddingTop: insets.top }]}>
-        {/* Top Header Bar — Back button, Title, and Author Edit/Delete */}
+        {/* Top Header Bar — Back button, Clickable Community Pill, and Author Edit/Delete */}
         <View style={styles.topBar}>
           <TouchableOpacity
             onPress={() => router.back()}
@@ -317,9 +334,27 @@ export default function ThreadDetailScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
           </TouchableOpacity>
-          <Text style={styles.topBarTitle} numberOfLines={1}>
-            {post.community?.name || 'Discussion'}
-          </Text>
+          {post.community?.name ? (
+            <TouchableOpacity
+              style={styles.topBarCommunityPill}
+              onPress={() => post.community?.slug && router.push(`/community/${post.community.slug}`)}
+              activeOpacity={0.75}
+            >
+              {communityPfp ? (
+                <Image source={{ uri: communityPfp }} style={styles.topBarCommunityAvatar} />
+              ) : (
+                <MaterialIcons name="groups" size={16} color={colors.primary} />
+              )}
+              <Text style={styles.topBarCommunityName} numberOfLines={1}>
+                {post.community.name}
+              </Text>
+              <MaterialIcons name="chevron-right" size={15} color={colors.tertiary} />
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.topBarTitle} numberOfLines={1}>
+              Discussion
+            </Text>
+          )}
           {isPostAuthor ? (
             <View style={styles.authorActionsRow}>
               <TouchableOpacity
@@ -352,41 +387,34 @@ export default function ThreadDetailScreen() {
         >
           {/* Main Post Card */}
           <View style={styles.postCard}>
-            {/* Community Affiliation & Real Timestamp */}
-            <View style={styles.affiliationRow}>
+            {/* Author Row with Timestamp on Right */}
+            <View style={styles.authorRow}>
               <TouchableOpacity
-                style={styles.affiliationGroup}
-                onPress={() => post.community?.slug && router.push(`/community/${post.community.slug}`)}
-                activeOpacity={0.8}
+                style={styles.authorInfoGroup}
+                onPress={() => {
+                  const authorId = post.author?.id || post.authorId || post.author_id;
+                  if (authorId) router.push(`/user/${authorId}`);
+                }}
+                activeOpacity={0.75}
               >
-                <View style={styles.commIconCircle}>
-                  <MaterialIcons name="groups" size={16} color={colors.primary} />
+                {post.author?.profile_picture_url ? (
+                  <Image
+                    source={{ uri: post.author.profile_picture_url }}
+                    style={styles.authorAvatar}
+                  />
+                ) : (
+                  <View style={styles.authorAvatarFallback}>
+                    <MaterialIcons name="person" size={20} color={colors.tertiary} />
+                  </View>
+                )}
+                <View style={styles.authorDetails}>
+                  <Text style={styles.authorFullName}>
+                    {post.author?.first_name} {post.author?.last_name || ''}
+                  </Text>
+                  <Text style={styles.authorHandle}>@{post.author?.username || 'member'}</Text>
                 </View>
-                <Text style={styles.commLinkText} numberOfLines={1}>
-                  {post.community?.name || 'Nexus Community'}
-                </Text>
               </TouchableOpacity>
               <Text style={styles.timeAgoText}>{timeDisplay}</Text>
-            </View>
-
-            {/* Author Row — "Community Member" removed */}
-            <View style={styles.authorRow}>
-              {post.author?.profile_picture_url ? (
-                <Image
-                  source={{ uri: post.author.profile_picture_url }}
-                  style={styles.authorAvatar}
-                />
-              ) : (
-                <View style={styles.authorAvatarFallback}>
-                  <MaterialIcons name="person" size={20} color={colors.tertiary} />
-                </View>
-              )}
-              <View style={styles.authorDetails}>
-                <Text style={styles.authorFullName}>
-                  {post.author?.first_name} {post.author?.last_name || ''}
-                </Text>
-                <Text style={styles.authorHandle}>@{post.author?.username || 'member'}</Text>
-              </View>
             </View>
 
             {/* Post Title */}
@@ -464,6 +492,9 @@ export default function ThreadDetailScreen() {
               </View>
 
               <View style={styles.reactionRight}>
+                {isPostEdited ? (
+                  <Text style={styles.editedText}>(edited)</Text>
+                ) : null}
                 <TouchableOpacity onPress={handleSave} style={styles.iconCircle} activeOpacity={0.7}>
                   <MaterialIcons
                     name={hasSaved ? 'bookmark' : 'bookmark-border'}
@@ -509,12 +540,19 @@ export default function ThreadDetailScreen() {
                 const isEditing = editingCommentId === comment.id;
 
                 return (
-                  <View
+                  <TouchableOpacity
                     key={comment.id}
                     style={[
                       styles.commentItem,
                       isHighlighted && styles.commentItemHighlighted,
                     ]}
+                    onLongPress={() => {
+                      if (isAuthor || isPostAuthor) {
+                        setCommentActionTarget(comment);
+                      }
+                    }}
+                    delayLongPress={320}
+                    activeOpacity={0.9}
                   >
                     <View style={styles.commentTopRow}>
                       <TouchableOpacity
@@ -559,24 +597,6 @@ export default function ThreadDetailScreen() {
                                 })
                               : 'recently'}
                           </Text>
-                          {isAuthor && !isEditing && (
-                            <View style={styles.commentActionBtnsRow}>
-                              <TouchableOpacity
-                                onPress={() => startEditComment(comment)}
-                                style={styles.editCommentIconBtn}
-                                activeOpacity={0.7}
-                              >
-                                <MaterialIcons name="edit" size={14} color={colors.secondary} />
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                onPress={() => handleDeleteComment(comment.id)}
-                                style={styles.deleteCommentIconBtn}
-                                activeOpacity={0.7}
-                              >
-                                <MaterialIcons name="delete-outline" size={15} color={colors.error} />
-                              </TouchableOpacity>
-                            </View>
-                          )}
                         </View>
 
                         {isEditing ? (
@@ -607,7 +627,7 @@ export default function ThreadDetailScreen() {
                         )}
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -662,6 +682,72 @@ export default function ThreadDetailScreen() {
           </View>
         </Animated.View>
       </View>
+
+      {/* iOS-style Alert Popup for Comment Edit/Delete on Long Press */}
+      <Modal
+        visible={Boolean(commentActionTarget)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCommentActionTarget(null)}
+      >
+        <Pressable
+          style={styles.iosBackdrop}
+          onPress={() => setCommentActionTarget(null)}
+        >
+          <Pressable style={styles.iosAlertCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.iosAlertHeader}>
+              <Text style={styles.iosAlertTitle}>Comment Options</Text>
+              {commentActionTarget?.content ? (
+                <Text style={styles.iosAlertMessage} numberOfLines={2}>
+                  "{commentActionTarget.content}"
+                </Text>
+              ) : null}
+            </View>
+
+            {/* Action 1: Edit Comment (if comment author) */}
+            {commentActionTarget &&
+              (commentActionTarget.author?.id === user?.id ||
+                commentActionTarget.userId === user?.id ||
+                commentActionTarget.author?.username === user?.username) && (
+                <TouchableOpacity
+                  style={styles.iosAlertBtn}
+                  onPress={() => {
+                    const c = commentActionTarget;
+                    setCommentActionTarget(null);
+                    startEditComment(c);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <MaterialIcons name="edit" size={18} color={colors.primary} style={{ marginRight: 6 }} />
+                  <Text style={styles.iosAlertBtnTextPrimary}>Edit Comment</Text>
+                </TouchableOpacity>
+              )}
+
+            {/* Action 2: Delete Comment */}
+            <TouchableOpacity
+              style={styles.iosAlertBtn}
+              onPress={() => {
+                const cId = commentActionTarget?.id;
+                setCommentActionTarget(null);
+                if (cId) handleDeleteComment(cId);
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete-outline" size={19} color="#ef4444" style={{ marginRight: 6 }} />
+              <Text style={styles.iosAlertBtnTextDestructive}>Delete Comment</Text>
+            </TouchableOpacity>
+
+            {/* Action 3: Cancel */}
+            <TouchableOpacity
+              style={[styles.iosAlertBtn, styles.iosAlertCancelBtn]}
+              onPress={() => setCommentActionTarget(null)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.iosAlertBtnTextCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -749,54 +835,40 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     borderColor: colors.cardBorder,
     gap: 12,
   },
-  affiliationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  affiliationGroup: {
+  topBarCommunityPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flex: 1,
-  },
-  commIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.secondaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  commLinkText: {
-    ...Typography.labelMd,
-    color: colors.secondary,
-    fontWeight: '700',
-    maxWidth: 120,
-  },
-  dotSeparator: {
-    color: colors.tertiary,
-  },
-  categoryPill: {
-    backgroundColor: colors.tertiaryFixed,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: BorderRadius.full,
-    maxWidth: 110,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.14)' : 'rgba(232, 167, 54, 0.09)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.32)' : 'rgba(232, 167, 54, 0.22)',
+    maxWidth: 220,
   },
-  categoryPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.onTertiaryContainer,
+  topBarCommunityAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceContainerHigh,
   },
-  timeAgoText: {
-    ...Typography.captionSm,
-    color: colors.tertiary,
+  topBarCommunityName: {
+    ...Typography.labelMd,
+    color: colors.primary,
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  authorInfoGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'space-between',
   },
   authorAvatar: {
     width: 40,
@@ -818,6 +890,10 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     fontWeight: '700',
   },
   authorHandle: {
+    ...Typography.captionSm,
+    color: colors.tertiary,
+  },
+  timeAgoText: {
     ...Typography.captionSm,
     color: colors.tertiary,
   },
@@ -876,6 +952,12 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  editedText: {
+    ...Typography.labelSm,
+    color: colors.tertiary,
+    fontStyle: 'italic',
+    alignSelf: 'center',
   },
   iconCircle: {
     padding: 2,
@@ -1200,5 +1282,69 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     ...Typography.labelMd,
     color: colors.onPrimaryContainer,
     fontWeight: '700',
+  },
+  iosBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  iosAlertCard: {
+    width: '100%',
+    maxWidth: 290,
+    backgroundColor: isDark ? '#1e1c1a' : '#f8f8f8',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.1)',
+  },
+  iosAlertHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+  },
+  iosAlertTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.onSurface,
+    textAlign: 'center',
+  },
+  iosAlertMessage: {
+    fontSize: 13,
+    color: colors.tertiary,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  iosAlertBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+  },
+  iosAlertBtnTextPrimary: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  iosAlertBtnTextDestructive: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
+  },
+  iosAlertCancelBtn: {
+    borderBottomWidth: 0,
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+  },
+  iosAlertBtnTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.onSurface,
   },
 });

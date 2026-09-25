@@ -15,7 +15,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -28,7 +29,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { PublicProfile, Post } from '../../src/types';
 
 export default function PublicUserProfileScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user: currentUser } = useAuth();
@@ -46,15 +47,15 @@ export default function PublicUserProfileScreen() {
   const loadData = useCallback(async () => {
     if (!id) return;
     try {
-      const [profileData, postsData] = await Promise.all([
-        usersService.getPublicProfile(id).catch(() => null),
-        usersService.getUserPosts(id).catch(() => []),
-      ]);
-
+      const profileData = await usersService.getPublicProfile(id).catch(() => null);
       if (profileData) {
         setProfile(profileData);
+        const postsData = await usersService.getUserPosts(profileData.id).catch(() => []);
+        setPosts(postsData || []);
+      } else {
+        const postsData = await usersService.getUserPosts(id).catch(() => []);
+        setPosts(postsData || []);
       }
-      setPosts(postsData || []);
     } catch {
       // Non-blocking fallback
     } finally {
@@ -245,7 +246,7 @@ export default function PublicUserProfileScreen() {
           <View style={styles.trustBadge}>
             <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
             <Text style={styles.trustBadgeText}>
-              Nexus Member
+              Trust Score: {(profile as any)?.trustScore ?? (profile as any)?.trust_score ?? 50}
             </Text>
           </View>
 
@@ -315,10 +316,23 @@ export default function PublicUserProfileScreen() {
               <Text style={styles.statLabel}>Following</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statColumn}>
+            <TouchableOpacity
+              style={styles.statColumn}
+              onPress={() => {
+                router.push({
+                  pathname: '/user/[id]/communities',
+                  params: {
+                    id: profile.id,
+                    username: profile.username,
+                    name: displayName,
+                  },
+                } as any);
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statValue}>{profile.stats?.communitiesCount ?? 0}</Text>
               <Text style={styles.statLabel}>Communities</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         </View>
 

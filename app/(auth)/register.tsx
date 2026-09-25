@@ -22,9 +22,11 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { Button } from '../../src/components/ui/Button';
 import { useAuth } from '../../src/context/AuthContext';
+import { authService } from '../../src/services/auth';
 import { ApiRequestError } from '../../src/services/api';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -76,6 +78,7 @@ function PickerColumn({
   onSelect: (index: number) => void;
   renderLabel: (item: number) => string;
 }) {
+  const pickerStyles = useThemedStyles(getPickerStyles);
   const flatListRef = useRef<FlatList>(null);
 
   const handleScrollEnd = (e: any) => {
@@ -132,6 +135,9 @@ export default function RegisterScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
+  const pickerStyles = useThemedStyles(getPickerStyles);
 
   const currentYear = new Date().getFullYear();
 
@@ -148,6 +154,7 @@ export default function RegisterScreen() {
     birthYear: currentYear - 20,
   });
 
+  const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedCountryCode, setSelectedCountryCode] = useState('+251');
@@ -183,10 +190,6 @@ export default function RegisterScreen() {
       errs.firstName = 'First name is required';
     }
 
-    if (!form.lastName.trim()) {
-      errs.lastName = 'Last name is required';
-    }
-
     if (!form.username.trim()) {
       errs.username = 'Username is required';
     } else if (form.username.length > 30) {
@@ -195,10 +198,34 @@ export default function RegisterScreen() {
       errs.username = 'Only letters, numbers, and underscores';
     }
 
-    if (!form.email.trim()) {
-      errs.email = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      errs.email = 'Invalid email address';
+    if (authMethod === 'email') {
+      if (!form.email.trim()) {
+        errs.email = 'Email address is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        errs.email = 'Invalid email address';
+      }
+    } else {
+      const cleanDigits = form.phoneNumber.replace(/\D/g, '');
+      if (!cleanDigits) {
+        errs.phoneNumber = 'Phone number is required';
+      } else if (selectedCountryCode === '+251') {
+        const sub = cleanDigits.startsWith('2510')
+          ? cleanDigits.slice(4)
+          : cleanDigits.startsWith('251')
+          ? cleanDigits.slice(3)
+          : cleanDigits.startsWith('0')
+          ? cleanDigits.slice(1)
+          : cleanDigits;
+        if (sub.length < 9) {
+          errs.phoneNumber = 'Missing digits. Ethiopian phone numbers must be 9 digits (e.g. 0911223344)';
+        } else if (sub.length > 9) {
+          errs.phoneNumber = 'Too many digits for an Ethiopian phone number';
+        } else if (!/^[97]/.test(sub)) {
+          errs.phoneNumber = 'Ethiopian phone numbers must start with 9 or 7 (or 09 / 07)';
+        }
+      } else if (cleanDigits.length < 8) {
+        errs.phoneNumber = 'Please enter a complete phone number';
+      }
     }
 
     if (!form.password) {
@@ -235,40 +262,47 @@ export default function RegisterScreen() {
     setGeneralError('');
 
     try {
-      const fullPhone = form.phoneNumber.trim()
-        ? (form.phoneNumber.startsWith('+') ? form.phoneNumber.trim() : `${selectedCountryCode}${form.phoneNumber.trim()}`)
-        : undefined;
+      if (authMethod === 'phone') {
+        const fullPhone = form.phoneNumber.trim().startsWith('+')
+          ? form.phoneNumber.trim()
+          : `${selectedCountryCode}${form.phoneNumber.trim().replace(/^0+/, '')}`;
 
-      const result = await register({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        username: form.username.trim(),
-        email: form.email.trim() || undefined,
-        phoneNumber: fullPhone,
-        password: form.password,
-        birthDate: birthDateISO,
-      });
-
-      if (result.phone) {
-        router.replace({
+        await authService.requestPhoneOtp({ phoneNumber: fullPhone });
+        router.push({
           pathname: '/(auth)/verify-phone',
-          params: { phone: result.phone },
+          params: {
+            phone: fullPhone,
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+            username: form.username.trim(),
+            password: form.password,
+            birthDate: birthDateISO,
+          },
         });
+      } else {
+        await register({
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          username: form.username.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          birthDate: birthDateISO,
+        });
+        router.replace('/(tabs)');
       }
     } catch (err) {
       if (err instanceof ApiRequestError) {
         if (err.details) {
           const fieldErrors: Record<string, string> = {};
-          err.details.forEach((d) => {
-            const field = d.path[0];
+          err.details.forEach((d: any) => {
+            const field = d.field || d.path?.[0] || 'general';
             fieldErrors[field] = d.message;
           });
           setErrors(fieldErrors);
-        } else {
-          setGeneralError(err.message);
         }
+        setGeneralError(err.message);
       } else {
-        setGeneralError('Something went wrong. Please try again.');
+        setGeneralError('Registration failed. Please check your network and try again.');
       }
     } finally {
       setLoading(false);
@@ -383,9 +417,10 @@ export default function RegisterScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>Create Account</Text>
+        <View style={styles.backButton} />
       </View>
 
       <ScrollView
@@ -394,22 +429,10 @@ export default function RegisterScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Step indicator */}
-        <View style={styles.stepBlock}>
-          <View style={styles.stepBadgeRow}>
-            <View style={styles.stepPill}>
-              <Text style={styles.stepPillText}>1</Text>
-            </View>
-            <Text style={styles.stepTitle}>Your Profile Details</Text>
-          </View>
-          <Text style={styles.stepSubtitle}>
-            Step into curated neighborhood salons, intimate threads, and physical meetups.
-          </Text>
-        </View>
 
         {generalError ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error" size={18} color={Colors.error} />
+            <MaterialIcons name="error" size={18} color={colors.error} />
             <Text style={styles.errorBannerText}>{generalError}</Text>
           </View>
         ) : null}
@@ -426,7 +449,7 @@ export default function RegisterScreen() {
                 <TextInput
                   style={styles.textInput}
                   placeholder="First name"
-                  placeholderTextColor={Colors.outline}
+                  placeholderTextColor={colors.outline}
                   value={form.firstName}
                   onChangeText={(v) => updateField('firstName', v)}
                 />
@@ -437,13 +460,13 @@ export default function RegisterScreen() {
             <View style={styles.col}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Last Name</Text>
-                <Text style={styles.requiredBadge}>Required</Text>
+                <Text style={styles.optionalBadge}>Optional</Text>
               </View>
               <View style={[styles.inputBox, errors.lastName && styles.inputBoxError]}>
                 <TextInput
                   style={styles.textInput}
                   placeholder="Last name"
-                  placeholderTextColor={Colors.outline}
+                  placeholderTextColor={colors.outline}
                   value={form.lastName}
                   onChangeText={(v) => updateField('lastName', v)}
                 />
@@ -462,7 +485,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="Choose a username"
-                placeholderTextColor={Colors.outline}
+                placeholderTextColor={colors.outline}
                 value={form.username}
                 onChangeText={(v) => updateField('username', v)}
                 autoCapitalize="none"
@@ -472,52 +495,118 @@ export default function RegisterScreen() {
             {errors.username ? <Text style={styles.errorText}>{errors.username}</Text> : null}
           </View>
 
-          {/* Email — Required */}
-          <View style={styles.fieldGroup}>
+          {/* Account Identifier Toggle: Email vs Phone */}
+          <View style={styles.authMethodSection}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Email</Text>
+              <Text style={styles.label}>Sign Up With</Text>
               <Text style={styles.requiredBadge}>Required</Text>
             </View>
-            <View style={[styles.inputBox, errors.email && styles.inputBoxError]}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter your email address"
-                placeholderTextColor={Colors.outline}
-                value={form.email}
-                onChangeText={(v) => updateField('email', v)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
+            <View style={styles.authMethodToggle}>
+              <TouchableOpacity
+                style={[
+                  styles.authMethodTab,
+                  authMethod === 'email' && styles.authMethodTabActive,
+                ]}
+                onPress={() => {
+                  setAuthMethod('email');
+                  setErrors((prev) => ({ ...prev, email: '', phoneNumber: '' }));
+                }}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="email"
+                  size={16}
+                  color={authMethod === 'email' ? colors.onPrimaryContainer : colors.onSurfaceVariant}
+                />
+                <Text
+                  style={[
+                    styles.authMethodTabText,
+                    authMethod === 'email' && styles.authMethodTabTextActive,
+                  ]}
+                >
+                  Email
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.authMethodTab,
+                  authMethod === 'phone' && styles.authMethodTabActive,
+                ]}
+                onPress={() => {
+                  setAuthMethod('phone');
+                  setErrors((prev) => ({ ...prev, email: '', phoneNumber: '' }));
+                }}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="phone"
+                  size={16}
+                  color={authMethod === 'phone' ? colors.onPrimaryContainer : colors.onSurfaceVariant}
+                />
+                <Text
+                  style={[
+                    styles.authMethodTabText,
+                    authMethod === 'phone' && styles.authMethodTabTextActive,
+                  ]}
+                >
+                  Phone Number
+                </Text>
+              </TouchableOpacity>
             </View>
-            <Text style={styles.helperText}>Used for login and account recovery</Text>
-            {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
           </View>
 
-          {/* Phone with Country Code Picker */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Phone</Text>
-            <View style={[styles.inputBox, styles.phoneInputBox]}>
-              <TouchableOpacity
-                style={styles.countryCodeBadge}
-                onPress={openCountryPicker}
-                activeOpacity={0.7}
-                accessibilityLabel="Select country code"
-              >
-                <Text style={styles.countryCodeText}>{selectedCountryCode}</Text>
-                <MaterialIcons name="arrow-drop-down" size={16} color={Colors.onSurfaceVariant} />
-              </TouchableOpacity>
-              <View style={styles.dividerVertical} />
-              <TextInput
-                style={styles.textInput}
-                placeholder="Phone number (optional)"
-                placeholderTextColor={Colors.outline}
-                value={form.phoneNumber}
-                onChangeText={(v) => updateField('phoneNumber', v)}
-                keyboardType="phone-pad"
-              />
+          {/* Conditional Email or Phone Input */}
+          {authMethod === 'email' ? (
+            <View style={styles.fieldGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Email Address</Text>
+                <Text style={styles.requiredBadge}>Required</Text>
+              </View>
+              <View style={[styles.inputBox, errors.email && styles.inputBoxError]}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter your email address"
+                  placeholderTextColor={colors.outline}
+                  value={form.email}
+                  onChangeText={(v) => updateField('email', v)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+              <Text style={styles.helperText}>Used for login and notifications</Text>
+              {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
             </View>
-            <Text style={styles.helperText}>Can be verified later for phone login</Text>
-          </View>
+          ) : (
+            <View style={styles.fieldGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Phone Number</Text>
+                <Text style={styles.requiredBadge}>Required</Text>
+              </View>
+              <View style={[styles.inputBox, styles.phoneInputBox, errors.phoneNumber && styles.inputBoxError]}>
+                <TouchableOpacity
+                  style={styles.countryCodeBadge}
+                  onPress={openCountryPicker}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Select country code"
+                >
+                  <Text style={styles.countryCodeText}>{selectedCountryCode}</Text>
+                  <MaterialIcons name="arrow-drop-down" size={16} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+                <View style={styles.dividerVertical} />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="911 234 567"
+                  placeholderTextColor={colors.outline}
+                  value={form.phoneNumber}
+                  onChangeText={(v) => updateField('phoneNumber', v)}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <Text style={styles.helperText}>We will send a 6-digit SMS verification code</Text>
+              {errors.phoneNumber ? <Text style={styles.errorText}>{errors.phoneNumber}</Text> : null}
+            </View>
+          )}
 
           {/* Password */}
           <View style={styles.fieldGroup}>
@@ -529,7 +618,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="Create a password"
-                placeholderTextColor={Colors.outline}
+                placeholderTextColor={colors.outline}
                 value={form.password}
                 onChangeText={(v) => updateField('password', v)}
                 secureTextEntry={!showPassword}
@@ -541,7 +630,7 @@ export default function RegisterScreen() {
                 <MaterialIcons
                   name={showPassword ? 'visibility' : 'visibility-off'}
                   size={20}
-                  color={Colors.onSurfaceVariant}
+                  color={colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
             </View>
@@ -558,7 +647,7 @@ export default function RegisterScreen() {
               <TextInput
                 style={styles.textInput}
                 placeholder="Re-enter your password"
-                placeholderTextColor={Colors.outline}
+                placeholderTextColor={colors.outline}
                 value={form.confirmPassword}
                 onChangeText={(v) => updateField('confirmPassword', v)}
                 secureTextEntry={!showConfirmPassword}
@@ -570,7 +659,7 @@ export default function RegisterScreen() {
                 <MaterialIcons
                   name={showConfirmPassword ? 'visibility' : 'visibility-off'}
                   size={20}
-                  color={Colors.onSurfaceVariant}
+                  color={colors.onSurfaceVariant}
                 />
               </TouchableOpacity>
             </View>
@@ -586,7 +675,7 @@ export default function RegisterScreen() {
               activeOpacity={0.7}
             >
               <Text style={styles.datePickerText}>{birthDateDisplay}</Text>
-              <MaterialIcons name="calendar-today" size={20} color={Colors.onSurfaceVariant} />
+              <MaterialIcons name="calendar-today" size={20} color={colors.onSurfaceVariant} />
             </TouchableOpacity>
             <Text style={styles.helperText}>You must be at least 13 years old</Text>
             {errors.birthDate ? <Text style={styles.errorText}>{errors.birthDate}</Text> : null}
@@ -699,7 +788,7 @@ export default function RegisterScreen() {
             <View style={pickerStyles.header}>
               <Text style={pickerStyles.title}>Select Country Code</Text>
               <TouchableOpacity onPress={closeCountryPicker} style={pickerStyles.headerBtn}>
-                <MaterialIcons name="close" size={22} color={Colors.tertiary} />
+                <MaterialIcons name="close" size={22} color={colors.onSurfaceVariant} />
               </TouchableOpacity>
             </View>
 
@@ -721,7 +810,7 @@ export default function RegisterScreen() {
                   <Text style={styles.countryName}>{item.name}</Text>
                   <Text style={styles.countryCodeValue}>{item.code}</Text>
                   {selectedCountryCode === item.code && (
-                    <MaterialIcons name="check" size={20} color={Colors.primaryContainer} />
+                    <MaterialIcons name="check" size={20} color={colors.primaryContainer} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -733,311 +822,360 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  topBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-    marginLeft: Spacing.xs,
-  },
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.xxl,
-  },
-  stepBlock: {
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.lg,
-  },
-  stepBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  stepPill: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.onPrimaryFixed,
-  },
-  stepTitle: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-  },
-  stepSubtitle: {
-    ...Typography.captionMd,
-    color: Colors.onSurfaceVariant,
-    lineHeight: 18,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: Colors.errorContainer,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-  },
-  errorBannerText: {
-    ...Typography.captionMd,
-    color: Colors.onErrorContainer,
-    flex: 1,
-  },
-  form: {
-    gap: Spacing.md,
-  },
-  fieldGroup: {
-    gap: 6,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  label: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-  },
-  requiredBadge: {
-    ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
-  },
-  inputBox: {
-    height: 48,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.surfaceVariant,
-    paddingHorizontal: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  inputBoxError: {
-    borderColor: Colors.error,
-  },
-  textInput: {
-    flex: 1,
-    height: '100%',
-    ...Typography.bodyMd,
-    color: Colors.onSurface,
-  },
-  datePickerText: {
-    flex: 1,
-    ...Typography.bodyMd,
-    color: Colors.onSurface,
-  },
-  eyeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phoneInputBox: {
-    paddingLeft: Spacing.sm,
-  },
-  countryCodeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceContainerHigh,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: BorderRadius.sm,
-    gap: 2,
-  },
-  countryCodeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.onSurface,
-  },
-  countryItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceContainerHigh,
-    gap: Spacing.md,
-  },
-  countryItemRowActive: {
-    backgroundColor: Colors.surfaceContainerLow,
-  },
-  countryFlag: {
-    fontSize: 22,
-  },
-  countryName: {
-    flex: 1,
-    ...Typography.bodyMd,
-    color: Colors.onSurface,
-  },
-  countryCodeValue: {
-    ...Typography.labelMd,
-    color: Colors.tertiary,
-    fontWeight: '600',
-  },
-  dividerVertical: {
-    width: 1,
-    height: 24,
-    backgroundColor: Colors.outlineVariant,
-    marginHorizontal: Spacing.sm,
-    opacity: 0.5,
-  },
-  rowTwoCols: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  col: {
-    flex: 1,
-    gap: 6,
-  },
-  helperText: {
-    ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
-    opacity: 0.8,
-    paddingLeft: 4,
-  },
-  errorText: {
-    ...Typography.captionSm,
-    color: Colors.error,
-    paddingLeft: 4,
-  },
-  actionContainer: {
-    marginTop: Spacing.lg,
-    gap: Spacing.md,
-    alignItems: 'center',
-  },
-  bottomLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  bottomLinkLead: {
-    ...Typography.bodyMd,
-    color: Colors.onSurfaceVariant,
-  },
-  bottomLinkAction: {
-    ...Typography.labelMd,
-    color: Colors.secondary,
-  },
-});
+const getStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.md,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    topBarTitle: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+      fontWeight: '700',
+      textAlign: 'center',
+      flex: 1,
+    },
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingHorizontal: Spacing.md,
+      paddingTop: Spacing.xl,
+      paddingBottom: Spacing.xxl,
+    },
+    stepBlock: {
+      paddingTop: Spacing.md,
+      paddingBottom: Spacing.lg,
+    },
+    stepBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      marginBottom: Spacing.xs,
+    },
+    stepPill: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.onPrimaryContainer,
+    },
+    stepTitle: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    stepSubtitle: {
+      ...Typography.captionMd,
+      color: colors.onSurfaceVariant,
+      lineHeight: 18,
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.sm,
+      backgroundColor: colors.errorContainer,
+      padding: Spacing.md,
+      borderRadius: BorderRadius.md,
+      marginBottom: Spacing.md,
+    },
+    errorBannerText: {
+      ...Typography.captionMd,
+      color: colors.onErrorContainer,
+      flex: 1,
+    },
+    form: {
+      gap: Spacing.md,
+    },
+    fieldGroup: {
+      gap: 6,
+    },
+    labelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    label: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    requiredBadge: {
+      ...Typography.captionSm,
+      color: colors.onSurfaceVariant,
+    },
+    optionalBadge: {
+      ...Typography.captionSm,
+      color: colors.outline,
+    },
+    authMethodSection: {
+      gap: 6,
+    },
+    authMethodToggle: {
+      flexDirection: 'row',
+      backgroundColor: colors.surfaceContainerHigh,
+      borderRadius: BorderRadius.md,
+      padding: 3,
+      gap: 4,
+    },
+    authMethodTab: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: BorderRadius.sm,
+    },
+    authMethodTabActive: {
+      backgroundColor: colors.primaryContainer,
+    },
+    authMethodTabText: {
+      ...Typography.labelMd,
+      color: colors.onSurfaceVariant,
+      fontWeight: '600',
+    },
+    authMethodTabTextActive: {
+      color: colors.onPrimaryContainer,
+      fontWeight: '700',
+    },
+    inputBox: {
+      height: 50,
+      borderRadius: BorderRadius.lg,
+      backgroundColor: colors.tertiaryFixed,
+      paddingHorizontal: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    inputBoxError: {
+      borderColor: colors.error,
+    },
+    textInput: {
+      flex: 1,
+      height: '100%',
+      ...Typography.bodyMd,
+      color: colors.onSurface,
+    },
+    datePickerText: {
+      flex: 1,
+      ...Typography.bodyMd,
+      color: colors.onSurface,
+    },
+    eyeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    phoneInputBox: {
+      paddingLeft: Spacing.sm,
+    },
+    countryCodeBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceContainerHigh,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: BorderRadius.sm,
+      gap: 2,
+    },
+    countryCodeText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.onSurface,
+    },
+    countryItemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: Spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+      gap: Spacing.md,
+    },
+    countryItemRowActive: {
+      backgroundColor: colors.surfaceContainerLow,
+    },
+    countryFlag: {
+      fontSize: 22,
+    },
+    countryName: {
+      flex: 1,
+      ...Typography.bodyMd,
+      color: colors.onSurface,
+    },
+    countryCodeValue: {
+      ...Typography.labelMd,
+      color: colors.primaryContainer,
+      fontWeight: '600',
+    },
+    dividerVertical: {
+      width: 1,
+      height: 24,
+      backgroundColor: colors.outlineVariant,
+      marginHorizontal: Spacing.sm,
+    },
+    rowTwoCols: {
+      flexDirection: 'row',
+      gap: Spacing.sm,
+    },
+    col: {
+      flex: 1,
+      gap: 6,
+    },
+    helperText: {
+      ...Typography.captionSm,
+      color: colors.outline,
+      paddingLeft: 4,
+    },
+    errorText: {
+      ...Typography.captionSm,
+      color: colors.error,
+      paddingLeft: 4,
+    },
+    actionContainer: {
+      marginTop: Spacing.lg,
+      gap: Spacing.md,
+      alignItems: 'center',
+    },
+    bottomLinkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+    },
+    bottomLinkLead: {
+      ...Typography.bodyMd,
+      color: colors.onSurfaceVariant,
+    },
+    bottomLinkAction: {
+      ...Typography.labelMd,
+      color: colors.primaryContainer,
+      fontWeight: '700',
+    },
+  });
 
-const pickerStyles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'flex-end',
-    zIndex: 9999,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill as any,
-    backgroundColor: Colors.scrim,
-  },
-  backdropPressable: {
-    ...StyleSheet.absoluteFill as any,
-  },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    zIndex: 10000,
-    ...Shadows.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingTop: Spacing.xs,
-    paddingBottom: Spacing.sm,
-  },
-  headerBtn: {
-    padding: Spacing.xs,
-  },
-  cancelText: {
-    ...Typography.bodyMd,
-    color: Colors.outline,
-  },
-  title: {
-    ...Typography.titleMd,
-    color: Colors.onSurface,
-    fontWeight: '700',
-  },
-  doneText: {
-    ...Typography.bodyMd,
-    color: Colors.primaryContainer,
-    fontWeight: '700',
-  },
-  preview: {
-    ...Typography.titleLg,
-    color: Colors.primaryContainer,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-    fontWeight: '700',
-  },
-  columnsRow: {
-    flexDirection: 'row',
-    height: ITEM_HEIGHT * 5,
-    paddingHorizontal: Spacing.sm,
-  },
-  column: {
-    flex: 1,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  selectionHighlight: {
-    position: 'absolute',
-    top: ITEM_HEIGHT * 2,
-    left: 4,
-    right: 4,
-    height: ITEM_HEIGHT,
-    backgroundColor: Colors.tertiaryFixed,
-    borderRadius: BorderRadius.md,
-    zIndex: 0,
-  },
-  item: {
-    height: ITEM_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemText: {
-    ...Typography.bodyMd,
-    color: Colors.outline,
-  },
-  itemTextSelected: {
-    ...Typography.titleMd,
-    color: Colors.onTertiaryFixed,
-    fontWeight: '700',
-  },
-});
+const getPickerStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    overlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'flex-end',
+      zIndex: 9999,
+    },
+    backdrop: {
+      ...(StyleSheet.absoluteFill as any),
+      backgroundColor: colors.scrim,
+    },
+    backdropPressable: {
+      ...(StyleSheet.absoluteFill as any),
+    },
+    sheet: {
+      backgroundColor: colors.surfaceContainer,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderTopWidth: 1,
+      borderColor: colors.outlineVariant,
+      paddingHorizontal: Spacing.md,
+      paddingTop: Spacing.md,
+      zIndex: 10000,
+      ...Shadows.lg,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.sm,
+      paddingTop: Spacing.xs,
+      paddingBottom: Spacing.sm,
+    },
+    headerBtn: {
+      padding: Spacing.xs,
+    },
+    cancelText: {
+      ...Typography.bodyMd,
+      color: colors.outline,
+    },
+    title: {
+      ...Typography.titleMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+    doneText: {
+      ...Typography.bodyMd,
+      color: colors.primaryContainer,
+      fontWeight: '700',
+    },
+    preview: {
+      ...Typography.titleLg,
+      color: colors.primaryContainer,
+      textAlign: 'center',
+      marginBottom: Spacing.md,
+      fontWeight: '700',
+    },
+    columnsRow: {
+      flexDirection: 'row',
+      height: ITEM_HEIGHT * 5,
+      paddingHorizontal: Spacing.sm,
+    },
+    column: {
+      flex: 1,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    selectionHighlight: {
+      position: 'absolute',
+      top: ITEM_HEIGHT * 2,
+      left: 4,
+      right: 4,
+      height: ITEM_HEIGHT,
+      backgroundColor: colors.tertiaryFixed,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      borderRadius: BorderRadius.md,
+      zIndex: 0,
+    },
+    item: {
+      height: ITEM_HEIGHT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    itemText: {
+      ...Typography.bodyMd,
+      color: colors.outline,
+    },
+    itemTextSelected: {
+      ...Typography.titleMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+    },
+  });

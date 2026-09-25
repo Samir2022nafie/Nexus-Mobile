@@ -24,7 +24,8 @@ import {
   useWindowDimensions,
   Animated,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -46,7 +47,7 @@ type SubTab = typeof SUB_TABS[number];
 const CATEGORIES = ['All', ...BACKEND_CATEGORIES.map((c) => c.label)];
 
 export default function ExploreScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -147,21 +148,23 @@ export default function ExploreScreen() {
   }, [navigation, activeTab]);
 
   useEffect(() => {
-    if (params.tab === 'events') handleSelectTab('Events');
-    else if (params.tab === 'posts' || params.tab === 'hangouts') handleSelectTab('Posts');
-    else if (params.tab === 'communities') handleSelectTab('Communities');
-  }, [params.tab]);
-
-  // Sync horizontal scroll on mount if initialized with Events or Posts tab
-  useEffect(() => {
-    const idx = SUB_TABS.indexOf(activeTab);
-    if (idx > 0) {
+    if (!params.tab) return;
+    const targetTab: SubTab =
+      params.tab === 'events'
+        ? 'Events'
+        : params.tab === 'posts' || params.tab === 'hangouts'
+        ? 'Posts'
+        : 'Communities';
+    setActiveTab(targetTab);
+    const idx = SUB_TABS.indexOf(targetTab);
+    if (idx !== -1) {
+      scrollX.setValue(idx * screenWidth);
+      horizontalScrollRef.current?.scrollTo({ x: idx * screenWidth, animated: false });
       setTimeout(() => {
         horizontalScrollRef.current?.scrollTo({ x: idx * screenWidth, animated: false });
-        scrollX.setValue(idx * screenWidth);
-      }, 60);
+      }, 50);
     }
-  }, []);
+  }, [params.tab, screenWidth]);
 
   // Decoupled fetch: fetch base communities, events, and posts without wiping on query
   const fetchData = useCallback(async (isRefresh = false) => {
@@ -417,7 +420,7 @@ export default function ExploreScreen() {
         <MaterialIcons name="search" size={20} color={colors.tertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder={`Search ${activeTab.toLowerCase()}...`}
+          placeholder="Search"
           placeholderTextColor={colors.tertiary}
           value={search}
           onChangeText={setSearch}

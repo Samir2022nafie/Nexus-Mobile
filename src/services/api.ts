@@ -126,8 +126,14 @@ class ApiClient {
       }
 
       // Parse success response
-      const data: ApiResponse<T> = await response.json();
-      return data.data;
+      const data: any = await response.json();
+      if (data && typeof data === 'object') {
+        if ('data' in data && data.data !== undefined) {
+          return data.data;
+        }
+        return data;
+      }
+      return data;
     } catch (error) {
       if (error instanceof ApiRequestError) {
         throw error;

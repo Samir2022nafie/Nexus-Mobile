@@ -14,13 +14,23 @@ export interface RegisterDto {
   phoneNumber?: string;
   password: string;
   firstName: string;
-  lastName: string;
+  lastName?: string;
   birthDate: string; // YYYY-MM-DD
+  otp?: string;
 }
 
 export interface LoginDto {
-  identifier: string; // email or phone
+  identifier: string; // email, phone, or username
   password: string;
+}
+
+export interface ForgotPasswordDto {
+  identifier: string; // email or phone
+}
+
+export interface ResetPasswordDto {
+  token: string;
+  newPassword: string;
 }
 
 export interface OAuthLoginDto {
@@ -60,8 +70,9 @@ export interface User {
   email?: string | null;
   phone_number?: string | null;
   phone_verified_at?: string | null;
+  phone_number_verified?: boolean;
   first_name: string;
-  last_name: string;
+  last_name?: string | null;
   name?: string | null;
   birth_date: string;
   bio?: string | null;
@@ -87,6 +98,8 @@ export interface PublicProfile {
     communitiesCount: number;
   };
   isFollowing: boolean;
+  trustScore?: number;
+  trust_score?: number;
 }
 
 export interface UpdateProfileDto {
@@ -284,7 +297,10 @@ export interface CreateEventDto {
   startsAt: string;
   endsAt?: string;
   visibility?: VisibilityScope;
-  maxParticipants?: number;
+  maxParticipants?: number | null;
+  location?: string;
+  locationName?: string;
+  locationId?: string;
 }
 
 // ============================================================================
@@ -309,10 +325,12 @@ export interface HangoutItem {
   isSaved: boolean;
   creator: PostAuthor;
   location?: {
-    placeName: string;
-    latitude: number;
-    longitude: number;
-  } | null;
+    placeName?: string;
+    place_name?: string;
+    name?: string;
+    latitude?: number;
+    longitude?: number;
+  } | string | null;
 }
 
 export interface CreateHangoutDto {
@@ -323,8 +341,11 @@ export interface CreateHangoutDto {
   endsAt?: string;
   visibility?: VisibilityScope;
   joinType?: HangoutJoinType;
-  maxParticipants?: number;
+  maxParticipants?: number | null;
   communityId?: string;
+  location?: string;
+  locationName?: string;
+  locationId?: string;
 }
 
 export interface HangoutJoinRequest {

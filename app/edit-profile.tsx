@@ -19,7 +19,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
@@ -30,7 +30,7 @@ import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 
 export default function EditProfileScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
@@ -76,26 +76,6 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Delete Account',
-      'This action is permanent and cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await usersService.deleteMyAccount();
-              await logout();
-            } catch {}
-          },
-        },
-      ]
-    );
-  };
-
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Modal Custom App Bar Header */}
@@ -127,24 +107,19 @@ export default function EditProfileScreen() {
         {/* Profile Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
-            <Image
-              source={{
-                uri:
-                  form.profilePictureUrl ||
-                  user?.profile_picture_url ||
-                  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-              }}
-              style={styles.avatarImage}
-            />
-            <View style={styles.cameraOverlay}>
-              <MaterialIcons name="photo-camera" size={20} color={colors.white} />
-              <Text style={styles.changePhotoText}>Change Photo</Text>
-            </View>
-            <View style={styles.editIconBadge}>
-              <MaterialIcons name="edit" size={14} color={colors.onPrimary} />
-            </View>
+            {(form.profilePictureUrl || user?.profile_picture_url) ? (
+              <Image
+                source={{
+                  uri: form.profilePictureUrl || user?.profile_picture_url || '',
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={[styles.avatarImage, styles.avatarFallback]}>
+                <MaterialIcons name="person" size={48} color={colors.onSurfaceVariant} />
+              </View>
+            )}
           </View>
-          <Text style={styles.avatarHint}>Tap photo to select a new portrait</Text>
         </View>
 
         {error ? (
@@ -171,7 +146,7 @@ export default function EditProfileScreen() {
 
           {/* Last Name */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>LAST NAME</Text>
+            <Text style={styles.fieldLabel}>LAST NAME (OPTIONAL)</Text>
             <View style={styles.inputBox}>
               <TextInput
                 style={styles.textInput}
@@ -235,26 +210,6 @@ export default function EditProfileScreen() {
               )}
             </View>
           </View>
-
-          {/* Additional Tactile Context Chip */}
-          <View style={styles.infoChip}>
-            <MaterialIcons name="info" size={20} color={colors.tertiary} />
-            <Text style={styles.infoChipText}>
-              Your verified badge and meetup organizer status are linked to this profile handle.
-            </Text>
-          </View>
-        </View>
-
-        {/* Delete Account */}
-        <View style={styles.deleteSection}>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={handleDeleteAccount}
-            activeOpacity={0.7}
-          >
-            <MaterialIcons name="delete-forever" size={18} color={colors.error} />
-            <Text style={styles.deleteBtnText}>Delete Account</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -320,6 +275,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   avatarImage: {
     width: '100%',
     height: '100%',
+  },
+  avatarFallback: {
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cameraOverlay: {
     ...StyleSheet.absoluteFill as any,

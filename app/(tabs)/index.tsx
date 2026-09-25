@@ -21,7 +21,8 @@ import {
   Alert,
   PanResponder,
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -131,7 +132,7 @@ function sortItemsByDate(items: any[]) {
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -557,7 +558,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
             <TouchableOpacity
-              onPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'events' } })}
+              onPress={() => (navigation as any).navigate('explore', { tab: 'events' })}
               style={styles.seeAllRow}
               activeOpacity={0.7}
             >
@@ -658,7 +659,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Hangouts Near You</Text>
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/hangouts')}
+              onPress={() => (navigation as any).navigate('hangouts')}
               style={styles.seeAllRow}
               activeOpacity={0.7}
             >
@@ -740,7 +741,7 @@ export default function HomeScreen() {
                         </View>
 
                         <View style={[styles.hangoutPill, isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest]}>
-                          {isOpen && <View style={styles.openDot} />}
+                          <View style={isOpen ? styles.openDot : styles.requestDot} />
                           <Text style={[styles.hangoutPillText, isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText]}>
                             {isOpen ? 'Open' : 'Request'}
                           </Text>
@@ -1081,13 +1082,21 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       ...Shadows.sm,
     },
     hangoutPillRequest: {
-      backgroundColor: colors.secondaryFixed,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.22)',
     },
     openDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
       backgroundColor: '#059669',
+    },
+    requestDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: isDark ? '#fbbf24' : '#d97706',
     },
     hangoutPillText: {
       fontSize: 10,
@@ -1097,7 +1106,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       color: colors.onSurface,
     },
     hangoutPillRequestText: {
-      color: colors.secondary,
+      color: isDark ? '#fbbf24' : '#b45309',
     },
     hangoutTitle: {
       ...Typography.labelMd,

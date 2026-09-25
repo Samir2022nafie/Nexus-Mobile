@@ -20,7 +20,8 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -33,7 +34,7 @@ import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
 import { Community, EventItem } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
-import { categorizeItemByDate } from '../../src/utils/dateUtils';
+import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -54,7 +55,7 @@ function formatPostDate(rawDate?: string) {
 }
 
 export default function CommunityDetailScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -114,7 +115,7 @@ export default function CommunityDetailScreen() {
       ]);
       const pList = postData || [];
       setPosts(pList);
-      setEvents(eventData || []);
+      setEvents(sortItemsByDate(eventData || []));
       const initLikes: Record<string, boolean> = {};
       const initSaves: Record<string, boolean> = {};
       pList.forEach((p: any) => {
@@ -350,21 +351,24 @@ export default function CommunityDetailScreen() {
                   </Text>
                   <View style={styles.verticalEventMeta}>
                     <View style={styles.metaItem}>
-                      <MaterialIcons name="calendar-today" size={14} color={colors.primary} />
-                      <Text style={styles.metaText}>
-                        {(ev as any).starts_at
-                          ? new Date((ev as any).starts_at).toLocaleDateString()
-                          : 'Upcoming'}
+                      <MaterialIcons
+                        name="calendar-today"
+                        size={13}
+                        color={cat.isPassed ? colors.tertiary : colors.primary}
+                      />
+                      <Text
+                        style={[
+                          styles.metaText,
+                          cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                        ]}
+                      >
+                        {cat.dateText}
                       </Text>
                     </View>
                     <View style={styles.metaItem}>
-                      <MaterialIcons name="group" size={14} color={colors.secondary} />
+                      <MaterialIcons name="group" size={13} color={colors.secondary} />
                       <Text style={styles.metaTextSec}>
-                        {(() => {
-                          const evDate = (ev as any).ends_at || (ev as any).endsAt || (ev as any).starts_at || (ev as any).startsAt;
-                          const isPassed = evDate ? new Date(evDate) < new Date() : false;
-                          return `${ev.participantsCount || 0} ${isPassed ? 'went' : 'going'}`;
-                        })()}
+                        {`${ev.participantsCount ?? (ev as any).participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
                       </Text>
                     </View>
                   </View>
@@ -458,9 +462,6 @@ export default function CommunityDetailScreen() {
                     <MaterialIcons name="groups" size={32} color={colors.primary} />
                   </View>
                 )}
-                <View style={styles.onlineRing}>
-                  <View style={styles.onlineDot} />
-                </View>
               </View>
 
               {/* Membership State Action */}
@@ -623,20 +624,26 @@ export default function CommunityDetailScreen() {
                       </Text>
                       <View style={styles.eventMetaRow}>
                         <View style={styles.metaItem}>
-                          <MaterialIcons name="calendar-today" size={13} color={colors.primary} />
-                          <Text style={styles.metaText}>
-                            {(ev as any).starts_at
-                              ? new Date((ev as any).starts_at).toLocaleDateString()
-                              : 'Upcoming'}
+                          <MaterialIcons
+                            name="calendar-today"
+                            size={13}
+                            color={cat.isPassed ? colors.tertiary : colors.primary}
+                          />
+                          <Text
+                            style={[
+                              styles.metaText,
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                            ]}
+                          >
+                            {cat.dateText}
                           </Text>
                         </View>
-                        <Text style={styles.metaTextSec}>
-                          {(() => {
-                            const evDate = (ev as any).ends_at || (ev as any).endsAt || (ev as any).starts_at || (ev as any).startsAt;
-                            const isPassed = evDate ? new Date(evDate) < new Date() : false;
-                            return `${ev.participantsCount || 0} ${isPassed ? 'went' : 'going'}`;
-                          })()}
-                        </Text>
+                        <View style={styles.metaItem}>
+                          <MaterialIcons name="group" size={13} color={colors.secondary} />
+                          <Text style={styles.metaTextSec}>
+                            {`${ev.participantsCount ?? (ev as any).participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -671,6 +678,7 @@ export default function CommunityDetailScreen() {
                       communityCategory: p.communityCategory || community.category,
                       communitySlug: p.communitySlug || community.slug,
                     }}
+                    showAuthor={true}
                     isLiked={likedPosts[p.id]}
                     isSaved={savedPosts[p.id]}
                     onToggleLike={toggleLike}

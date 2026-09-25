@@ -297,16 +297,18 @@ export default function NewHangoutScreen() {
         await hangoutsService.update(params.hangoutId, {
           title: form.title.trim(),
           description: form.description.trim() || undefined,
+          location: form.location.trim() || undefined,
           coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : (null as any),
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
-          maxParticipants: form.maxParticipants ? parseInt(form.maxParticipants) : undefined,
+          maxParticipants: form.maxParticipants && form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : null,
           joinType: form.joinType,
         });
       } else {
         await hangoutsService.create({
           title: form.title.trim(),
           description: form.description.trim() || undefined,
+          location: form.location.trim() || undefined,
           coverImageUrl: form.coverImageUrl.trim() || undefined,
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
@@ -348,16 +350,7 @@ export default function NewHangoutScreen() {
           <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Hangout' : 'New Hangout'}</Text>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={loading}
-          style={styles.createBtn}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.createText}>
-            {loading ? (isEditing ? 'Saving...' : 'Posting...') : (isEditing ? 'Save' : 'Create')}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -401,6 +394,23 @@ export default function NewHangoutScreen() {
               onChangeText={(v) => updateField('location', v)}
             />
             <MaterialIcons name="storefront" size={20} color={colors.secondary} />
+          </View>
+        </View>
+
+        {/* Description / About Hangout */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>ABOUT HANGOUT</Text>
+          <View style={[styles.inputBox, styles.textAreaBox]}>
+            <TextInput
+              style={[styles.textInput, styles.textAreaInput]}
+              placeholder="What are we doing? Tell people what to bring..."
+              placeholderTextColor={colors.outline}
+              value={form.description}
+              onChangeText={(v) => updateField('description', v)}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
           </View>
         </View>
 
@@ -534,23 +544,6 @@ export default function NewHangoutScreen() {
                 onChangeText={(v) => updateField('maxParticipants', v)}
               />
             </View>
-          </View>
-        </View>
-
-        {/* Description */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>ABOUT HANGOUT</Text>
-          <View style={[styles.inputBox, styles.textAreaBox]}>
-            <TextInput
-              style={[styles.textInput, styles.textAreaInput]}
-              placeholder="What are we doing? Tell people what to bring..."
-              placeholderTextColor={colors.outline}
-              value={form.description}
-              onChangeText={(v) => updateField('description', v)}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
           </View>
         </View>
 

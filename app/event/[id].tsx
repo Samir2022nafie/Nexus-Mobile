@@ -20,7 +20,8 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -32,7 +33,7 @@ import { communitiesService } from '../../src/services/communities';
 import { formatCategoryName } from '../../src/utils/categories';
 
 export default function EventDetailScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
@@ -273,16 +274,16 @@ export default function EventDetailScreen() {
     : 'Time to be announced';
 
   const locationName =
-    event.location?.name ||
     event.location?.place_name ||
+    event.location?.name ||
     event.location?.address ||
     (typeof event.location === 'string' ? event.location : '') ||
-    (event.is_online ? 'Online Event' : 'Location to be announced');
+    (event.is_online ? 'Online Event' : (event.community?.name ? `${event.community.name} Main Hall` : 'Addis Ababa Venue'));
   const locationDistrict =
     event.location?.city ||
     (event.location?.place_name ? event.location.place_name.split(',')[0] : '') ||
     event.community?.name ||
-    'Community Event';
+    'Addis Ababa';
 
   const rawMax = event.max_participants || event.maxParticipants;
   const hasLimit = typeof rawMax === 'number' && rawMax > 0;
@@ -299,6 +300,13 @@ export default function EventDetailScreen() {
   const participantsList = (event.participants || []).filter(
     (p: any) => !p.status || p.status === 'approved' || p.status === 'active'
   );
+
+  const communityPfp =
+    event.community?.profile_picture_url ||
+    event.community?.profilePictureUrl ||
+    event.community?.avatar_url ||
+    event.community?.avatarUrl ||
+    event.community?.logo_url;
 
   return (
     <View style={styles.screen}>
@@ -372,9 +380,13 @@ export default function EventDetailScreen() {
             onPress={() => communitySlug && router.push(`/community/${communitySlug}`)}
             activeOpacity={0.8}
           >
-            <View style={styles.commIconProminent}>
-              <MaterialIcons name="groups" size={20} color={colors.primary} />
-            </View>
+            {communityPfp ? (
+              <Image source={{ uri: communityPfp }} style={styles.commAvatarProminent} />
+            ) : (
+              <View style={styles.commIconProminent}>
+                <MaterialIcons name="groups" size={20} color={colors.primary} />
+              </View>
+            )}
             <Text style={styles.communityNameProminent} numberOfLines={1}>
               {event.community?.name || 'Nexus Community'}
             </Text>
@@ -727,9 +739,19 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(232, 167, 54, 0.16)',
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.18)' : 'rgba(232, 167, 54, 0.14)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  commAvatarProminent: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
   communityNameProminent: {
     fontSize: 16,

@@ -26,7 +26,8 @@ import {
   Animated,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -76,7 +77,7 @@ const BOOKMARKS_SUB_TABS = ['Posts', 'Events', 'Hangouts'] as const;
 type BookmarksSubTab = typeof BOOKMARKS_SUB_TABS[number];
 
 export default function ProfileScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
@@ -696,9 +697,6 @@ export default function ProfileScreen() {
                 <MaterialIcons name="person" size={54} color={colors.tertiary} />
               </View>
             )}
-            <View style={styles.cameraBadge}>
-              <MaterialIcons name="photo-camera" size={16} color={colors.onPrimary} />
-            </View>
           </TouchableOpacity>
 
           {/* User Identity */}
@@ -707,20 +705,39 @@ export default function ProfileScreen() {
 
           {/* Stats Row — Placed directly below username and above bio */}
           <View style={styles.statsMatrix}>
-            <View style={styles.statColumn}>
+            <TouchableOpacity
+              style={styles.statColumn}
+              onPress={() => router.push('/followers')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statValue}>{userStats?.followersCount ?? 0}</Text>
               <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
             <View style={styles.statColumn}>
               <Text style={styles.statValue}>{userStats?.followingCount ?? 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statColumn}>
+            <TouchableOpacity
+              style={styles.statColumn}
+              onPress={() => {
+                if (user?.id) {
+                  router.push({
+                    pathname: '/user/[id]/communities',
+                    params: {
+                      id: user.id,
+                      username: user.username,
+                      name: displayName,
+                    },
+                  } as any);
+                }
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.statValue}>{userStats?.communitiesCount ?? 0}</Text>
               <Text style={styles.statLabel}>Communities</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Bio Statement */}
@@ -1100,7 +1117,7 @@ export default function ProfileScreen() {
                               isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
                             ]}
                           >
-                            {isOpen && <View style={styles.openDot} />}
+                            <View style={isOpen ? styles.openDot : styles.requestDot} />
                             <Text
                               style={[
                                 styles.hangoutPillText,
@@ -1223,7 +1240,7 @@ export default function ProfileScreen() {
                               isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
                             ]}
                           >
-                            {isOpen && <View style={styles.openDot} />}
+                            <View style={isOpen ? styles.openDot : styles.requestDot} />
                             <Text
                               style={[
                                 styles.hangoutPillText,
@@ -1926,10 +1943,12 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: 'rgba(252, 249, 248, 0.94)',
+    backgroundColor: isDark ? 'rgba(30, 28, 26, 0.94)' : 'rgba(252, 249, 248, 0.94)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: BorderRadius.md,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'transparent',
     ...Shadows.sm,
   },
   eventCategoryBadgeText: {
@@ -1941,9 +1960,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: isDark ? 'rgba(30, 28, 26, 0.94)' : 'rgba(255, 255, 255, 0.92)',
     padding: 6,
     borderRadius: BorderRadius.full,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'transparent',
     ...Shadows.sm,
   },
   eventBody: {
@@ -1989,17 +2010,25 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     gap: 4,
   },
   hangoutPillOpen: {
-    backgroundColor: colors.surface,
+    backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surface,
     ...Shadows.sm,
   },
   hangoutPillRequest: {
-    backgroundColor: colors.secondaryFixed,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.22)',
   },
   openDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#059669',
+  },
+  requestDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: isDark ? '#fbbf24' : '#d97706',
   },
   hangoutPillText: {
     fontSize: 10,
@@ -2009,7 +2038,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     color: colors.onSurface,
   },
   hangoutPillRequestText: {
-    color: colors.secondary,
+    color: isDark ? '#fbbf24' : '#b45309',
   },
   hangoutTitle: {
     ...Typography.labelMd,

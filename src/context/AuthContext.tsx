@@ -22,6 +22,7 @@ interface AuthContextValue extends AuthState {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUser: (user: User) => void;
+  completePhoneVerification: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -94,13 +95,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(async (dto: RegisterDto): Promise<{ phone?: string }> => {
     const result = await authService.register(dto);
     await api.setToken(result.token);
+    const hasPhone = !!dto.phoneNumber && dto.phoneNumber.trim().length > 0;
     setState({
       user: result.user,
       token: result.token,
-      isAuthenticated: true,
+      isAuthenticated: !hasPhone,
       isLoading: false,
     });
     return { phone: dto.phoneNumber };
+  }, []);
+
+  /** Mark session authenticated after phone OTP verification */
+  const completePhoneVerification = useCallback(async () => {
+    setState((prev) => ({
+      ...prev,
+      isAuthenticated: true,
+    }));
   }, []);
 
   /** Logout and clear session */
@@ -143,6 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         refreshUser,
         updateUser,
+        completePhoneVerification,
       }}
     >
       {children}

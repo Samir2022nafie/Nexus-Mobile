@@ -24,7 +24,8 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -119,20 +120,27 @@ function PickerColumn<T>({
 }
 
 export default function NewEventScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
   const pickerStyles = useThemedStyles(getPickerStyles);
-  const params = useLocalSearchParams<{ eventId?: string; slug?: string }>();
+  const params = useLocalSearchParams<{
+    eventId?: string;
+    slug?: string;
+    communitySlug?: string;
+    communityId?: string;
+    communityName?: string;
+  }>();
   const isEditing = Boolean(params.eventId);
+  const incomingSlug = params.communitySlug || params.slug || '';
 
   const now = new Date();
   const defaultStartsAt = new Date(Date.now() + 3600 * 1000 * 4).toISOString();
   const defaultEndsAt = new Date(Date.now() + 3600 * 1000 * 6).toISOString();
 
   const [communities, setCommunities] = useState<ManagedCommunity[]>([]);
-  const [selectedSlug, setSelectedSlug] = useState(params.slug || '');
+  const [selectedSlug, setSelectedSlug] = useState(incomingSlug);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '',
@@ -161,31 +169,59 @@ export default function NewEventScreen() {
   const [tempPeriod, setTempPeriod] = useState(now.getHours() >= 12 ? 'PM' : 'AM');
 
   useEffect(() => {
-    usersService
-      .getMyCommunities()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setCommunities(data);
-          if (!selectedSlug) setSelectedSlug(data[0].slug);
-        } else {
-          communitiesService.list().then((allComms) => {
-            if (allComms && allComms.length > 0) {
-              const mapped: ManagedCommunity[] = allComms.map((c) => ({
-                id: c.id,
-                name: c.name,
-                slug: c.slug,
-                role: 'member',
-                memberCount: c.memberCount || 0,
-                isPrivate: c.is_private || false,
-              }));
-              setCommunities(mapped);
-              if (!selectedSlug) setSelectedSlug(mapped[0].slug);
-            }
-          }).catch(() => {});
+    async function loadCommunities() {
+      try {
+        const [managed, all] = await Promise.all([
+          usersService.getMyCommunities().catch(() => []),
+          communitiesService.list().catch(() => []),
+        ]);
+
+        const combinedMap = new Map<string, ManagedCommunity>();
+
+        (all || []).forEach((c: any) => {
+          combinedMap.set(c.slug, {
+            id: c.id,
+            name: c.name,
+            slug: c.slug,
+            role: 'member',
+            memberCount: c.memberCount || 0,
+            isPrivate: c.is_private || false,
+          });
+        });
+
+        (managed || []).forEach((m: ManagedCommunity) => {
+          combinedMap.set(m.slug, m);
+        });
+
+        // If incoming slug is not in map, fetch directly
+        const targetSlug = incomingSlug || selectedSlug;
+        if (targetSlug && !combinedMap.has(targetSlug)) {
+          const directComm = await communitiesService.getBySlug(targetSlug).catch(() => null);
+          if (directComm) {
+            combinedMap.set(directComm.slug, {
+              id: directComm.id,
+              name: directComm.name,
+              slug: directComm.slug,
+              role: (directComm as any).role || (directComm as any).myRole || 'member',
+              memberCount: directComm.memberCount || 0,
+              isPrivate: directComm.is_private || false,
+            });
+          }
         }
-      })
-      .catch(() => {});
-  }, [selectedSlug]);
+
+        const combinedList = Array.from(combinedMap.values());
+        setCommunities(combinedList);
+
+        if (incomingSlug && combinedMap.has(incomingSlug)) {
+          setSelectedSlug(incomingSlug);
+        } else if (!selectedSlug && combinedList.length > 0) {
+          setSelectedSlug(combinedList[0].slug);
+        }
+      } catch {}
+    }
+
+    loadCommunities();
+  }, [incomingSlug]);
 
   // Load existing event data when editing
   useEffect(() => {
@@ -361,9 +397,12 @@ export default function NewEventScreen() {
       const payload: any = {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
+        location: form.location.trim() || undefined,
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
-        maxParticipants: form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : undefined,
+        maxParticipants: isEditing
+          ? (form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : null)
+          : (form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : undefined),
         coverImageUrl: isEditing
           ? (uploadedCoverUrl ? uploadedCoverUrl : null)
           : (uploadedCoverUrl || undefined),
@@ -371,10 +410,27 @@ export default function NewEventScreen() {
 
       if (isEditing && params.eventId) {
         await eventsService.update(selectedSlug, params.eventId, payload);
+        Alert.alert('Event Updated', 'Your event changes have been saved.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
       } else {
-        await eventsService.create(selectedSlug, payload);
+        const created = await eventsService.create(selectedSlug, payload);
+        if (
+          created &&
+          ((created as any).approvalStatus === 'proposed' ||
+            (created as any).approval_status === 'proposed')
+        ) {
+          Alert.alert(
+            'Proposal Submitted',
+            'Your event proposal has been submitted to community admins for review. You will be notified once it is approved.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+        } else {
+          Alert.alert('Event Published', 'Your event is now live!', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+        }
       }
-      router.back();
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setGeneralError(err.message);
@@ -385,6 +441,12 @@ export default function NewEventScreen() {
       setLoading(false);
     }
   };
+
+  const selectedCommunity = communities.find((c) => c.slug === selectedSlug);
+  const isLeadership =
+    selectedCommunity?.role === 'owner' ||
+    selectedCommunity?.role === 'admin' ||
+    selectedCommunity?.role === 'moderator';
 
   const currentYear = now.getFullYear();
   const years = [currentYear, currentYear + 1];
@@ -413,16 +475,7 @@ export default function NewEventScreen() {
           <MaterialIcons name="close" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>{isEditing ? 'Edit Event' : 'New Event'}</Text>
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={loading}
-          style={styles.createBtn}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.createText}>
-            {loading ? 'Saving...' : isEditing ? 'Save' : 'Create'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -469,6 +522,16 @@ export default function NewEventScreen() {
           </ScrollView>
           {errors.community ? <Text style={styles.errorText}>{errors.community}</Text> : null}
         </View>
+
+        {/* Proposal Information Notice if current user is regular member in selected community */}
+        {!isEditing && selectedCommunity && selectedCommunity.role === 'member' && (
+          <View style={styles.proposalNoticeBox}>
+            <MaterialIcons name="info-outline" size={18} color={colors.primary} />
+            <Text style={styles.proposalNoticeText}>
+              As a member of {selectedCommunity.name}, your event will be submitted as a proposal for community leadership to review and approve.
+            </Text>
+          </View>
+        )}
 
         {/* Event Banner / Cover Image */}
         <View style={styles.fieldGroup}>
@@ -577,7 +640,7 @@ export default function NewEventScreen() {
               <Text style={styles.dateTimeText} numberOfLines={1}>
                 {formatDisplay(form.startsAt)}
               </Text>
-              <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
+              <MaterialIcons name="schedule" size={18} color={colors.primary} />
             </TouchableOpacity>
             {errors.startsAt ? <Text style={styles.errorText}>{errors.startsAt}</Text> : null}
           </View>
@@ -592,7 +655,7 @@ export default function NewEventScreen() {
               <Text style={styles.dateTimeText} numberOfLines={1}>
                 {formatDisplay(form.endsAt)}
               </Text>
-              <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
+              <MaterialIcons name="schedule" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -631,7 +694,7 @@ export default function NewEventScreen() {
         </View>
 
         <Button
-          title={isEditing ? 'Save Changes' : 'Publish Event'}
+          title={isEditing ? 'Save Changes' : isLeadership ? 'Publish Event' : 'Submit Event Proposal'}
           onPress={handleSubmit}
           loading={loading}
           fullWidth
@@ -797,7 +860,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: isDark ? colors.cardBorder : 'transparent',
   },
   inputBoxError: {
     borderColor: colors.error,
@@ -844,6 +907,24 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   },
   commChipActive: {
     backgroundColor: colors.primaryContainer,
+  },
+  proposalNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.12)' : 'rgba(232, 167, 54, 0.10)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.3)' : 'rgba(232, 167, 54, 0.25)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    marginTop: 4,
+    marginBottom: Spacing.xs,
+  },
+  proposalNoticeText: {
+    ...Typography.bodySm,
+    color: colors.onSurface,
+    flex: 1,
+    lineHeight: 18,
   },
   commChipText: {
     ...Typography.labelMd,
@@ -938,11 +1019,13 @@ const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
     flex: 1,
   },
   sheet: {
-    backgroundColor: '#ffffff',
+    backgroundColor: isDark ? colors.surfaceContainer : '#ffffff',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: isDark ? colors.cardBorder : 'transparent',
     ...Shadows.lg,
   },
   header: {
@@ -989,7 +1072,7 @@ const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
     left: 2,
     right: 2,
     height: ITEM_HEIGHT,
-    backgroundColor: 'rgba(232, 167, 54, 0.15)',
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.25)' : 'rgba(232, 167, 54, 0.15)',
     borderRadius: 8,
     zIndex: 1,
   },

@@ -16,7 +16,7 @@ import {
   Dimensions,
   BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../constants/theme';
@@ -39,16 +39,16 @@ const CREATE_OPTIONS: CreateOption[] = [
     route: '/new-post',
   },
   {
-    icon: 'calendar-month',
-    title: 'New Event',
-    description: 'Organize a meetup or activity',
-    route: '/new-event',
-  },
-  {
     icon: 'local-cafe',
     title: 'New Hangout',
     description: 'Create a spontaneous get-together',
     route: '/new-hangout',
+  },
+  {
+    icon: 'calendar-month',
+    title: 'New Event',
+    description: 'Organize a meetup or activity',
+    route: '/new-event',
   },
   {
     icon: 'diversity-3',
@@ -69,7 +69,7 @@ interface CreateBottomSheetProps {
 }
 
 export function CreateBottomSheet({ visible, onClose, communityContext }: CreateBottomSheetProps) {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
@@ -162,9 +162,9 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
       setIsRendered(false);
       isClosingRef.current = false;
       onClose();
-      if (route === '/new-post' && communityContext) {
+      if ((route === '/new-post' || route === '/new-event') && communityContext) {
         router.push({
-          pathname: '/new-post',
+          pathname: route,
           params: {
             communityId: communityContext.id,
             communitySlug: communityContext.slug,
@@ -240,12 +240,6 @@ export function CreateBottomSheet({ visible, onClose, communityContext }: Create
               <MaterialIcons name="chevron-right" size={20} color={colors.outlineVariant} />
             </TouchableOpacity>
           ))}
-        </View>
-
-        {/* Soft Tactile Cancel Hint */}
-        <View style={styles.cancelHint}>
-          <MaterialIcons name="info-outline" size={14} color={colors.tertiary} />
-          <Text style={styles.cancelHintText}>Tap anywhere outside to cancel</Text>
         </View>
       </Animated.View>
     </View>
@@ -343,17 +337,5 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       ...Typography.captionMd,
       color: colors.tertiary,
       marginTop: 2,
-    },
-    cancelHint: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: Spacing.xs,
-      marginTop: Spacing.lg,
-      paddingTop: Spacing.xs,
-    },
-    cancelHintText: {
-      ...Typography.captionSm,
-      color: colors.tertiary,
     },
   });

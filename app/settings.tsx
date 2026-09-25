@@ -18,7 +18,7 @@ import {
   Switch,
   Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
@@ -26,7 +26,7 @@ import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
 
 export default function SettingsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const { themeMode, setThemeMode, isDark, colors } = useTheme();
@@ -90,14 +90,16 @@ export default function SettingsScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.rowLeft}>
-                <Image
-                  source={{
-                    uri:
-                      user?.profile_picture_url ||
-                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-                  }}
-                  style={styles.userRowAvatar}
-                />
+                {user?.profile_picture_url ? (
+                  <Image
+                    source={{ uri: user.profile_picture_url }}
+                    style={styles.userRowAvatar}
+                  />
+                ) : (
+                  <View style={[styles.userRowAvatar, styles.avatarPlaceholder]}>
+                    <MaterialIcons name="person" size={20} color={colors.onSurfaceVariant} />
+                  </View>
+                )}
                 <View style={styles.textCol}>
                   <Text style={styles.rowTitle}>Edit Profile</Text>
                   <Text style={styles.rowSubtitle}>{displayName}</Text>
@@ -120,7 +122,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={styles.textCol}>
                   <Text style={styles.rowTitle}>Account Settings</Text>
-                  <Text style={styles.rowSubtitle}>Linked accounts & deletion</Text>
+                  <Text style={styles.rowSubtitle}>Security & account deletion</Text>
                 </View>
               </View>
               <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
@@ -223,9 +225,8 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* DANGER ZONE SECTION */}
+        {/* LOGOUT SECTION */}
         <View style={styles.section}>
-          <Text style={[styles.sectionHeading, { color: colors.error }]}>Danger Zone</Text>
           <View style={styles.sectionCard}>
             <TouchableOpacity
               style={styles.rowItem}
@@ -316,6 +317,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       width: 32,
       height: 32,
       borderRadius: 16,
+    },
+    avatarPlaceholder: {
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     iconCircle: {
       width: 32,

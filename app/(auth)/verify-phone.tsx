@@ -1,6 +1,7 @@
 /**
  * Verify Phone Screen — 6-digit OTP verification.
  * Matches Stitch: screen_6_phone_verification_empty
+ * Fully themed for dark mode support.
  * Backend: POST /auth/verify-phone, POST /auth/verify-phone/confirm
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -8,18 +9,32 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-nativ
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
+import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
+import { useAuth } from '../../src/context/AuthContext';
 import { Button } from '../../src/components/ui/Button';
 import { authService } from '../../src/services/auth';
 import { ApiRequestError } from '../../src/services/api';
+import { OtpInput } from '../../src/components/ui/OtpInput';
 
 const OTP_LENGTH = 6;
 
 export default function VerifyPhoneScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
-  const phoneNumber = phone || '+251911234567';
+  const params = useLocalSearchParams<{
+    phone?: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    email?: string;
+    password?: string;
+    birthDate?: string;
+  }>();
+  const phoneNumber = params.phone || '+251911234567';
+  const { colors, isDark } = useTheme();
+  const { register, completePhoneVerification } = useAuth();
+  const styles = useThemedStyles(getStyles);
 
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [error, setError] = useState('');
@@ -45,28 +60,6 @@ export default function VerifyPhoneScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[value.length - 1];
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    setError('');
-
-    if (value && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (newOtp.every((d) => d) && newOtp.join('').length === OTP_LENGTH) {
-      handleVerify(newOtp.join(''));
-    }
-  };
-
-  const handleKeyPress = (index: number, key: string) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
   const handleVerify = async (code?: string) => {
     const otpCode = code || otp.join('');
     if (otpCode.length !== OTP_LENGTH) {
@@ -78,11 +71,29 @@ export default function VerifyPhoneScreen() {
     setError('');
 
     try {
-      await authService.confirmPhoneOtp({
-        phoneNumber,
-        otp: otpCode,
-      });
-      // Verification succeeded, router switches to tabs automatically via AuthContext
+      if (params.password && params.username && params.firstName) {
+        // Flow: Create account now with verified phone OTP
+        await register({
+          firstName: params.firstName,
+          lastName: params.lastName || '',
+          username: params.username,
+          email: params.email || undefined,
+          phoneNumber,
+          password: params.password,
+          birthDate: params.birthDate || '',
+          otp: otpCode,
+        });
+        await completePhoneVerification();
+        router.replace('/(tabs)');
+      } else {
+        // Flow: Existing user verifying phone
+        await authService.confirmPhoneOtp({
+          phoneNumber,
+          otp: otpCode,
+        });
+        await completePhoneVerification();
+        router.replace('/(tabs)');
+      }
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);
@@ -90,7 +101,6 @@ export default function VerifyPhoneScreen() {
         setError('Verification failed. Please check the code.');
       }
       setOtp(Array(OTP_LENGTH).fill(''));
-      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -119,20 +129,34 @@ export default function VerifyPhoneScreen() {
           style={styles.backButton}
           activeOpacity={0.7}
         >
-          <MaterialIcons name="arrow-back" size={24} color={Colors.onSurface} />
+          <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle}>Verify Phone</Text>
         <View style={{ width: 44 }} />
       </View>
 
       <View style={styles.content}>
-        {/* Warm Tactile Icon Badge */}
+        {/* Warm Tactile Icon Badge — Phone receiving SMS */}
         <View style={styles.badgeWrapper}>
-          <View style={styles.outerBadge}>
-            <View style={styles.innerBadge}>
-              <MaterialIcons name="shield" size={40} color={Colors.primaryContainer} />
+          <View
+            style={[
+              styles.outerBadge,
+              {
+                backgroundColor: isDark ? 'rgba(36,33,30,0.85)' : 'rgba(241, 223, 207, 0.7)',
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.innerBadge,
+                { backgroundColor: isDark ? 'rgba(232, 167, 54, 0.25)' : 'rgba(232, 167, 54, 0.2)' },
+              ]}
+            >
+              <MaterialIcons name="textsms" size={38} color={colors.primaryContainer} />
             </View>
-            <View style={styles.sparkDot} />
+            <View style={[styles.sparkDot, { borderColor: colors.surface }]} />
           </View>
         </View>
 
@@ -147,45 +171,36 @@ export default function VerifyPhoneScreen() {
 
         {error ? (
           <View style={styles.errorBanner}>
-            <MaterialIcons name="error-outline" size={18} color={Colors.error} />
+            <MaterialIcons name="error-outline" size={18} color={colors.error} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
 
-        {/* 6-Digit OTP Matrix */}
-        <View style={styles.otpRow}>
-          {otp.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={(ref) => {
-                inputRefs.current[index] = ref;
-              }}
-              style={[
-                styles.otpBox,
-                digit ? styles.otpBoxFilled : null,
-                error ? styles.otpBoxError : null,
-              ]}
-              value={digit}
-              onChangeText={(val) => handleOtpChange(index, val)}
-              onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-              keyboardType="number-pad"
-              maxLength={1}
-              textAlign="center"
-              selectTextOnFocus
-            />
-          ))}
-        </View>
+        {/* 6-Digit Tactile OTP Input with full paste & autofill support */}
+        <OtpInput
+          value={otp}
+          onChange={(code, arr) => {
+            setOtp(arr);
+            setError('');
+            if (code.length === OTP_LENGTH) {
+              handleVerify(code);
+            }
+          }}
+          boxWidth={48}
+          error={Boolean(error)}
+          autoFocus
+        />
 
         {/* Active Resend Timer Indicator */}
         <View style={styles.resendRow}>
-          <MaterialIcons name="schedule" size={16} color={Colors.tertiary} />
+          <MaterialIcons name="schedule" size={16} color={colors.tertiary} />
           {resendTimer > 0 ? (
             <Text style={styles.timerText}>
               Resend code in <Text style={styles.timerCount}>0:{resendTimer < 10 ? `0${resendTimer}` : resendTimer}</Text>
             </Text>
           ) : (
             <TouchableOpacity onPress={handleResend} activeOpacity={0.7}>
-              <Text style={styles.resendAction}>Resend code via SMS</Text>
+              <Text style={styles.resendAction}>Resend code</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -201,212 +216,159 @@ export default function VerifyPhoneScreen() {
             size="lg"
           />
         </View>
-
-        {/* Wrong Number Action */}
-        <TouchableOpacity
-          style={styles.wrongNumberButton}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <MaterialIcons name="edit-note" size={18} color={Colors.secondary} />
-          <Text style={styles.wrongNumberText}>Wrong number? Edit phone details</Text>
-        </TouchableOpacity>
-
-        {/* Security Micro-Trust Footer Badge */}
-        <View style={styles.securityBadge}>
-          <View style={styles.lockCircle}>
-            <MaterialIcons name="lock" size={18} color={Colors.tertiary} />
-          </View>
-          <Text style={styles.securityText}>
-            End-to-end encrypted session for local community onboarding.
-          </Text>
-        </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  topBar: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBarTitle: {
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-  badgeWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
-  outerBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(241, 223, 207, 0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    ...Shadows.sm,
-  },
-  innerBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(232, 167, 54, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sparkDot: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.primaryContainer,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-  },
-  headerBlock: {
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    maxWidth: 320,
-  },
-  heading: {
-    ...Typography.headlineMd,
-    color: Colors.onSurface,
-    textAlign: 'center',
-    marginBottom: Spacing.xs,
-  },
-  subheading: {
-    ...Typography.bodyMd,
-    color: Colors.tertiary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  phoneHighlight: {
-    ...Typography.labelMd,
-    color: Colors.onSurface,
-    marginTop: 2,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.errorContainer,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.md,
-  },
-  errorText: {
-    ...Typography.captionMd,
-    color: Colors.onErrorContainer,
-  },
-  otpRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: Spacing.lg,
-  },
-  otpBox: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.tertiaryFixed,
-    ...Typography.headlineSm,
-    color: Colors.onSurface,
-    ...Shadows.sm,
-  },
-  otpBoxFilled: {
-    backgroundColor: Colors.surfaceContainerHighest,
-    borderColor: Colors.primaryContainer,
-    borderWidth: 1.5,
-  },
-  otpBoxError: {
-    borderWidth: 1.5,
-    borderColor: Colors.error,
-  },
-  resendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.xl,
-  },
-  timerText: {
-    ...Typography.captionMd,
-    color: Colors.tertiary,
-  },
-  timerCount: {
-    fontWeight: '700',
-    color: Colors.onSurface,
-  },
-  resendAction: {
-    ...Typography.labelMd,
-    color: Colors.primary,
-    textDecorationLine: 'underline',
-  },
-  buttonWrapper: {
-    width: '100%',
-    marginBottom: Spacing.md,
-  },
-  wrongNumberButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: Spacing.sm,
-  },
-  wrongNumberText: {
-    ...Typography.captionMd,
-    color: Colors.secondary,
-  },
-  securityBadge: {
-    marginTop: Spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: 'rgba(246, 243, 242, 0.8)',
-    borderRadius: BorderRadius.xl,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    maxWidth: 320,
-    ...Shadows.sm,
-  },
-  lockCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceContainerHighest,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  securityText: {
-    ...Typography.captionSm,
-    color: Colors.onSurfaceVariant,
-    flex: 1,
-    lineHeight: 16,
-  },
-});
+const getStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    topBar: {
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Spacing.md,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    topBarTitle: {
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+      textAlign: 'center',
+    },
+    content: {
+      flex: 1,
+      alignItems: 'center',
+      paddingHorizontal: Spacing.lg,
+      paddingTop: Spacing.md,
+    },
+    badgeWrapper: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: Spacing.lg,
+    },
+    outerBadge: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      ...Shadows.sm,
+    },
+    innerBadge: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sparkDot: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: colors.primaryContainer,
+      borderWidth: 2,
+    },
+    headerBlock: {
+      alignItems: 'center',
+      marginBottom: Spacing.lg,
+      maxWidth: 320,
+    },
+    heading: {
+      ...Typography.headlineMd,
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginBottom: Spacing.xs,
+    },
+    subheading: {
+      ...Typography.bodyMd,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    phoneHighlight: {
+      ...Typography.labelMd,
+      color: colors.onSurface,
+      fontWeight: '700',
+      marginTop: 2,
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.xs,
+      backgroundColor: colors.errorContainer,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: Spacing.sm,
+      borderRadius: BorderRadius.md,
+      marginBottom: Spacing.md,
+    },
+    errorText: {
+      ...Typography.captionMd,
+      color: colors.onErrorContainer,
+    },
+    otpRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: Spacing.lg,
+    },
+    otpBox: {
+      width: 48,
+      height: 52,
+      borderRadius: BorderRadius.lg,
+      backgroundColor: colors.tertiaryFixed,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      ...Typography.headlineSm,
+      color: colors.onSurface,
+      textAlign: 'center',
+      ...Shadows.sm,
+    },
+    otpBoxFilled: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderColor: colors.primaryContainer,
+      borderWidth: 1.5,
+    },
+    otpBoxError: {
+      borderWidth: 1.5,
+      borderColor: colors.error,
+    },
+    resendRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: Spacing.xl,
+    },
+    timerText: {
+      ...Typography.captionMd,
+      color: colors.onSurfaceVariant,
+    },
+    timerCount: {
+      fontWeight: '700',
+      color: colors.primaryContainer,
+    },
+    resendAction: {
+      ...Typography.labelMd,
+      color: colors.primaryContainer,
+      textDecorationLine: 'underline',
+      fontWeight: '700',
+    },
+    buttonWrapper: {
+      width: '100%',
+      marginBottom: Spacing.md,
+    },
+  });

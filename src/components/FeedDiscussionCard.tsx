@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle, Share } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../hooks/useSafeRouter';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../constants/theme';
 import { useTheme, useThemedStyles } from '../context/ThemeContext';
@@ -44,6 +44,7 @@ export interface FeedDiscussionCardProps {
   onPressPost?: (postId: string) => void;
   onPressCommunity?: (slug: string) => void;
   onPressShare?: (post: any) => void;
+  showAuthor?: boolean;
   style?: ViewStyle;
 }
 
@@ -57,9 +58,10 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
   onPressPost,
   onPressCommunity,
   onPressShare,
+  showAuthor = false,
   style,
 }) => {
-  const router = useRouter();
+  const router = useSafeRouter();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
   const { likedPosts, savedPosts, commentCounts, likesCounts, toggleLike, toggleSave } = usePostState();
@@ -93,6 +95,16 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     post._count?.comments ??
     (Array.isArray(post.comments) ? post.comments.length : 0);
 
+  const isPostEdited = Boolean(
+    post.isEdited ||
+    post.is_edited ||
+    (post.updatedAt && post.createdAt && new Date(post.updatedAt).getTime() - new Date(post.createdAt).getTime() > 2000) ||
+    (post.updated_at && post.created_at && new Date(post.updated_at).getTime() - new Date(post.created_at).getTime() > 2000)
+  );
+
+  const [commImgFailed, setCommImgFailed] = React.useState(false);
+  const [authorImgFailed, setAuthorImgFailed] = React.useState(false);
+
   // Tags
   const tagsList = Array.isArray(post.tags) ? post.tags : [];
 
@@ -101,6 +113,39 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     post.communityName || post.community?.name || 'Nexus Community';
   const commSlug =
     post.communitySlug || post.community?.slug || '';
+  const rawCommPic =
+    post.community?.profile_picture_url ||
+    post.community?.profilePictureUrl ||
+    post.communityAvatar ||
+    post.communityProfilePictureUrl ||
+    post.community?.avatar_url ||
+    post.community?.avatarUrl ||
+    post.community?.logo_url ||
+    post.community?.banner_url ||
+    post.community?.bannerUrl ||
+    post.communityBanner ||
+    post.communityBannerUrl;
+  const commPic = extractDirectImageUrl(rawCommPic);
+
+  const authorName =
+    post.author?.name ||
+    (post.author?.first_name || post.author?.last_name
+      ? `${post.author?.first_name || ''} ${post.author?.last_name || ''}`.trim()
+      : '') ||
+    post.author?.username ||
+    post.authorName ||
+    post.authorUsername ||
+    'Member';
+
+  const rawAuthorPic =
+    post.author?.profile_picture_url ||
+    post.author?.profilePictureUrl ||
+    post.authorAvatar ||
+    post.authorProfilePictureUrl ||
+    post.author?.avatar_url ||
+    post.author?.avatarUrl ||
+    post.authorPic;
+  const authorPic = extractDirectImageUrl(rawAuthorPic);
 
   const rawCat =
     post.communityCategory ||
@@ -108,14 +153,6 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     post.community?.category ||
     post.category;
   const categoryBadge = rawCat ? formatCategoryName(rawCat, true) : '';
-
-  const authorPic =
-    post.authorAvatar || post.author?.profile_picture_url;
-  const authorDisplayName =
-    post.authorName ||
-    (post.author
-      ? `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim() || 'Member'
-      : 'Member');
 
   const rawMedia = post.mediaUrl || post.media_url || (Array.isArray(post.mediaUrls) ? post.mediaUrls[0] : null);
   const postMedia = extractDirectImageUrl(rawMedia);
@@ -138,6 +175,17 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     }
   };
 
+  const handleHeaderPress = () => {
+    if (showAuthor) {
+      const authorId = post.author?.id || post.author_id || post.authorId;
+      if (authorId) {
+        router.push(`/user/${authorId}` as any);
+      }
+    } else {
+      handleCommunityPress();
+    }
+  };
+
   const handleShare = async () => {
     if (onPressShare) {
       onPressShare(post);
@@ -153,15 +201,42 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
 
   return (
     <View style={[styles.card, style]}>
-      {/* Top Line: Community Name on Left, Category Pill on Right Edge */}
-      <View style={styles.topHeaderRow}>
+      {/* Top Header Row: Author/Community PFP + Name on Left, Category/Tags on Right */}
+      <View style={styles.communityHeaderRow}>
         <TouchableOpacity
-          onPress={handleCommunityPress}
-          activeOpacity={0.8}
-          style={styles.communityLinkPressable}
+          style={styles.communityInfo}
+          onPress={handleHeaderPress}
+          activeOpacity={0.75}
         >
-          <Text style={styles.communityHeaderText} numberOfLines={1}>
-            {commDisplayName}
+          {showAuthor ? (
+            !authorImgFailed && authorPic ? (
+              <Image
+                source={{ uri: authorPic }}
+                style={styles.commAvatar}
+                onError={() => setAuthorImgFailed(true)}
+              />
+            ) : (
+              <View style={styles.commAvatarFallback}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
+                  {authorName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )
+          ) : (
+            !commImgFailed && commPic ? (
+              <Image
+                source={{ uri: commPic }}
+                style={styles.commAvatar}
+                onError={() => setCommImgFailed(true)}
+              />
+            ) : (
+              <View style={styles.commAvatarFallback}>
+                <MaterialIcons name="groups" size={16} color={colors.primary} />
+              </View>
+            )
+          )}
+          <Text style={styles.communityNameText} numberOfLines={1}>
+            {showAuthor ? authorName : commDisplayName}
           </Text>
         </TouchableOpacity>
 
@@ -172,47 +247,6 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
             </Text>
           </View>
         ) : null}
-      </View>
-
-      {/* Author & Right-aligned Tags Row */}
-      <View style={styles.authorRow}>
-        <TouchableOpacity
-          style={styles.authorInfo}
-          onPress={() => {
-            const authorId = post.authorId || post.author_id || post.author?.id;
-            if (authorId) {
-              router.push(`/user/${authorId}`);
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          {authorPic ? (
-            <Image source={{ uri: authorPic }} style={styles.authorAvatar} />
-          ) : (
-            <View style={styles.authorAvatarFallback}>
-              <MaterialIcons name="person" size={18} color={colors.tertiary} />
-            </View>
-          )}
-          <Text style={styles.authorName} numberOfLines={1}>
-            {authorDisplayName}
-          </Text>
-        </TouchableOpacity>
-
-        {tagsList.length > 0 && (
-          <View style={styles.tagsWrapper}>
-            {tagsList.slice(0, 2).map((tag: any, idx: number) => {
-              const tagName = typeof tag === 'string' ? tag : tag.name || tag.tag?.name;
-              if (!tagName) return null;
-              return (
-                <View key={idx} style={styles.tagBadge}>
-                  <Text style={styles.tagBadgeText} numberOfLines={1}>
-                    #{tagName}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
       </View>
 
       {/* Body: Title + Image (Below Title, Above Description) + Truncated Content */}
@@ -233,6 +267,23 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
           </Text>
         ) : null}
       </TouchableOpacity>
+
+      {/* Dedicated Tags Row below post content */}
+      {tagsList.length > 0 && (
+        <View style={styles.tagsRow}>
+          {tagsList.slice(0, 3).map((tag: any, idx: number) => {
+            const tagName = typeof tag === 'string' ? tag : tag.name || tag.tag?.name;
+            if (!tagName) return null;
+            return (
+              <View key={idx} style={styles.tagBadge}>
+                <Text style={styles.tagBadgeText} numberOfLines={1}>
+                  #{tagName}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Actions Row: Like, Comment, Bookmark, Share */}
       <View style={styles.actionsRow}>
@@ -274,6 +325,10 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
         </View>
 
         <View style={styles.actionGroup}>
+          {isPostEdited ? (
+            <Text style={styles.editedText}>(edited)</Text>
+          ) : null}
+
           {/* Bookmark */}
           <TouchableOpacity
             style={styles.iconOnly}
@@ -317,84 +372,76 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       borderColor: colors.cardBorder,
       ...Shadows.sm,
     },
-    topHeaderRow: {
+    communityHeaderRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 2,
+      marginBottom: Spacing.xs,
     },
-    communityLinkPressable: {
+    communityInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
       flex: 1,
       marginRight: Spacing.sm,
     },
-    communityHeaderText: {
-      ...Typography.captionSm,
+    commAvatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: colors.surfaceContainerHigh,
+    },
+    commAvatarFallback: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.18)' : 'rgba(232, 167, 54, 0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.25)',
+    },
+    communityNameText: {
+      ...Typography.labelMd,
       color: colors.primary,
       fontWeight: '700',
-      letterSpacing: 0.3,
+      letterSpacing: 0.2,
+      flex: 1,
     },
     categoryPill: {
-      backgroundColor: colors.surface,
+      backgroundColor: isDark ? colors.surfaceContainerHigh : colors.surface,
       paddingHorizontal: 8,
       paddingVertical: 2,
       borderRadius: BorderRadius.full,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      alignSelf: 'flex-start',
+      alignSelf: 'center',
     },
     categoryPillText: {
       fontSize: 10,
       color: colors.onSurfaceVariant,
       fontWeight: '700',
     },
-    authorRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    authorInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      flex: 1,
-    },
-    authorAvatar: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-    },
-    authorAvatarFallback: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceContainerHigh,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    authorName: {
-      ...Typography.captionMd,
-      color: colors.onSurface,
-      fontWeight: '600',
-      flex: 1,
-    },
-    tagsWrapper: {
+    tagsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 4,
-      justifyContent: 'flex-end',
-      maxWidth: 160,
+      gap: 6,
+      alignItems: 'center',
+      marginTop: 6,
+      marginBottom: 2,
     },
     tagBadge: {
-      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.12)',
-      paddingHorizontal: 6,
-      paddingVertical: 1,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.10)',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
       borderRadius: BorderRadius.full,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.30)' : 'rgba(232, 167, 54, 0.20)',
     },
     tagBadgeText: {
       fontSize: 10,
-      color: colors.secondary,
-      fontWeight: '600',
+      color: isDark ? '#fbbf24' : '#b45309',
+      fontWeight: '700',
     },
     postTitle: {
       ...Typography.labelMd,
@@ -442,6 +489,12 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     iconOnly: {
       padding: 2,
+    },
+    editedText: {
+      ...Typography.labelSm,
+      color: colors.tertiary,
+      fontStyle: 'italic',
+      alignSelf: 'center',
     },
     timestampText: {
       ...Typography.captionSm,

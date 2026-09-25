@@ -11,7 +11,8 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { Colors, Typography, BorderRadius, Spacing } from '../../constants/theme';
+import { Typography, BorderRadius, Spacing, ThemeColors } from '../../constants/theme';
+import { useTheme, useThemedStyles } from '../../context/ThemeContext';
 
 type ButtonVariant = 'primary' | 'secondary' | 'tonal' | 'outlined' | 'text' | 'error';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -41,7 +42,14 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(getStyles);
   const isDisabled = disabled || loading;
+
+  const spinnerColor =
+    variant === 'outlined' || variant === 'text' || variant === 'tonal'
+      ? colors.primaryContainer
+      : colors.onPrimary;
 
   return (
     <TouchableOpacity
@@ -58,10 +66,7 @@ export const Button: React.FC<ButtonProps> = ({
       ]}
     >
       {loading ? (
-        <ActivityIndicator
-          size="small"
-          color={variant === 'outlined' || variant === 'text' ? Colors.primaryContainer : Colors.onPrimary}
-        />
+        <ActivityIndicator size="small" color={spinnerColor} />
       ) : (
         <>
           {icon}
@@ -82,95 +87,104 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    borderRadius: BorderRadius.full,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  disabled: {
-    opacity: 0.4,
-  },
+const getStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    base: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: Spacing.sm,
+      borderRadius: BorderRadius.full,
+    },
+    fullWidth: {
+      width: '100%',
+    },
+    disabled: {
+      opacity: 0.4,
+    },
 
-  // Variants
-  primary: {
-    backgroundColor: Colors.primaryContainer,
-  },
-  secondary: {
-    backgroundColor: Colors.secondary,
-  },
-  tonal: {
-    backgroundColor: Colors.surfaceContainerHigh,
-  },
-  outlined: {
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    borderColor: Colors.outlineVariant,
-  },
-  text: {
-    backgroundColor: 'transparent',
-  },
-  error: {
-    backgroundColor: Colors.error,
-  },
+    // Variants
+    primary: {
+      backgroundColor: colors.primaryContainer,
+    },
+    secondary: {
+      backgroundColor: colors.secondary,
+    },
+    tonal: {
+      backgroundColor: colors.surfaceContainerHigh,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    outlined: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: colors.outlineVariant,
+    },
+    text: {
+      backgroundColor: 'transparent',
+    },
+    error: {
+      backgroundColor: colors.error,
+    },
 
-  // Sizes
-  size_sm: {
-    height: 36,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.full,
-  },
-  size_md: {
-    height: 44,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: BorderRadius.full,
-  },
-  size_lg: {
-    height: 48,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.full,
-  },
+    // Sizes
+    size_sm: {
+      height: 36,
+      paddingHorizontal: Spacing.md,
+      borderRadius: BorderRadius.full,
+    },
+    size_md: {
+      height: 44,
+      paddingHorizontal: Spacing.lg,
+      borderRadius: BorderRadius.full,
+    },
+    size_lg: {
+      height: 48,
+      paddingHorizontal: Spacing.xl,
+      borderRadius: BorderRadius.full,
+    },
 
-  // Text
-  text_base: {
-    fontWeight: '600',
-  },
-  text_primary: {
-    color: Colors.onPrimary,
-  },
-  text_secondary: {
-    color: Colors.onSecondary,
-  },
-  text_tonal: {
-    color: Colors.primaryContainer,
-  },
-  text_outlined: {
-    color: Colors.primaryContainer,
-  },
-  text_text: {
-    color: Colors.primaryContainer,
-  },
-  text_error: {
-    color: Colors.onError,
-  },
+    // Text
+    text_base: {
+      fontWeight: '600',
+    },
+    text_primary: {
+      color: colors.onPrimary,
+      fontWeight: '700',
+    },
+    text_secondary: {
+      color: colors.onSecondary,
+      fontWeight: '600',
+    },
+    text_tonal: {
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    text_outlined: {
+      color: colors.primaryContainer,
+      fontWeight: '600',
+    },
+    text_text: {
+      color: colors.primaryContainer,
+      fontWeight: '600',
+    },
+    text_error: {
+      color: colors.onError,
+      fontWeight: '600',
+    },
 
-  // Text sizes
-  textSize_sm: {
-    ...Typography.labelSm,
-  },
-  textSize_md: {
-    ...Typography.labelMd,
-  },
-  textSize_lg: {
-    ...Typography.labelLg,
-  },
+    // Text sizes
+    textSize_sm: {
+      ...Typography.labelSm,
+    },
+    textSize_md: {
+      ...Typography.labelMd,
+    },
+    textSize_lg: {
+      ...Typography.labelLg,
+    },
 
-  disabledText: {
-    opacity: 0.7,
-  },
-});
+    disabledText: {
+      opacity: 0.7,
+    },
+  });

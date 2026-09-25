@@ -16,7 +16,8 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
+import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -28,7 +29,7 @@ import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function HangoutDetailScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
@@ -321,16 +322,16 @@ export default function HangoutDetailScreen() {
     : 'Time to be announced';
 
   const locationText =
-    hangout.location?.name ||
     hangout.location?.place_name ||
+    hangout.location?.name ||
     hangout.location?.address ||
     (typeof hangout.location === 'string' ? hangout.location : '') ||
-    'Location to be shared upon joining';
+    (hangout.community?.name ? `${hangout.community.name} Space` : 'Meetup Venue');
   const locationDistrict =
     hangout.location?.city ||
     (hangout.location?.place_name ? hangout.location.place_name.split(',')[0] : '') ||
     hangout.community?.name ||
-    'Meetup Location';
+    'Addis Ababa';
 
   const approvedParticipants = (hangout.participants || []).filter(
     (p: any) => !p.status || p.status === 'approved' || p.status === 'active'
@@ -421,7 +422,16 @@ export default function HangoutDetailScreen() {
           <View style={styles.headerBlock}>
             <Text style={styles.titleText}>{hangout.title}</Text>
 
-            <View style={styles.creatorRow}>
+            <TouchableOpacity
+              style={styles.creatorRow}
+              onPress={() => {
+                const creatorId = hangout.creator_id || hangout.creatorId || hangout.creator?.id;
+                if (creatorId) {
+                  router.push(`/user/${creatorId}`);
+                }
+              }}
+              activeOpacity={0.7}
+            >
               {hangout.creator?.profile_picture_url ? (
                 <Image
                   source={{ uri: hangout.creator.profile_picture_url }}
@@ -442,7 +452,7 @@ export default function HangoutDetailScreen() {
                     : 'Hangout Host'}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
 
             {/* Description alone directly below host inside white rounded rectangle card */}
             {hangout.description ? (

@@ -64,6 +64,8 @@ function RootNavigator() {
         <Stack.Screen name="settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="account-settings" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="followers" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="user/[id]/communities" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
     </View>
   );

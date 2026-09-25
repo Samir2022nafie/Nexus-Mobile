@@ -17,7 +17,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
@@ -38,7 +38,7 @@ function formatTimeAgo(rawDate?: string) {
 }
 
 export default function NotificationsScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);
@@ -194,7 +194,7 @@ export default function NotificationsScreen() {
               style={styles.markReadBtn}
               activeOpacity={0.7}
             >
-              <MaterialIcons name="done-all" size={16} color={colors.secondary} />
+              <MaterialIcons name="done-all" size={16} color={colors.primary} />
               <Text style={styles.markReadText}>Mark read</Text>
             </TouchableOpacity>
           )}
@@ -376,11 +376,13 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: BorderRadius.full,
-    backgroundColor: colors.secondaryFixed,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.25)',
   },
   markReadText: {
     ...Typography.labelMd,
-    color: colors.secondary,
+    color: colors.primary,
     fontWeight: '700',
     fontSize: 12,
   },

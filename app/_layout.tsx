@@ -71,16 +71,20 @@ function RootNavigator() {
   );
 }
 
+import { LocationProvider } from '../src/context/LocationContext';
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <PostStateProvider>
-            <TabBarVisibilityProvider>
-              <RootNavigator />
-            </TabBarVisibilityProvider>
-          </PostStateProvider>
+          <LocationProvider>
+            <PostStateProvider>
+              <TabBarVisibilityProvider>
+                <RootNavigator />
+              </TabBarVisibilityProvider>
+            </PostStateProvider>
+          </LocationProvider>
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>

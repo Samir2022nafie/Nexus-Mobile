@@ -55,15 +55,15 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
           <Text style={[styles.tabLabel, { color: getTabColor('home') }]}>Home</Text>
         </TouchableOpacity>
 
-        {/* Tab 2: Explore */}
+        {/* Tab 2: Search (formerly Explore) */}
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => router.push('/(tabs)/explore')}
           activeOpacity={0.7}
-          accessibilityLabel="Explore tab"
+          accessibilityLabel="Search tab"
         >
-          <MaterialIcons name="explore" size={24} color={getTabColor('explore')} />
-          <Text style={[styles.tabLabel, { color: getTabColor('explore') }]}>Explore</Text>
+          <MaterialIcons name="search" size={24} color={getTabColor('explore')} />
+          <Text style={[styles.tabLabel, { color: getTabColor('explore') }]}>Search</Text>
         </TouchableOpacity>
 
         {/* Tab 3: Create FAB */}
@@ -78,15 +78,15 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
           </View>
         </TouchableOpacity>
 
-        {/* Tab 4: Hangouts */}
+        {/* Tab 4: Explore (formerly Hangouts — opens 3D Globe Explore map) */}
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => router.push('/(tabs)/hangouts')}
           activeOpacity={0.7}
-          accessibilityLabel="Hangouts tab"
+          accessibilityLabel="Explore tab"
         >
-          <MaterialIcons name="local-cafe" size={24} color={getTabColor('hangouts')} />
-          <Text style={[styles.tabLabel, { color: getTabColor('hangouts') }]}>Hangouts</Text>
+          <MaterialIcons name="explore" size={24} color={getTabColor('hangouts')} />
+          <Text style={[styles.tabLabel, { color: getTabColor('hangouts') }]}>Explore</Text>
         </TouchableOpacity>
 
         {/* Tab 5: Profile */}

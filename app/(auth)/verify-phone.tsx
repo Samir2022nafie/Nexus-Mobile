@@ -30,6 +30,10 @@ export default function VerifyPhoneScreen() {
     email?: string;
     password?: string;
     birthDate?: string;
+    locationName?: string;
+    latitude?: string;
+    longitude?: string;
+    isLocationPrivate?: string;
   }>();
   const phoneNumber = params.phone || '+251911234567';
   const { colors, isDark } = useTheme();
@@ -82,6 +86,10 @@ export default function VerifyPhoneScreen() {
           password: params.password,
           birthDate: params.birthDate || '',
           otp: otpCode,
+          locationName: params.locationName || undefined,
+          latitude: params.latitude ? Number(params.latitude) : undefined,
+          longitude: params.longitude ? Number(params.longitude) : undefined,
+          isLocationPrivate: params.isLocationPrivate === 'true',
         });
         await completePhoneVerification();
         router.replace('/(tabs)');

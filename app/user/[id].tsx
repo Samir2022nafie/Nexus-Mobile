@@ -242,12 +242,23 @@ export default function PublicUserProfileScreen() {
           <Text style={styles.displayNameText}>{displayName}</Text>
           <Text style={styles.usernameText}>@{profile.username}</Text>
 
-          {/* Trust Score Badge */}
-          <View style={styles.trustBadge}>
-            <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
-            <Text style={styles.trustBadgeText}>
-              Trust Score: {(profile as any)?.trustScore ?? (profile as any)?.trust_score ?? 50}
-            </Text>
+          {/* Badges Row: Trust Score & Public Location Pill */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+            <View style={[styles.trustBadge, { marginTop: 0 }]}>
+              <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
+              <Text style={styles.trustBadgeText}>
+                Trust Score: {(profile as any)?.trustScore ?? (profile as any)?.trust_score ?? 50}
+              </Text>
+            </View>
+
+            {!profile.isLocationPrivate && !profile.is_location_private && (profile.location?.placeName || profile.location?.name) && (
+              <View style={[styles.trustBadge, { marginTop: 0 }]}>
+                <MaterialIcons name="place" size={14} color={colors.primaryContainer} />
+                <Text style={styles.trustBadgeText} numberOfLines={1}>
+                  {profile.location?.placeName || profile.location?.name}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Bio */}

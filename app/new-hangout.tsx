@@ -30,6 +30,7 @@ import { Button } from '../src/components/ui/Button';
 import { hangoutsService } from '../src/services/hangouts';
 import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { LocationInput } from '../src/components/ui/LocationInput';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -126,6 +127,9 @@ export default function NewHangoutScreen() {
   const [form, setForm] = useState({
     title: '',
     location: '',
+    locationName: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     description: '',
     coverImageUrl: '',
     startsAt: defaultStartsAt,
@@ -151,6 +155,9 @@ export default function NewHangoutScreen() {
           setForm({
             title: h.title || '',
             location: loc,
+            locationName: loc,
+            latitude: h.location?.latitude ?? null,
+            longitude: h.location?.longitude ?? null,
             description: h.description || '',
             coverImageUrl: h.coverImageUrl || h.cover_image_url || '',
             startsAt: h.startsAt || h.starts_at || defaultStartsAt,
@@ -297,7 +304,10 @@ export default function NewHangoutScreen() {
         await hangoutsService.update(params.hangoutId, {
           title: form.title.trim(),
           description: form.description.trim() || undefined,
-          location: form.location.trim() || undefined,
+          location: (form.locationName || form.location).trim() || undefined,
+          locationName: (form.locationName || form.location).trim() || undefined,
+          latitude: form.latitude ?? undefined,
+          longitude: form.longitude ?? undefined,
           coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : (null as any),
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
@@ -308,7 +318,10 @@ export default function NewHangoutScreen() {
         await hangoutsService.create({
           title: form.title.trim(),
           description: form.description.trim() || undefined,
-          location: form.location.trim() || undefined,
+          location: (form.locationName || form.location).trim() || undefined,
+          locationName: (form.locationName || form.location).trim() || undefined,
+          latitude: form.latitude ?? undefined,
+          longitude: form.longitude ?? undefined,
           coverImageUrl: form.coverImageUrl.trim() || undefined,
           startsAt: new Date(form.startsAt).toISOString(),
           endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
@@ -382,20 +395,21 @@ export default function NewHangoutScreen() {
           {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
         </View>
 
-        {/* Location */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>LOCATION / VENUE</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. Tomoca Coffee, Piazza"
-              placeholderTextColor={colors.outline}
-              value={form.location}
-              onChangeText={(v) => updateField('location', v)}
-            />
-            <MaterialIcons name="storefront" size={20} color={colors.secondary} />
-          </View>
-        </View>
+        {/* Location with Free Map Picker */}
+        <LocationInput
+          label="LOCATION / VENUE"
+          value={form.locationName || form.location}
+          latitude={form.latitude}
+          longitude={form.longitude}
+          placeholder="e.g. Tomoca Coffee or tap map pin"
+          hint="Places this hangout on the 3D Explore Globe"
+          onChangeLocation={(loc) => {
+            updateField('location', loc.name);
+            updateField('locationName', loc.name);
+            updateField('latitude', loc.latitude);
+            updateField('longitude', loc.longitude);
+          }}
+        />
 
         {/* Description / About Hangout */}
         <View style={styles.fieldGroup}>

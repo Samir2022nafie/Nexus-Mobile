@@ -8,7 +8,7 @@
  * 5. "What people are saying" section with stock rising arrow icon.
  * 6. Double-click Home tab in navigation bar scrolls to top and refreshes feed.
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,14 @@ import { Community, HangoutItem } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { usePostState } from '../../src/context/PostStateContext';
+import { useUserLocation } from '../../src/context/LocationContext';
+import {
+  sortItemsByLocationAndDate,
+  sortCommunitiesByLocation,
+  formatDistance,
+  extractItemCoordinates,
+  getDistanceInKm,
+} from '../../src/utils/distance';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 
@@ -144,6 +152,21 @@ export default function HomeScreen() {
   const [hangouts, setHangouts] = useState<HangoutItem[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const { userLocation } = useUserLocation();
+
+  const displayHangouts = useMemo(
+    () => sortItemsByLocationAndDate(hangouts, userLocation),
+    [hangouts, userLocation]
+  );
+  const displayEvents = useMemo(
+    () => sortItemsByLocationAndDate(events, userLocation),
+    [events, userLocation]
+  );
+  const displayCommunities = useMemo(
+    () => sortCommunitiesByLocation(communities, userLocation),
+    [communities, userLocation]
+  );
+
   const {
     likedPosts: globalLiked,
     savedPosts: globalSaved,
@@ -507,7 +530,7 @@ export default function HomeScreen() {
       >
         {/* Section 1: Joined Communities (Instagram Stories style, 76x76, no yellow ring) */}
         <View style={styles.storiesSection}>
-          {communities.length === 0 ? (
+          {displayCommunities.length === 0 ? (
             <View style={styles.emptyStoryWrap}>
               <TouchableOpacity
                 style={styles.singleExploreCircle}
@@ -528,7 +551,7 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.storiesCarousel}
             >
-              {communities.map((comm) => (
+              {displayCommunities.map((comm) => (
                 <TouchableOpacity
                   key={comm.id}
                   style={styles.storyItem}
@@ -567,7 +590,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {events.length === 0 ? (
+          {displayEvents.length === 0 ? (
             <View style={styles.emptyFeedCard}>
               <MaterialIcons name="event" size={32} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No upcoming events</Text>
@@ -581,7 +604,7 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carousel}
             >
-              {events.map((event) => {
+              {displayEvents.map((event) => {
                 const cat = categorizeItemByDate(event);
                 const categoryBadge = event.category || event.community?.category || 'Community';
                 const commName = event.communityName || event.community?.name || 'Nexus Community';
@@ -645,6 +668,22 @@ export default function HomeScreen() {
                             {`${event.participantsCount ?? event.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
                           </Text>
                         </View>
+                        {(() => {
+                          const coords = extractItemCoordinates(event);
+                          if (userLocation && coords) {
+                            const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
+                            const txt = formatDistance(d);
+                            if (txt) {
+                              return (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6, marginLeft: 'auto' }}>
+                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                </View>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -659,7 +698,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Hangouts Near You</Text>
             <TouchableOpacity
-              onPress={() => (navigation as any).navigate('hangouts')}
+              onPress={() => router.push('/hangouts' as any)}
               style={styles.seeAllRow}
               activeOpacity={0.7}
             >
@@ -668,7 +707,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {hangouts.length === 0 ? (
+          {displayHangouts.length === 0 ? (
             <View style={styles.emptyFeedCard}>
               <MaterialIcons name="local-cafe" size={32} color={colors.tertiary} />
               <Text style={styles.emptyFeedTitle}>No hangouts active nearby</Text>
@@ -689,7 +728,7 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carousel}
             >
-              {hangouts.map((hangout: any) => {
+              {displayHangouts.map((hangout: any) => {
                 const cat = categorizeItemByDate(hangout);
                 const isJoined =
                   joinedHangouts[hangout.id] !== undefined
@@ -751,20 +790,38 @@ export default function HomeScreen() {
                       <Text style={styles.hangoutTitle} numberOfLines={2}>
                         {hangout.title}
                       </Text>
-                      <View style={styles.hangoutScheduleRow}>
-                        <MaterialIcons
-                          name="schedule"
-                          size={13}
-                          color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
-                        />
-                        <Text
-                          style={[
-                            styles.hangoutScheduleText,
-                            cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
-                          ]}
-                        >
-                          {cat.dateText}
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+                        <View style={styles.hangoutScheduleRow}>
+                          <MaterialIcons
+                            name="schedule"
+                            size={13}
+                            color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
+                          />
+                          <Text
+                            style={[
+                              styles.hangoutScheduleText,
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                            ]}
+                          >
+                            {cat.dateText}
+                          </Text>
+                        </View>
+                        {(() => {
+                          const coords = extractItemCoordinates(hangout);
+                          if (userLocation && coords) {
+                            const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
+                            const txt = formatDistance(d);
+                            if (txt) {
+                              return (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
+                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                </View>
+                              );
+                            }
+                          }
+                          return null;
+                        })()}
                       </View>
                     </View>
 

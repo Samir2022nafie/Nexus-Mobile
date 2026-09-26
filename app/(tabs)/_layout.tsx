@@ -86,11 +86,11 @@ function AnimatedTabBar({ state, descriptors, navigation }: any) {
             let iconName: any = 'home';
             let label = 'Home';
             if (route.name === 'explore') {
+              iconName = 'search';
+              label = 'Search';
+            } else if (route.name === 'hangouts') {
               iconName = 'explore';
               label = 'Explore';
-            } else if (route.name === 'hangouts') {
-              iconName = 'local-cafe';
-              label = 'Hangouts';
             } else if (route.name === 'profile') {
               iconName = 'account-circle';
               label = 'Profile';
@@ -149,9 +149,9 @@ export default function TabLayout() {
         }}
       >
         <Tabs.Screen name="index" options={{ title: 'Home' }} />
-        <Tabs.Screen name="explore" options={{ title: 'Explore' }} />
+        <Tabs.Screen name="explore" options={{ title: 'Search' }} />
         <Tabs.Screen name="create" options={{ title: '' }} />
-        <Tabs.Screen name="hangouts" options={{ title: 'Hangouts' }} />
+        <Tabs.Screen name="hangouts" options={{ title: 'Explore' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
     </View>

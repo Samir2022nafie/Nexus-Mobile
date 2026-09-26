@@ -17,6 +17,11 @@ export interface RegisterDto {
   lastName?: string;
   birthDate: string; // YYYY-MM-DD
   otp?: string;
+  locationId?: string | null;
+  locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isLocationPrivate?: boolean;
 }
 
 export interface LoginDto {
@@ -64,6 +69,14 @@ export interface AuthResponse {
 // Users
 // ============================================================================
 
+export interface UserLocation {
+  id: string;
+  name: string;
+  placeName?: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface User {
   id: string;
   username: string;
@@ -81,6 +94,9 @@ export interface User {
   created_at: string;
   updated_at: string;
   deleted_at?: string | null;
+  isLocationPrivate?: boolean;
+  is_location_private?: boolean;
+  location?: UserLocation | null;
 }
 
 export interface PublicProfile {
@@ -100,6 +116,9 @@ export interface PublicProfile {
   isFollowing: boolean;
   trustScore?: number;
   trust_score?: number;
+  isLocationPrivate?: boolean;
+  is_location_private?: boolean;
+  location?: UserLocation | null;
 }
 
 export interface UpdateProfileDto {
@@ -107,6 +126,11 @@ export interface UpdateProfileDto {
   lastName?: string;
   bio?: string;
   profilePictureUrl?: string;
+  locationId?: string | null;
+  locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isLocationPrivate?: boolean;
 }
 
 // ============================================================================
@@ -145,6 +169,10 @@ export interface CreateCommunityDto {
   bannerUrl?: string;
   profilePictureUrl?: string;
   isPrivate?: boolean;
+  locationId?: string | null;
+  locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface UpdateCommunityDto {
@@ -152,6 +180,10 @@ export interface UpdateCommunityDto {
   description?: string;
   rules?: string;
   isPrivate?: boolean;
+  locationId?: string | null;
+  locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface CommunityMember {
@@ -301,6 +333,8 @@ export interface CreateEventDto {
   location?: string;
   locationName?: string;
   locationId?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 // ============================================================================
@@ -346,6 +380,8 @@ export interface CreateHangoutDto {
   location?: string;
   locationName?: string;
   locationId?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface HangoutJoinRequest {

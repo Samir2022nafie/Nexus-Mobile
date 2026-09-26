@@ -8,3 +8,5 @@ export * from './Input';
 export * from './LoadingSpinner';
 export * from './TabBar';
 export * from './Toast';
+export * from './LocationInput';
+export * from './MapPickerModal';

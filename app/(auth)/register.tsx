@@ -25,6 +25,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { Button } from '../../src/components/ui/Button';
+import { LocationInput } from '../../src/components/ui/LocationInput';
 import { useAuth } from '../../src/context/AuthContext';
 import { authService } from '../../src/services/auth';
 import { ApiRequestError } from '../../src/services/api';
@@ -152,6 +153,10 @@ export default function RegisterScreen() {
     birthDay: 15,
     birthMonth: 6,
     birthYear: currentYear - 20,
+    locationName: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
+    isLocationPrivate: false,
   });
 
   const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
@@ -277,6 +282,10 @@ export default function RegisterScreen() {
             username: form.username.trim(),
             password: form.password,
             birthDate: birthDateISO,
+            locationName: form.locationName.trim() || '',
+            latitude: form.latitude !== null ? String(form.latitude) : '',
+            longitude: form.longitude !== null ? String(form.longitude) : '',
+            isLocationPrivate: String(form.isLocationPrivate),
           },
         });
       } else {
@@ -287,6 +296,10 @@ export default function RegisterScreen() {
           email: form.email.trim().toLowerCase(),
           password: form.password,
           birthDate: birthDateISO,
+          locationName: form.locationName.trim() || undefined,
+          latitude: form.latitude ?? undefined,
+          longitude: form.longitude ?? undefined,
+          isLocationPrivate: form.isLocationPrivate,
         });
         router.replace('/(tabs)');
       }
@@ -680,6 +693,26 @@ export default function RegisterScreen() {
             <Text style={styles.helperText}>You must be at least 13 years old</Text>
             {errors.birthDate ? <Text style={styles.errorText}>{errors.birthDate}</Text> : null}
           </View>
+
+          {/* Location Selection & Privacy */}
+          <LocationInput
+            label="Your City / Location"
+            value={form.locationName}
+            latitude={form.latitude}
+            longitude={form.longitude}
+            placeholder="Select your city or venue..."
+            hint="Displayed as a pill on your profile page"
+            onChangeLocation={(loc) => {
+              updateField('locationName', loc.name);
+              updateField('latitude', loc.latitude);
+              updateField('longitude', loc.longitude);
+            }}
+            showPrivacyToggle={true}
+            isPrivate={form.isLocationPrivate}
+            onPrivacyChange={(val) => updateField('isLocationPrivate', val)}
+            privacyLabel="Keep my location private"
+            privacyHint="Hide your city from other users on your profile & explore map"
+          />
 
           {/* Submit Button */}
           <View style={styles.actionContainer}>

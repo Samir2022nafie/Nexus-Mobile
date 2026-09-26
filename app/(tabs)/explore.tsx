@@ -36,9 +36,17 @@ import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
 import { Community } from '../../src/types';
 import { BACKEND_CATEGORIES, formatCategoryName } from '../../src/utils/categories';
-import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
+import { categorizeItemByDate } from '../../src/utils/dateUtils';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { usePostState } from '../../src/context/PostStateContext';
+import { useUserLocation } from '../../src/context/LocationContext';
+import {
+  sortItemsByLocationAndDate,
+  sortCommunitiesByLocation,
+  formatDistance,
+  extractItemCoordinates,
+  getDistanceInKm,
+} from '../../src/utils/distance';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 
 const SUB_TABS = ['Communities', 'Events', 'Posts'] as const;
@@ -52,6 +60,7 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const { colors, isDark } = useTheme();
+  const { userLocation } = useUserLocation();
   const styles = useThemedStyles(getStyles);
   const params = useLocalSearchParams<{ tab?: string }>();
 
@@ -521,7 +530,7 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                filteredCommunities.map((comm) => {
+                sortCommunitiesByLocation(filteredCommunities, userLocation).map((comm) => {
                   const isJoined =
                     joinedCommunities[comm.id] !== undefined
                       ? joinedCommunities[comm.id]
@@ -640,7 +649,7 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                sortItemsByDate(filteredEvents).map((event: any) => {
+                sortItemsByLocationAndDate(filteredEvents, userLocation).map((event: any) => {
                   const dateInfo = categorizeItemByDate(event);
                   const isSaved = savedEvents[event.id] ?? false;
                   return (

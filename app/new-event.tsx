@@ -39,6 +39,7 @@ import { uploadService } from '../src/services/upload';
 import { ApiRequestError } from '../src/services/api';
 import { ManagedCommunity } from '../src/types';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { LocationInput } from '../src/components/ui/LocationInput';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -145,6 +146,9 @@ export default function NewEventScreen() {
   const [form, setForm] = useState({
     title: '',
     location: '',
+    locationName: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     description: '',
     startsAt: defaultStartsAt,
     endsAt: defaultEndsAt as string | undefined,
@@ -242,6 +246,9 @@ export default function NewEventScreen() {
           setForm({
             title: ev.title || '',
             location: loc,
+            locationName: loc,
+            latitude: ev.location?.latitude ?? null,
+            longitude: ev.location?.longitude ?? null,
             description: ev.description || '',
             startsAt: ev.startsAt || ev.starts_at || defaultStartsAt,
             endsAt: ev.endsAt || ev.ends_at || undefined,
@@ -397,7 +404,10 @@ export default function NewEventScreen() {
       const payload: any = {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
-        location: form.location.trim() || undefined,
+        location: (form.locationName || form.location).trim() || undefined,
+        locationName: (form.locationName || form.location).trim() || undefined,
+        latitude: form.latitude ?? undefined,
+        longitude: form.longitude ?? undefined,
         startsAt: new Date(form.startsAt).toISOString(),
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
         maxParticipants: isEditing
@@ -613,20 +623,21 @@ export default function NewEventScreen() {
           {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
         </View>
 
-        {/* Location */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>LOCATION / MEETING POINT</Text>
-          <View style={styles.inputBox}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. Entoto Park Trailhead"
-              placeholderTextColor={colors.outline}
-              value={form.location}
-              onChangeText={(v) => updateField('location', v)}
-            />
-            <MaterialIcons name="location-on" size={20} color={colors.secondary} />
-          </View>
-        </View>
+        {/* Location with Free Map Picker */}
+        <LocationInput
+          label="LOCATION / MEETING POINT"
+          value={form.locationName || form.location}
+          latitude={form.latitude}
+          longitude={form.longitude}
+          placeholder="e.g. Entoto Park Trailhead or tap map pin"
+          hint="Places this event on the 3D Explore Globe"
+          onChangeLocation={(loc) => {
+            updateField('location', loc.name);
+            updateField('locationName', loc.name);
+            updateField('latitude', loc.latitude);
+            updateField('longitude', loc.longitude);
+          }}
+        />
 
         {/* Date & Time with Interactive Pickers */}
         <View style={styles.twoCols}>

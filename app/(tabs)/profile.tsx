@@ -749,12 +749,28 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Compact Trust Badge */}
-          <View style={styles.trustBadge}>
-            <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
-            <Text style={styles.trustBadgeText}>
-              Trust Score: {user?.trust_score ?? 50}
-            </Text>
+          {/* Badges Row: Trust Score & Permanent Location Pill */}
+          <View style={styles.badgesRow}>
+            <View style={styles.trustBadge}>
+              <MaterialIcons name="verified" size={14} color={colors.primaryContainer} />
+              <Text style={styles.trustBadgeText}>
+                Trust Score: {user?.trust_score ?? 50}
+              </Text>
+            </View>
+
+            {(user?.location?.placeName || user?.location?.name) && (
+              <View style={styles.locationBadge}>
+                <MaterialIcons
+                  name={Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? 'lock' : 'place'}
+                  size={14}
+                  color={Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? colors.outline : colors.primaryContainer}
+                />
+                <Text style={styles.trustBadgeText} numberOfLines={1}>
+                  {user?.location?.placeName || user?.location?.name}
+                  {Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? ' (Private)' : ''}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -1588,6 +1604,14 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     fontWeight: '600',
     marginTop: Spacing.xs,
   },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
   trustBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1596,9 +1620,20 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     paddingVertical: 3,
     borderRadius: BorderRadius.full,
     gap: 4,
-    marginTop: 8,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLow,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    maxWidth: 200,
   },
   trustBadgeText: {
     ...Typography.captionSm,

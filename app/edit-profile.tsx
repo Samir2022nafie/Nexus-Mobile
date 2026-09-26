@@ -28,6 +28,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { usersService } from '../src/services/users';
 import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { LocationInput } from '../src/components/ui/LocationInput';
 
 export default function EditProfileScreen() {
   const router = useSafeRouter();
@@ -41,6 +42,10 @@ export default function EditProfileScreen() {
     lastName: user?.last_name || '',
     bio: user?.bio || '',
     profilePictureUrl: user?.profile_picture_url || '',
+    locationName: user?.location?.placeName || user?.location?.name || '',
+    latitude: user?.location?.latitude ?? (null as number | null),
+    longitude: user?.location?.longitude ?? (null as number | null),
+    isLocationPrivate: Boolean(user?.isLocationPrivate ?? user?.is_location_private),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -54,6 +59,11 @@ export default function EditProfileScreen() {
         lastName: form.lastName.trim(),
         bio: form.bio.trim(),
         profilePictureUrl: form.profilePictureUrl.trim() ? form.profilePictureUrl.trim() : (null as any),
+        locationId: user?.location?.id || (user as any)?.location_id || undefined,
+        locationName: form.locationName.trim() || undefined,
+        latitude: form.latitude ?? undefined,
+        longitude: form.longitude ?? undefined,
+        isLocationPrivate: form.isLocationPrivate,
       });
       updateUser(updated);
       router.back();
@@ -209,6 +219,31 @@ export default function EditProfileScreen() {
                 <MaterialIcons name="link" size={18} color={colors.tertiary} />
               )}
             </View>
+          </View>
+
+          {/* Location & Privacy */}
+          <View style={styles.fieldGroup}>
+            <LocationInput
+              label="YOUR CITY / LOCATION"
+              value={form.locationName}
+              latitude={form.latitude}
+              longitude={form.longitude}
+              placeholder="Select your city or hometown..."
+              hint="Displayed as a pill on your profile page"
+              onChangeLocation={(loc) => {
+                setForm((p) => ({
+                  ...p,
+                  locationName: loc.name,
+                  latitude: loc.latitude ?? null,
+                  longitude: loc.longitude ?? null,
+                }));
+              }}
+              showPrivacyToggle={true}
+              isPrivate={form.isLocationPrivate}
+              onPrivacyChange={(val) => setForm((p) => ({ ...p, isLocationPrivate: val }))}
+              privacyLabel="Keep location private"
+              privacyHint="Hide your city from other users on your profile and map"
+            />
           </View>
         </View>
       </ScrollView>

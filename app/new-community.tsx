@@ -24,6 +24,7 @@ import { communitiesService } from '../src/services/communities';
 import { ApiRequestError } from '../src/services/api';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { LocationInput } from '../src/components/ui/LocationInput';
 
 export default function NewCommunityScreen() {
   const router = useRouter();
@@ -42,6 +43,9 @@ export default function NewCommunityScreen() {
     profilePictureUrl: '',
     bannerUrl: '',
     isPrivate: false,
+    locationName: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -63,6 +67,9 @@ export default function NewCommunityScreen() {
             profilePictureUrl: c.profile_picture_url || (c as any).profilePictureUrl || '',
             bannerUrl: c.banner_url || (c as any).bannerUrl || '',
             isPrivate: Boolean(c.is_private ?? (c as any).isPrivate),
+            locationName: (c as any).location?.place_name || (c as any).location?.placeName || (c as any).location?.name || '',
+            latitude: (c as any).location?.latitude ?? null,
+            longitude: (c as any).location?.longitude ?? null,
           });
         }
       })
@@ -113,6 +120,9 @@ export default function NewCommunityScreen() {
           isPrivate: form.isPrivate,
           profilePictureUrl: form.profilePictureUrl.trim() || undefined,
           bannerUrl: form.bannerUrl.trim() || undefined,
+          locationName: form.locationName.trim() || undefined,
+          latitude: form.latitude ?? undefined,
+          longitude: form.longitude ?? undefined,
         } as any);
       } else {
         await communitiesService.create({
@@ -124,6 +134,9 @@ export default function NewCommunityScreen() {
           categoryId: form.categoryId,
           profilePictureUrl: form.profilePictureUrl.trim() || undefined,
           bannerUrl: form.bannerUrl.trim() || undefined,
+          locationName: form.locationName.trim() || undefined,
+          latitude: form.latitude ?? undefined,
+          longitude: form.longitude ?? undefined,
         });
       }
       router.back();
@@ -248,6 +261,21 @@ export default function NewCommunityScreen() {
             />
           </View>
         </View>
+
+        {/* Location Selection */}
+        <LocationInput
+          label="COMMUNITY LOCATION / HEADQUARTERS"
+          value={form.locationName}
+          latitude={form.latitude}
+          longitude={form.longitude}
+          placeholder="Select city, campus, or area..."
+          hint="Places this hub on the 3D Explore Globe"
+          onChangeLocation={(loc) => {
+            updateField('locationName', loc.name);
+            updateField('latitude', loc.latitude);
+            updateField('longitude', loc.longitude);
+          }}
+        />
 
         {/* Community Rules */}
         <View style={styles.fieldGroup}>

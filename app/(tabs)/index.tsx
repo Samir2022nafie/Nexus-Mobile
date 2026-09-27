@@ -662,28 +662,30 @@ export default function HomeScreen() {
                             {cat.dateText}
                           </Text>
                         </View>
-                        <View style={styles.metaItem}>
-                          <MaterialIcons name="group" size={13} color={colors.secondary} />
-                          <Text style={styles.metaTextSec}>
-                            {`${event.participantsCount ?? event.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
-                          </Text>
-                        </View>
-                        {(() => {
-                          const coords = extractItemCoordinates(event);
-                          if (userLocation && coords) {
-                            const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
-                            const txt = formatDistance(d);
-                            if (txt) {
-                              return (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6, marginLeft: 'auto' }}>
-                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
-                                </View>
-                              );
+                        <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                          {(() => {
+                            const coords = extractItemCoordinates(event);
+                            if (userLocation && coords) {
+                              const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
+                              const txt = formatDistance(d);
+                              if (txt) {
+                                return (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
+                                    <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
+                                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                  </View>
+                                );
+                              }
                             }
-                          }
-                          return null;
-                        })()}
+                            return null;
+                          })()}
+                          <View style={styles.metaItem}>
+                            <MaterialIcons name="group" size={13} color={colors.secondary} />
+                            <Text style={styles.metaTextSec}>
+                              {`${event.participantsCount ?? event.participantCount ?? 0} ${cat.isPassed ? 'went' : 'going'}`}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
                   </TouchableOpacity>
@@ -790,22 +792,25 @@ export default function HomeScreen() {
                       <Text style={styles.hangoutTitle} numberOfLines={2}>
                         {hangout.title}
                       </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-                        <View style={styles.hangoutScheduleRow}>
-                          <MaterialIcons
-                            name="schedule"
-                            size={13}
-                            color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
-                          />
-                          <Text
-                            style={[
-                              styles.hangoutScheduleText,
-                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
-                            ]}
-                          >
-                            {cat.dateText}
-                          </Text>
-                        </View>
+                      <View style={styles.hangoutScheduleRow}>
+                        <MaterialIcons
+                          name="schedule"
+                          size={13}
+                          color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
+                        />
+                        <Text
+                          style={[
+                            styles.hangoutScheduleText,
+                            cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                          ]}
+                        >
+                          {cat.dateText}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.hangoutFooter}>
+                      <View style={{ gap: 3, justifyContent: 'center', flexShrink: 1 }}>
                         {(() => {
                           const coords = extractItemCoordinates(hangout);
                           if (userLocation && coords) {
@@ -813,7 +818,7 @@ export default function HomeScreen() {
                             const txt = formatDistance(d);
                             if (txt) {
                               return (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6, alignSelf: 'flex-start' }}>
                                   <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
                                   <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
                                 </View>
@@ -822,20 +827,17 @@ export default function HomeScreen() {
                           }
                           return null;
                         })()}
+                        {(() => {
+                          const pCount = hangout.participantsCount ?? hangout.participantCount ?? 0;
+                          const rawMax = hangout.maxParticipants ?? hangout.max_participants;
+                          const hasLimit = typeof rawMax === 'number' && rawMax > 0;
+                          return (
+                            <Text style={styles.hangoutSpotsText}>
+                              {hangout.spotsText || (hasLimit ? `${pCount}/${rawMax} spots` : `${pCount} going`)}
+                            </Text>
+                          );
+                        })()}
                       </View>
-                    </View>
-
-                    <View style={styles.hangoutFooter}>
-                      {(() => {
-                        const pCount = hangout.participantsCount ?? hangout.participantCount ?? 0;
-                        const rawMax = hangout.maxParticipants ?? hangout.max_participants;
-                        const hasLimit = typeof rawMax === 'number' && rawMax > 0;
-                        return (
-                          <Text style={styles.hangoutSpotsText}>
-                            {hangout.spotsText || (hasLimit ? `${pCount}/${rawMax} spots` : `${pCount} going`)}
-                          </Text>
-                        );
-                      })()}
                       <TouchableOpacity
                         style={[
                           styles.hangoutActionIconBtn,
@@ -1088,7 +1090,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     // Section 3: Hangouts — Square cards (~180x180)
     hangoutCardSquare: {
       width: 180,
-      height: 180,
+      minHeight: 184,
       backgroundColor: isDark ? colors.surfaceContainer : colors.tertiaryFixed,
       borderRadius: BorderRadius.xl,
       padding: Spacing.md,

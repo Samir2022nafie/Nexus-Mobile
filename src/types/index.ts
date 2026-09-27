@@ -150,6 +150,10 @@ export interface Community {
   memberCount: number;
   isMember?: boolean;
   myRole?: CommunityRole | null;
+  locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  location?: any;
   category: {
     id: string;
     name: string;

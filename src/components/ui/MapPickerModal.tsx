@@ -19,6 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { Colors, Typography, BorderRadius, Spacing, Shadows } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
+import { useUserLocation } from '../../context/LocationContext';
 
 export interface LocationResult {
   name: string;
@@ -47,7 +48,9 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
+  const { userLocation, requestLocation, isLoadingLocation } = useUserLocation();
   const webViewRef = useRef<WebView>(null);
+  const [locatingGps, setLocatingGps] = useState<boolean>(false);
 
   // Selected state
   const [selectedCoords, setSelectedCoords] = useState<{ lat: number; lng: number }>({
@@ -181,9 +184,50 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
     setShowSearchResults(false);
     setSearchQuery('');
 
-    // Pan map
-    const script = `if (window.map) { window.map.setView([${lat}, ${lng}], 15); if (window.marker) window.marker.setLatLng([${lat}, ${lng}]); } true;`;
+    // Pan map to new search selection
+    const script = `if (window.map) {
+      window.map.flyTo({ center: [${lng}, ${lat}], zoom: 15, essential: true });
+      if (window.marker) window.marker.setLngLat([${lng}, ${lat}]);
+    } true;`;
     webViewRef.current?.injectJavaScript(script);
+  };
+
+  const handleFlyToGpsLocation = async () => {
+    if (userLocation?.latitude && userLocation?.longitude) {
+      const lat = userLocation.latitude;
+      const lng = userLocation.longitude;
+      setSelectedCoords({ lat, lng });
+      reverseGeocode(lat, lng);
+      const js = `if (window.map) {
+        window.map.flyTo({ center: [${lng}, ${lat}], zoom: 15, essential: true });
+        if (window.marker) window.marker.setLngLat([${lng}, ${lat}]);
+      } true;`;
+      webViewRef.current?.injectJavaScript(js);
+    }
+    setLocatingGps(true);
+    try {
+      const loc = await requestLocation(true, true);
+      if (loc?.latitude && loc?.longitude) {
+        setSelectedCoords({ lat: loc.latitude, lng: loc.longitude });
+        reverseGeocode(loc.latitude, loc.longitude);
+        const js = `if (window.map) {
+          window.map.flyTo({ center: [${loc.longitude}, ${loc.latitude}], zoom: 15, essential: true });
+          if (window.marker) window.marker.setLngLat([${loc.longitude}, ${loc.latitude}]);
+        } true;`;
+        webViewRef.current?.injectJavaScript(js);
+      }
+    } catch (e) {
+      console.warn('GPS location error in picker:', e);
+    } finally {
+      setLocatingGps(false);
+    }
+  };
+
+  const handleResetGlobe = () => {
+    const js = `if (window.map) {
+      window.map.flyTo({ center: [20, 20], zoom: 1.5, pitch: 0, bearing: 0, essential: true });
+    } true;`;
+    webViewRef.current?.injectJavaScript(js);
   };
 
   const handleConfirm = () => {
@@ -197,69 +241,239 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
 
   const initialLat = initialLocation?.latitude ?? 40.7128;
   const initialLng = initialLocation?.longitude ?? -74.006;
-  // 100% Free OpenStreetMap standard tiles (Zero API keys, zero watermarks)
-  const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // Free OpenFreeMap vector styles: Dark mode style for dark theme, Liberty style for light theme
+  const mapStyleUrl = isDark
+    ? 'https://tiles.openfreemap.org/styles/dark'
+    : 'https://tiles.openfreemap.org/styles/liberty';
 
   const mapHtml = `
     <!DOCTYPE html>
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body, html, #map { width: 100%; height: 100%; background: ${isDark ? '#121212' : '#f5f5f5'}; overflow: hidden; }
-          ${isDark ? `
-          .leaflet-tile-pane {
-            filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(110%);
+          body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: ${isDark ? '#02040a' : '#f8f9fa'};
           }
-          ` : ''}
-          .custom-pin {
-            width: 32px;
-            height: 32px;
+          #map {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            background: transparent !important;
+          }
+          .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { display: none !important; }
+
+          /* Cosmic Starry Atmosphere for Dark Mode */
+          .cosmos-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at 50% 50%, #0d1538 0%, #070c20 60%, #02040a 100%);
+            z-index: 0;
+            pointer-events: none;
+          }
+          .cosmos-stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+              radial-gradient(1.2px 1.2px at 30px 40px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 100px 140px, #38bdf8, transparent),
+              radial-gradient(1px 1px at 170px 80px, #ffffff, transparent),
+              radial-gradient(2px 2px at 230px 210px, #fde047, transparent),
+              radial-gradient(1.2px 1.2px at 340px 90px, #ffffff, transparent),
+              radial-gradient(1.8px 1.8px at 290px 260px, #38bdf8, transparent),
+              radial-gradient(1px 1px at 110px 310px, #ffffff, transparent),
+              radial-gradient(2px 2px at 200px 360px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 360px 330px, #fde047, transparent);
+            background-repeat: repeat;
+            background-size: 380px 380px;
+            opacity: 0.85;
+            pointer-events: none;
+            z-index: 0;
+          }
+          .cosmos-atmosphere {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 360px;
+            height: 360px;
+            transform: translate(-50%, -50%);
             border-radius: 50%;
-            background: #8b5cf6;
-            border: 3px solid #ffffff;
-            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(99, 102, 241, 0.14) 50%, transparent 72%);
+            filter: blur(28px);
+            pointer-events: none;
+            z-index: 0;
+          }
+
+          /* Interactive Location Pin (Explore/Nexus Gold Pin) - Anchored at tip via MapLibre anchor: bottom */
+          .picker-pin-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: grab;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+          }
+          .picker-pin-wrap:active { cursor: grabbing; }
+          .picker-pin-body {
+            width: 38px;
+            height: 38px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            background: #e8a736;
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 4px 16px rgba(232, 167, 54, 0.75);
             display: flex;
             align-items: center;
             justify-content: center;
           }
-          .custom-pin::after {
-            content: '';
-            width: 10px;
-            height: 10px;
-            background: #ffffff;
+          .picker-pin-inner {
+            transform: rotate(45deg);
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
+            background: #201e1c;
           }
-          .leaflet-control-attribution { display: none !important; }
+          .picker-pin-shadow {
+            width: 18px;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 50%;
+            margin-top: 3px;
+          }
         </style>
       </head>
       <body>
+        ${isDark ? '<div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>' : ''}
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
         <script>
-          var map = L.map('map', {
-            zoomControl: false,
-            attributionControl: false
-          }).setView([${initialLat}, ${initialLng}], 14);
-
-          L.tileLayer('${tileUrl}', {
-            maxZoom: 19,
-            subdomains: 'abc'
-          }).addTo(map);
-
-          var pinIcon = L.divIcon({
-            className: 'custom-pin-wrap',
-            html: '<div class="custom-pin"></div>',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
+          var map = new maplibregl.Map({
+            container: 'map',
+            style: '${mapStyleUrl}',
+            center: [${initialLng}, ${initialLat}],
+            zoom: 14,
+            projection: { type: 'globe' },
+            antialias: true
           });
 
-          var marker = L.marker([${initialLat}, ${initialLng}], {
-            icon: pinIcon,
+          map.on('style.load', function() {
+            try {
+              map.setProjection({ type: 'globe' });
+            } catch(e) {}
+
+            var isDark = ${isDark ? 'true' : 'false'};
+            if (isDark) {
+              try {
+                if (map.getLayer('water')) {
+                  map.setPaintProperty('water', 'fill-color', '#0e1d44');
+                }
+                if (map.getLayer('background')) {
+                  map.setPaintProperty('background', 'background-color', '#131826');
+                }
+              } catch(e) {}
+            }
+
+            // Country Borders & Boundary Presentation:
+            // 1. Hide state, county, maritime, and sub-national clutter
+            // 2. Make country borders clearly visible, crisp, solid lines (removes blue dotted effect)
+            try {
+              var allStyleLayers = map.getStyle().layers || [];
+              allStyleLayers.forEach(function(l) {
+                if (!l.id) return;
+                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1;
+                if (!isBoundary) return;
+
+                var isCountryBorder = l.id === 'boundary_country' || 
+                                     l.id === 'boundary_country_z0-4' || 
+                                     (l.id.indexOf('country') !== -1 && l.type === 'line');
+
+                if (isCountryBorder) {
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'visible');
+                  } catch(e) {}
+                  try {
+                    // Remove dotted / dashed pattern so lines are solid and clean
+                    map.setPaintProperty(l.id, 'line-dasharray', null);
+                  } catch(e) {
+                    try { map.setPaintProperty(l.id, 'line-dasharray', [1, 0]); } catch(e2) {}
+                  }
+                  try {
+                    // High-contrast visible borders: luminous white in dark mode, crisp slate in light mode
+                    map.setPaintProperty(l.id, 'line-color', isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(30, 41, 59, 0.80)');
+                  } catch(e) {}
+                  try {
+                    var w = l.id.indexOf('z0-4') !== -1 ? 1.5 : 2.0;
+                    map.setPaintProperty(l.id, 'line-width', w);
+                  } catch(e) {}
+                  try {
+                    map.setPaintProperty(l.id, 'line-opacity', 0.95);
+                  } catch(e) {}
+                } else {
+                  // Hide county, state, maritime, and sub-national clutter
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'none');
+                  } catch(e) {}
+                }
+              });
+            } catch(e) {}
+
+            // Clean progressive labels
+            var labelConfigs = {
+              'place_country_major': { minzoom: 0, maxzoom: 6 },
+              'place_country_minor': { minzoom: 3.8, maxzoom: 8 },
+              'place_country_other': { minzoom: 4.8, maxzoom: 9 },
+              'place_state': { minzoom: 4.8, maxzoom: 12 },
+              'place_city_large': { minzoom: 5.2, maxzoom: 12 },
+              'place_city': { minzoom: 6.8, maxzoom: 14 },
+              'place_town': { minzoom: 9.0, maxzoom: 15 },
+              'place_village': { minzoom: 11.0, maxzoom: 15 },
+              'place_suburb': { minzoom: 12.0, maxzoom: 15 },
+              'place_other': { minzoom: 12.5, maxzoom: 15 }
+            };
+
+            Object.keys(labelConfigs).forEach(function(layerId) {
+              if (map.getLayer(layerId)) {
+                var cfg = labelConfigs[layerId];
+                try {
+                  map.setLayerZoomRange(layerId, cfg.minzoom, cfg.maxzoom);
+                  map.setLayoutProperty(layerId, 'text-field', [
+                    'coalesce',
+                    ['get', 'name:en'],
+                    ['get', 'name:latin'],
+                    ['get', 'name']
+                  ]);
+                  map.setLayoutProperty(layerId, 'text-padding', 10);
+                  map.setLayoutProperty(layerId, 'text-optional', true);
+                } catch(e) {}
+              }
+            });
+          });
+
+          var pinEl = document.createElement('div');
+          pinEl.className = 'picker-pin-wrap';
+          pinEl.innerHTML = '<div class="picker-pin-body"><div class="picker-pin-inner"></div></div><div class="picker-pin-shadow"></div>';
+
+          var marker = new maplibregl.Marker({
+            element: pinEl,
+            anchor: 'bottom',
             draggable: true
-          }).addTo(map);
+          })
+            .setLngLat([${initialLng}, ${initialLat}])
+            .addTo(map);
 
           window.map = map;
           window.marker = marker;
@@ -275,13 +489,13 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
           }
 
           map.on('click', function(e) {
-            marker.setLatLng(e.latlng);
-            sendLocation(e.latlng.lat, e.latlng.lng);
+            marker.setLngLat(e.lngLat);
+            sendLocation(e.lngLat.lat, e.lngLat.lng);
           });
 
-          marker.on('dragend', function(e) {
-            var latlng = marker.getLatLng();
-            sendLocation(latlng.lat, latlng.lng);
+          marker.on('dragend', function() {
+            var lngLat = marker.getLngLat();
+            sendLocation(lngLat.lat, lngLat.lng);
           });
         </script>
       </body>
@@ -358,6 +572,36 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
           <View style={styles.instructionsBadge}>
             <MaterialIcons name="touch-app" size={16} color="#ffffff" style={{ marginRight: 6 }} />
             <Text style={styles.instructionsText}>Tap map or drag pin to choose location</Text>
+          </View>
+
+          {/* Floating Actions: Reset to Globe and Current Phone GPS */}
+          <View style={styles.floatingControls}>
+            <TouchableOpacity
+              style={[
+                styles.floatingControlBtn,
+                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: '#e8a73680' },
+              ]}
+              onPress={handleResetGlobe}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="public" size={20} color="#e8a736" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.floatingControlBtn,
+                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: '#e8a73680' },
+              ]}
+              onPress={handleFlyToGpsLocation}
+              disabled={locatingGps || isLoadingLocation}
+              activeOpacity={0.8}
+            >
+              {locatingGps || isLoadingLocation ? (
+                <ActivityIndicator size="small" color="#e8a736" />
+              ) : (
+                <MaterialIcons name="my-location" size={20} color="#e8a736" />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -488,6 +732,23 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  floatingControls: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    flexDirection: 'column',
+    gap: 10,
+    zIndex: 10,
+  },
+  floatingControlBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    ...Shadows.md,
   },
   bottomSheet: {
     paddingHorizontal: Spacing.lg,

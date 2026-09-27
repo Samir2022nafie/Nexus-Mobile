@@ -625,7 +625,8 @@ export default function NewEventScreen() {
 
         {/* Location with Free Map Picker */}
         <LocationInput
-          label="LOCATION / MEETING POINT"
+          label="Event Location"
+          modalTitle="Event Location"
           value={form.locationName || form.location}
           latitude={form.latitude}
           longitude={form.longitude}

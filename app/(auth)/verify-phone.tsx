@@ -6,7 +6,8 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -20,7 +21,7 @@ import { OtpInput } from '../../src/components/ui/OtpInput';
 const OTP_LENGTH = 6;
 
 export default function VerifyPhoneScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     phone?: string;

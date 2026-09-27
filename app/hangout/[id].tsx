@@ -477,8 +477,24 @@ export default function HangoutDetailScreen() {
               </View>
             </View>
 
-            {/* Where */}
-            <View style={styles.infoCard}>
+            {/* Where (Tapping forwards to explore map and zooms in) */}
+            <TouchableOpacity
+              style={styles.infoCard}
+              onPress={() => {
+                const lat = hangout.location?.latitude ?? hangout.latitude;
+                const lng = hangout.location?.longitude ?? hangout.longitude;
+                router.push({
+                  pathname: '/(tabs)/hangouts',
+                  params: {
+                    focusId: String(hangout.id),
+                    focusType: 'hangouts',
+                    focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
+                    focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
+                  },
+                } as any);
+              }}
+              activeOpacity={0.8}
+            >
               <View style={styles.cardIconBox}>
                 <MaterialIcons name="pin-drop" size={22} color={colors.primaryContainer} />
               </View>
@@ -490,7 +506,8 @@ export default function HangoutDetailScreen() {
                   {locationDistrict}
                 </Text>
               </View>
-            </View>
+              <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginLeft: 'auto' }} />
+            </TouchableOpacity>
           </View>
 
           {/* Pending Join Requests for Host */}

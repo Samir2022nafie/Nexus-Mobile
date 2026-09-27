@@ -19,7 +19,7 @@ import {
   Dimensions,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -133,7 +133,7 @@ function PickerColumn({
 }
 
 export default function RegisterScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { register } = useAuth();
   const { colors, isDark } = useTheme();
@@ -696,7 +696,8 @@ export default function RegisterScreen() {
 
           {/* Location Selection & Privacy */}
           <LocationInput
-            label="Your City / Location"
+            label="Home Location"
+            modalTitle="Home Location"
             value={form.locationName}
             latitude={form.latitude}
             longitude={form.longitude}

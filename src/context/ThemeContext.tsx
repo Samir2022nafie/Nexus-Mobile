@@ -3,7 +3,7 @@
  * Provides colors, isDark flag, and useThemedStyles hook for reactive styling.
  */
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, Appearance, ColorSchemeName } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Colors, DarkColors, ThemeColors } from '../constants/theme';
 
@@ -20,7 +20,7 @@ interface ThemeContextValue {
 const THEME_STORAGE_KEY = 'nexus_theme_mode';
 
 const ThemeContext = createContext<ThemeContextValue>({
-  themeMode: 'light',
+  themeMode: 'system',
   isDark: false,
   colors: Colors,
   setThemeMode: () => {},
@@ -28,8 +28,27 @@ const ThemeContext = createContext<ThemeContextValue>({
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const systemScheme = useColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
+  const hookScheme = useColorScheme();
+  const [systemScheme, setSystemScheme] = useState<ColorSchemeName>(
+    Appearance.getColorScheme() || hookScheme || 'light'
+  );
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+
+  // Listen to OS-level Appearance change events in real time
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      if (colorScheme) {
+        setSystemScheme(colorScheme);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (hookScheme) {
+      setSystemScheme(hookScheme);
+    }
+  }, [hookScheme]);
 
   useEffect(() => {
     SecureStore.getItemAsync(THEME_STORAGE_KEY)
@@ -48,7 +67,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isDark = useMemo(() => {
     if (themeMode === 'system') {
-      return systemScheme === 'dark';
+      const activeSys = systemScheme || Appearance.getColorScheme() || 'light';
+      return activeSys === 'dark';
     }
     return themeMode === 'dark';
   }, [themeMode, systemScheme]);

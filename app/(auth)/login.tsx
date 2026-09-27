@@ -7,7 +7,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -18,7 +18,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { ApiRequestError } from '../../src/services/api';
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const { colors } = useTheme();

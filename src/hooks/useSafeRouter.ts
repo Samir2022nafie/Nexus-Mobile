@@ -5,9 +5,8 @@
 import { useRouter as useExpoRouter, Href } from 'expo-router';
 import { useCallback } from 'react';
 
-// Global navigation cooldown timestamp across all components
 let globalLastNavTime = 0;
-const DEFAULT_COOLDOWN_MS = 750;
+const DEFAULT_COOLDOWN_MS = 850;
 
 export function useSafeRouter() {
   const router = useExpoRouter();
@@ -48,11 +47,21 @@ export function useSafeRouter() {
     [router]
   );
 
+  const safeBack = useCallback(() => {
+    const now = Date.now();
+    if (now - globalLastNavTime < 450) {
+      return;
+    }
+    globalLastNavTime = now;
+    router.back();
+  }, [router]);
+
   return {
     ...router,
     push: safePush,
     navigate: safeNavigate,
     replace: safeReplace,
+    back: safeBack,
   };
 }
 

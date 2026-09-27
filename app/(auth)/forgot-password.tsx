@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -22,7 +22,7 @@ import authService from '../../src/services/auth';
 import { ApiRequestError } from '../../src/services/api';
 
 export default function ForgotPasswordScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useThemedStyles(getStyles);

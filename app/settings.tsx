@@ -151,37 +151,108 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* APPEARANCE SECTION */}
+        {/* APPEARANCE SECTION (System Default, Light Mode, Dark Mode) */}
         <View style={styles.section}>
           <Text style={styles.sectionHeading}>Appearance</Text>
           <View style={styles.sectionCard}>
-            <View style={styles.rowItem}>
+            {/* 1. System Default */}
+            <TouchableOpacity
+              style={styles.rowItem}
+              onPress={() => setThemeMode('system')}
+              activeOpacity={0.7}
+            >
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
                   <MaterialIcons
-                    name={isDark ? 'dark-mode' : 'light-mode'}
+                    name="settings-brightness"
                     size={18}
-                    color={colors.primary}
+                    color={themeMode === 'system' ? colors.primaryContainer : colors.outline}
                   />
                 </View>
                 <View style={styles.textCol}>
-                  <Text style={styles.rowTitle}>Dark Mode</Text>
+                  <Text
+                    style={[
+                      styles.rowTitle,
+                      themeMode === 'system' && { fontWeight: '700', color: colors.onSurface },
+                    ]}
+                  >
+                    System Default
+                  </Text>
                   <Text style={styles.rowSubtitle}>
-                    {themeMode === 'system'
-                      ? 'System mode'
-                      : isDark
-                      ? 'Dark theme active'
-                      : 'Light theme active'}
+                    Matches device setting ({isDark ? 'Dark mode' : 'Light mode'})
                   </Text>
                 </View>
               </View>
-              <Switch
-                value={isDark}
-                onValueChange={(val) => setThemeMode(val ? 'dark' : 'light')}
-                trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
-                thumbColor={colors.white}
-              />
-            </View>
+              <View style={[styles.radioOuter, themeMode === 'system' && styles.radioOuterActive]}>
+                {themeMode === 'system' && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.hairline} />
+
+            {/* 2. Light Mode */}
+            <TouchableOpacity
+              style={styles.rowItem}
+              onPress={() => setThemeMode('light')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowLeft}>
+                <View style={styles.iconCircle}>
+                  <MaterialIcons
+                    name="light-mode"
+                    size={18}
+                    color={themeMode === 'light' ? colors.primaryContainer : colors.outline}
+                  />
+                </View>
+                <View style={styles.textCol}>
+                  <Text
+                    style={[
+                      styles.rowTitle,
+                      themeMode === 'light' && { fontWeight: '700', color: colors.onSurface },
+                    ]}
+                  >
+                    Light Mode
+                  </Text>
+                  <Text style={styles.rowSubtitle}>Always use light theme</Text>
+                </View>
+              </View>
+              <View style={[styles.radioOuter, themeMode === 'light' && styles.radioOuterActive]}>
+                {themeMode === 'light' && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.hairline} />
+
+            {/* 3. Dark Mode */}
+            <TouchableOpacity
+              style={styles.rowItem}
+              onPress={() => setThemeMode('dark')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.rowLeft}>
+                <View style={styles.iconCircle}>
+                  <MaterialIcons
+                    name="dark-mode"
+                    size={18}
+                    color={themeMode === 'dark' ? colors.primaryContainer : colors.outline}
+                  />
+                </View>
+                <View style={styles.textCol}>
+                  <Text
+                    style={[
+                      styles.rowTitle,
+                      themeMode === 'dark' && { fontWeight: '700', color: colors.onSurface },
+                    ]}
+                  >
+                    Dark Mode
+                  </Text>
+                  <Text style={styles.rowSubtitle}>Always use dark theme</Text>
+                </View>
+              </View>
+              <View style={[styles.radioOuter, themeMode === 'dark' && styles.radioOuterActive]}>
+                {themeMode === 'dark' && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -368,5 +439,23 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       height: 1,
       backgroundColor: colors.surfaceVariant,
       marginHorizontal: Spacing.md,
+    },
+    radioOuter: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 2,
+      borderColor: colors.outline,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioOuterActive: {
+      borderColor: colors.primaryContainer,
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primaryContainer,
     },
   });

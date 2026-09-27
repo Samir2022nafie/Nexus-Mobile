@@ -224,7 +224,8 @@ export default function EditProfileScreen() {
           {/* Location & Privacy */}
           <View style={styles.fieldGroup}>
             <LocationInput
-              label="YOUR CITY / LOCATION"
+              label="Home Location"
+              modalTitle="Home Location"
               value={form.locationName}
               latitude={form.latitude}
               longitude={form.longitude}

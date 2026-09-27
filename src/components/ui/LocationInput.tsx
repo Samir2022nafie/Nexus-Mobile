@@ -33,6 +33,7 @@ interface LocationInputProps {
   error?: string;
   hint?: string;
   onChangeLocation?: (location: LocationData) => void;
+  modalTitle?: string;
   // Privacy toggle (for User registration and profile edit)
   showPrivacyToggle?: boolean;
   isPrivate?: boolean;
@@ -43,6 +44,7 @@ interface LocationInputProps {
 
 export const LocationInput: React.FC<LocationInputProps> = ({
   label = 'Location',
+  modalTitle,
   value = '',
   latitude = null,
   longitude = null,
@@ -159,7 +161,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
           longitude,
           name: value,
         }}
-        title={`Select ${label}`}
+        title={modalTitle || `Select ${label}`}
       />
     </View>
   );

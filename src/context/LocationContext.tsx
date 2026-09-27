@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Platform, Alert } from 'react-native';
 import * as Location from 'expo-location';
 
@@ -11,7 +11,7 @@ interface LocationContextType {
   userLocation: GpsLocation | null;
   hasLocationPermission: boolean | null;
   isLoadingLocation: boolean;
-  requestLocation: (promptUser?: boolean) => Promise<GpsLocation | null>;
+  requestLocation: (promptUser?: boolean, forceFresh?: boolean) => Promise<GpsLocation | null>;
   refreshLocation: () => Promise<GpsLocation | null>;
 }
 
@@ -21,52 +21,84 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const [userLocation, setUserLocation] = useState<GpsLocation | null>(null);
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const lastFetchedAt = useRef<number>(0);
+  const cachedLocationRef = useRef<GpsLocation | null>(null);
 
-  const fetchPosition = useCallback(async (): Promise<GpsLocation | null> => {
+  // Sync ref with state
+  useEffect(() => {
+    cachedLocationRef.current = userLocation;
+  }, [userLocation]);
+
+  const fetchPosition = useCallback(async (forceFresh: boolean = false): Promise<GpsLocation | null> => {
+    // If cached location is fresh (< 90s) and not forced, return immediately (saves GPS chip battery)
+    const now = Date.now();
+    if (!forceFresh && cachedLocationRef.current && now - lastFetchedAt.current < 90000) {
+      return cachedLocationRef.current;
+    }
+
     try {
       setIsLoadingLocation(true);
 
-      // Try quick last known position first
-      const lastKnown = await Location.getLastKnownPositionAsync();
-      if (lastKnown?.coords) {
-        const coords = {
-          latitude: lastKnown.coords.latitude,
-          longitude: lastKnown.coords.longitude,
-        };
-        setUserLocation(coords);
+      // 1. Try instantaneous last known position first (available in ~10ms from OS cache)
+      try {
+        const lastKnown = await Location.getLastKnownPositionAsync({ maxAge: 180000 });
+        if (lastKnown?.coords) {
+          const coords = {
+            latitude: lastKnown.coords.latitude,
+            longitude: lastKnown.coords.longitude,
+          };
+          setUserLocation(coords);
+          cachedLocationRef.current = coords;
+          lastFetchedAt.current = Date.now();
+
+          // If caller didn't strictly ask for fresh GPS or we already have high accuracy, return immediately
+          if (!forceFresh) {
+            return coords;
+          }
+        }
+      } catch (err) {
+        // Continue to fresh fetch
       }
 
-      // Then get fresh accurate position
-      const current = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+      // 2. Fresh GPS acquisition with strict 5-second timeout to prevent locking UI
+      const gpsPromise = Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // Optimal for mobile: uses WiFi + cellular + GPS without draining battery
       });
 
-      if (current?.coords) {
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5000);
+      });
+
+      const current = await Promise.race([gpsPromise, timeoutPromise]);
+
+      if (current && 'coords' in current && current.coords) {
         const coords = {
           latitude: current.coords.latitude,
           longitude: current.coords.longitude,
         };
         setUserLocation(coords);
+        cachedLocationRef.current = coords;
+        lastFetchedAt.current = Date.now();
         return coords;
       }
 
-      return userLocation;
+      return cachedLocationRef.current;
     } catch (err) {
       console.warn('Could not get GPS position:', err);
-      return userLocation;
+      return cachedLocationRef.current;
     } finally {
       setIsLoadingLocation(false);
     }
-  }, [userLocation]);
+  }, []);
 
   const requestLocation = useCallback(
-    async (promptUser: boolean = true): Promise<GpsLocation | null> => {
+    async (promptUser: boolean = true, forceFresh: boolean = false): Promise<GpsLocation | null> => {
       try {
         const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
 
         if (existingStatus === 'granted') {
           setHasLocationPermission(true);
-          return await fetchPosition();
+          return await fetchPosition(forceFresh);
         }
 
         if (!promptUser) {
@@ -77,7 +109,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           setHasLocationPermission(true);
-          return await fetchPosition();
+          return await fetchPosition(forceFresh);
         } else {
           setHasLocationPermission(false);
           if (promptUser && Platform.OS !== 'web') {
@@ -98,7 +130,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshLocation = useCallback(async (): Promise<GpsLocation | null> => {
-    return await requestLocation(false);
+    return await requestLocation(false, true);
   }, [requestLocation]);
 
   // Check initial permission quietly on mount
@@ -107,7 +139,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       .then(({ status }) => {
         if (status === 'granted') {
           setHasLocationPermission(true);
-          fetchPosition();
+          fetchPosition(false);
         } else {
           setHasLocationPermission(false);
         }

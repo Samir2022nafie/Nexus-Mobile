@@ -46,6 +46,16 @@ export const Button: React.FC<ButtonProps> = ({
   const styles = useThemedStyles(getStyles);
   const isDisabled = disabled || loading;
 
+  const lastPressRef = React.useRef<number>(0);
+  const handlePress = React.useCallback(() => {
+    const now = Date.now();
+    if (now - lastPressRef.current < 650) {
+      return;
+    }
+    lastPressRef.current = now;
+    onPress();
+  }, [onPress]);
+
   const spinnerColor =
     variant === 'outlined' || variant === 'text' || variant === 'tonal'
       ? colors.primaryContainer
@@ -53,7 +63,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={handlePress}
       disabled={isDisabled}
       activeOpacity={0.8}
       style={[

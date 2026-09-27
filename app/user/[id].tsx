@@ -252,12 +252,28 @@ export default function PublicUserProfileScreen() {
             </View>
 
             {!profile.isLocationPrivate && !profile.is_location_private && (profile.location?.placeName || profile.location?.name) && (
-              <View style={[styles.trustBadge, { marginTop: 0 }]}>
+              <TouchableOpacity
+                style={[styles.trustBadge, { marginTop: 0 }]}
+                onPress={() => {
+                  const lat = (profile.location as any)?.latitude;
+                  const lng = (profile.location as any)?.longitude;
+                  router.push({
+                    pathname: '/(tabs)/hangouts',
+                    params: {
+                      focusId: String(profile.id),
+                      focusType: 'users',
+                      focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
+                      focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
+                    },
+                  } as any);
+                }}
+                activeOpacity={0.8}
+              >
                 <MaterialIcons name="place" size={14} color={colors.primaryContainer} />
                 <Text style={styles.trustBadgeText} numberOfLines={1}>
                   {profile.location?.placeName || profile.location?.name}
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
 

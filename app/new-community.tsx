@@ -264,7 +264,8 @@ export default function NewCommunityScreen() {
 
         {/* Location Selection */}
         <LocationInput
-          label="COMMUNITY LOCATION / HEADQUARTERS"
+          label="Community Location"
+          modalTitle="Community Location"
           value={form.locationName}
           latitude={form.latitude}
           longitude={form.longitude}

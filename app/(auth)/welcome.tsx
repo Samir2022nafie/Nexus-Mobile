@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -17,7 +17,7 @@ const WELCOME_HERO =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuA0ZLL5dwN_CPiowRNA0XWW94Z1vWxKaW7eWHKrXQ2YbAp_t7UZ0cs-zO_t1m-i4iLdjA2NMc7Fsu7u2OA72VxobCD57aMw4HzhF6GwdgNcxkd6CXsxoOviZ-apLXjbpYLE0uoAqDINhHbgOKfjbRz4Cgb9_SKMfq8xvjlR0_Y9HWhw1a5q1VMKSYIXeJmKydbjIiJ-1O4w31up59n3AeDqqAsI2dElSSLXLpkVz8NhIuEzE1uYzoU3BQ';
 
 export default function WelcomeScreen() {
-  const router = useRouter();
+  const router = useSafeRouter();
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const styles = useThemedStyles(getStyles);

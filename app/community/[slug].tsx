@@ -514,6 +514,41 @@ export default function CommunityDetailScreen() {
               </View>
             </View>
 
+            {/* Clickable Community Location Pill */}
+            {(() => {
+              const locName =
+                community.locationName ||
+                (community as any).location?.name ||
+                (community as any).location?.place_name ||
+                (typeof (community as any).location === 'string' ? (community as any).location : null);
+              if (!locName) return null;
+              return (
+                <TouchableOpacity
+                  style={styles.locationPillBtn}
+                  onPress={() => {
+                    const lat = community.latitude ?? (community as any).location?.latitude;
+                    const lng = community.longitude ?? (community as any).location?.longitude;
+                    router.push({
+                      pathname: '/(tabs)/hangouts',
+                      params: {
+                        focusId: String(community.id || community.slug),
+                        focusType: 'communities',
+                        focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
+                        focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
+                      },
+                    } as any);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons name="place" size={14} color="#e8a736" style={{ marginRight: 4 }} />
+                  <Text style={styles.locationPillText} numberOfLines={1}>
+                    {locName}
+                  </Text>
+                  <MaterialIcons name="chevron-right" size={15} color="#e8a736" style={{ marginLeft: 3 }} />
+                </TouchableOpacity>
+              );
+            })()}
+
             {/* Row 2: Bio max 2 lines with '...', tap text directly to expand/collapse (no arrows) */}
             <TouchableOpacity
               onPress={() => setDescExpanded(!descExpanded)}
@@ -924,6 +959,24 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   memberCountText: {
     ...Typography.captionMd,
     color: colors.tertiary,
+  },
+  locationPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.15)' : 'rgba(232, 167, 54, 0.12)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(232, 167, 54, 0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.full,
+    marginBottom: 8,
+  },
+  locationPillText: {
+    ...Typography.captionMd,
+    color: '#e8a736',
+    fontWeight: '700',
+    maxWidth: 220,
   },
 
   // Row 2: Bio

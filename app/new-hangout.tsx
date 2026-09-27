@@ -397,7 +397,8 @@ export default function NewHangoutScreen() {
 
         {/* Location with Free Map Picker */}
         <LocationInput
-          label="LOCATION / VENUE"
+          label="Hangout Location"
+          modalTitle="Hangout Location"
           value={form.locationName || form.location}
           latitude={form.latitude}
           longitude={form.longitude}

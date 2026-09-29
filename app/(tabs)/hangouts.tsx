@@ -643,28 +643,38 @@ export default function ExploreMapScreen() {
           }
           .cosmos-stars {
             position: absolute;
-            inset: -350px;
+            inset: -400px;
             background-image: 
-              radial-gradient(2.5px 2.5px at 25px 35px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(3.5px 3.5px at 140px 75px, #ffffff, rgba(255,255,255,0.4) 50%, rgba(0,0,0,0)),
-              radial-gradient(2.2px 2.2px at 80px 180px, #fde047, rgba(0,0,0,0)),
-              radial-gradient(3px 3px at 280px 130px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 220px 290px, #93c5fd, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 45px 260px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(3.2px 3.2px at 320px 40px, #e0f2fe, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 190px 170px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 110px 310px, #fed7aa, rgba(0,0,0,0)),
-              radial-gradient(3.5px 3.5px at 50px 120px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
-              radial-gradient(2.2px 2.2px at 165px 230px, #93c5fd, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 310px 250px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 260px 320px, #fde047, rgba(0,0,0,0)),
-              radial-gradient(3px 3px at 340px 180px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2px 2px at 15px 210px, #bae6fd, rgba(0,0,0,0)),
-              radial-gradient(3px 3px at 130px 15px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 240px 85px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.2px 2.2px at 300px 335px, #fef08a, rgba(0,0,0,0));
+              radial-gradient(4.5px 4.5px at 28px 36px, #ffffff, rgba(255,255,255,0.7) 40%, rgba(0,0,0,0)),
+              radial-gradient(3.8px 3.8px at 145px 78px, #38bdf8, rgba(56,189,248,0.5) 45%, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 82px 185px, #fde047, rgba(0,0,0,0)),
+              radial-gradient(4.2px 4.2px at 278px 128px, #ffffff, rgba(255,255,255,0.6) 40%, rgba(0,0,0,0)),
+              radial-gradient(3.2px 3.2px at 218px 288px, #93c5fd, rgba(0,0,0,0)),
+              radial-gradient(2.6px 2.6px at 48px 258px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(4.5px 4.5px at 318px 42px, #e0f2fe, rgba(224,242,254,0.6) 40%, rgba(0,0,0,0)),
+              radial-gradient(3px 3px at 188px 168px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.6px 2.6px at 112px 308px, #fed7aa, rgba(0,0,0,0)),
+              radial-gradient(4.2px 4.2px at 52px 122px, #ffffff, rgba(255,255,255,0.7) 35%, rgba(0,0,0,0)),
+              radial-gradient(2.8px 2.8px at 168px 228px, #93c5fd, rgba(0,0,0,0)),
+              radial-gradient(3.5px 3.5px at 308px 248px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.6px 2.6px at 258px 318px, #fde047, rgba(0,0,0,0)),
+              radial-gradient(4px 4px at 338px 178px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
+              radial-gradient(2.6px 2.6px at 16px 208px, #bae6fd, rgba(0,0,0,0)),
+              radial-gradient(4.5px 4.5px at 128px 18px, #ffffff, rgba(255,255,255,0.7) 35%, rgba(0,0,0,0)),
+              radial-gradient(3.2px 3.2px at 238px 88px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.8px 2.8px at 298px 332px, #fef08a, rgba(0,0,0,0)),
+              radial-gradient(3.8px 3.8px at 95px 65px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 175px 45px, #38bdf8, rgba(0,0,0,0)),
+              radial-gradient(4.5px 4.5px at 60px 290px, #ffffff, rgba(255,255,255,0.6) 45%, rgba(0,0,0,0)),
+              radial-gradient(2.8px 2.8px at 245px 195px, #fed7aa, rgba(0,0,0,0)),
+              radial-gradient(3.6px 3.6px at 15px 95px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 195px 260px, #93c5fd, rgba(0,0,0,0)),
+              radial-gradient(4.2px 4.2px at 285px 215px, #ffffff, rgba(255,255,255,0.6) 40%, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 135px 270px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(3.8px 3.8px at 215px 115px, #fde047, rgba(253,224,71,0.5) 40%, rgba(0,0,0,0)),
+              radial-gradient(2.8px 2.8px at 30px 160px, #bae6fd, rgba(0,0,0,0));
             background-repeat: repeat;
-            background-size: 350px 350px;
+            background-size: 320px 320px;
             opacity: 1;
             will-change: transform;
             transition: transform 0.05s linear;
@@ -674,6 +684,23 @@ export default function ExploreMapScreen() {
             inset: 0;
             background: radial-gradient(circle at center, transparent 38%, rgba(2, 6, 23, 0.7) 72%, #02040a 100%);
             pointer-events: none;
+          }
+
+          /* Snapchat-style Soft Globe Atmospheric Halo Glow */
+          .globe-atmosphere-glow {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+            box-shadow: 
+              0 0 35px 14px rgba(56, 189, 248, 0.65),
+              0 0 75px 32px rgba(14, 165, 233, 0.42),
+              0 0 120px 58px rgba(2, 132, 199, 0.22);
+            opacity: 0;
+            transition: opacity 0.25s ease-out;
           }
 
           .marker-container {
@@ -1060,6 +1087,7 @@ export default function ExploreMapScreen() {
       </head>
       <body>
         <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>
+        <div id="globe-glow" class="globe-atmosphere-glow"></div>
         <div id="map"></div>
 
         <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
@@ -1097,6 +1125,32 @@ export default function ExploreMapScreen() {
           map.on('zoom', updateZoomScale);
           updateZoomScale();
 
+          // Requirement 1a: Soft glowing cyan-blue atmospheric aura around the globe like Snapchat
+          function updateGlobeGlow() {
+            var glowEl = document.getElementById('globe-glow');
+            if (!glowEl) return;
+            var z = map.getZoom();
+            if (z >= 4.2) {
+              glowEl.style.opacity = '0';
+              return;
+            }
+            var op = Math.max(0, Math.min(1, (4.2 - z) / 2.2));
+            glowEl.style.opacity = (op * 0.95).toFixed(2);
+            var container = map.getContainer();
+            var cx = container.clientWidth / 2;
+            var cy = container.clientHeight / 2;
+            var r = (512 * Math.pow(2, z)) / (2 * Math.PI);
+            var d = Math.round(r * 2);
+            glowEl.style.width = d + 'px';
+            glowEl.style.height = d + 'px';
+            glowEl.style.left = cx + 'px';
+            glowEl.style.top = cy + 'px';
+          }
+          map.on('zoom', updateGlobeGlow);
+          map.on('move', updateGlobeGlow);
+          map.on('resize', updateGlobeGlow);
+          updateGlobeGlow();
+
           // Requirement 1e: Starry background responsive to swiping / parallax like Snapchat
           function updateCosmicParallax() {
             var starEl = document.querySelector('.cosmos-stars');
@@ -1104,8 +1158,8 @@ export default function ExploreMapScreen() {
             var center = map.getCenter();
             var bearing = map.getBearing() || 0;
             var pitch = map.getPitch() || 0;
-            var shiftX = (center.lng * 2.2 + bearing * 0.9) % 350;
-            var shiftY = (center.lat * 2.2 + pitch * 0.6) % 350;
+            var shiftX = (center.lng * 3.4 + bearing * 1.4) % 320;
+            var shiftY = (center.lat * 3.4 + pitch * 1.0) % 320;
             starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
           }
           map.on('move', updateCosmicParallax);
@@ -2548,11 +2602,16 @@ export default function ExploreMapScreen() {
                   inputRange: [0, 1],
                   outputRange: [0.82, 1],
                 });
+                const itemOpacity = categoryStackAnim.interpolate({
+                  inputRange: [0, 0.4, 1],
+                  outputRange: [idx === 0 ? 0.9 : 0.25, 0.75, 1],
+                });
                 return (
                   <Animated.View
                     key={item.id}
                     style={{
                       transform: [{ translateY: itemTranslateY }, { scale: itemScale }],
+                      opacity: itemOpacity,
                     }}
                   >
                     <TouchableOpacity
@@ -2623,7 +2682,7 @@ export default function ExploreMapScreen() {
           style={[
             styles.cityPillsWrapper,
             {
-              bottom: Math.max(insets.bottom, 12) + 63,
+              bottom: Math.max(insets.bottom, 12) + 66,
               transform: [{ translateY: cityPillsSlideAnim }],
             },
           ]}
@@ -3089,7 +3148,7 @@ const styles = StyleSheet.create({
     zIndex: 95,
   },
   cityPillsContent: {
-    paddingLeft: 10,
+    paddingLeft: 6,
     paddingRight: Spacing.md,
     gap: 8,
     flexDirection: 'row',

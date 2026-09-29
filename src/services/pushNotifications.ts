@@ -1,24 +1,31 @@
 import { Platform } from 'react-native';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import notificationPreferences, { GlobalNotificationSettings } from './notificationPreferences';
 
 // Safe dynamic require for expo-notifications to prevent crash on Expo Go (SDK 53)
-let Notifications: typeof import('expo-notifications') | null = null;
-try {
-  Notifications = require('expo-notifications');
-  if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
+const isExpoGo =
+  Constants.appOwnership === 'expo' ||
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+let Notifications: any = null;
+if (!isExpoGo) {
+  try {
+    Notifications = require('expo-notifications');
+    if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    }
+  } catch (e) {
+    // Expo Go (SDK 53) removed native push notification modules
+    console.log('[PushNotificationService] Native push notifications not available in this environment.');
   }
-} catch (e) {
-  // Expo Go (SDK 53) removed native push notification modules
-  console.log('[PushNotificationService] Native push notifications not available in this environment.');
 }
 
 class PushNotificationService {

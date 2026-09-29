@@ -673,8 +673,8 @@ export default function HomeScreen() {
                         styles.leadershipExpandedContainer,
                         {
                           opacity: leadershipAnim.interpolate({
-                            inputRange: [0, 0.4, 1],
-                            outputRange: [0.6, 0.9, 1],
+                            inputRange: [0, 0.3, 1],
+                            outputRange: [0.5, 0.85, 1],
                           }),
                         },
                       ]}
@@ -690,11 +690,16 @@ export default function HomeScreen() {
                           inputRange: [0, 1],
                           outputRange: [idx === 0 ? 1 : 0.82, 1],
                         });
+                        const itemOpacity = leadershipAnim.interpolate({
+                          inputRange: [0, 0.4, 1],
+                          outputRange: [idx === 0 ? 0.9 : 0.3, 0.8, 1],
+                        });
                         return (
                           <Animated.View
                             key={comm.id}
                             style={{
                               transform: [{ translateX: itemTranslateX }, { scale: itemScale }],
+                              opacity: itemOpacity,
                             }}
                           >
                             <TouchableOpacity
@@ -734,7 +739,7 @@ export default function HomeScreen() {
                         onPress={handleCollapseLeadership}
                         activeOpacity={0.7}
                       >
-                        <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+                        <MaterialIcons name="chevron-left" size={20} color={colors.primary} />
                       </TouchableOpacity>
                     </Animated.View>
                   )}
@@ -1178,14 +1183,17 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
 
     // Section 1: Communities (Stories) — Enlarged 76x76, no yellow ring
     storiesSection: {
-      paddingTop: 10,
-      paddingBottom: Spacing.xs,
+      paddingTop: 8,
+      paddingBottom: 4,
+      height: 124,
       overflow: 'visible',
     },
     storiesCarousel: {
       paddingHorizontal: Spacing.md,
       gap: 16,
-      alignItems: 'center',
+      alignItems: 'flex-start',
+      paddingTop: 8,
+      height: 124,
     },
     storyItem: {
       alignItems: 'center',
@@ -1311,6 +1319,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       width: 86,
       marginRight: Spacing.sm,
+      paddingTop: 3,
     },
     communityStackContainer: {
       width: 76,
@@ -1362,26 +1371,29 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     leadershipExpandedContainer: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       backgroundColor: isDark ? 'rgba(232, 167, 54, 0.12)' : 'rgba(232, 167, 54, 0.16)',
       borderWidth: 1.5,
       borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.35)',
       borderRadius: 44,
       paddingHorizontal: 8,
-      paddingVertical: 0,
+      paddingTop: 3,
+      paddingBottom: 2,
       gap: 12,
       marginRight: 14,
+      alignSelf: 'flex-start',
     },
     stackCollapseChevronBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: colors.surface,
       borderWidth: 1.5,
       borderColor: colors.primaryContainer,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 4,
+      alignSelf: 'center',
+      marginRight: 2,
     },
 
     // Section 3: Hangouts — Square cards (~180x180)

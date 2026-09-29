@@ -511,37 +511,66 @@ export default function HangoutDetailScreen() {
               </View>
             </View>
 
-            {/* Where (Tapping forwards to explore map and zooms in) */}
-            <TouchableOpacity
-              style={styles.infoCard}
-              onPress={() => {
-                const lat = hangout.location?.latitude ?? hangout.latitude;
-                const lng = hangout.location?.longitude ?? hangout.longitude;
-                router.push({
-                  pathname: '/(tabs)/hangouts',
-                  params: {
-                    focusId: String(hangout.id),
-                    focusType: 'hangouts',
-                    focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
-                    focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
-                  },
-                } as any);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.cardIconBox}>
-                <MaterialIcons name="pin-drop" size={22} color={colors.primaryContainer} />
-              </View>
-              <View style={styles.cardTextCol}>
-                <Text style={styles.cardPrimaryText} numberOfLines={1}>
-                  {locationText}
-                </Text>
-                <Text style={styles.cardSecondaryText} numberOfLines={1}>
-                  {locationDistrict}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
+            {/* Where: clickable only if valid coordinates were chosen on map */}
+            {(() => {
+              const lat = hangout.location?.latitude ?? hangout.latitude;
+              const lng = hangout.location?.longitude ?? hangout.longitude;
+              const hasValidCoords =
+                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+
+              if (!hasValidCoords) {
+                return (
+                  <View style={styles.infoCard}>
+                    <View style={styles.cardIconBox}>
+                      <MaterialIcons name="pin-drop" size={22} color={colors.primaryContainer} />
+                    </View>
+                    <View style={styles.cardTextCol}>
+                      <Text style={styles.cardPrimaryText} numberOfLines={1}>
+                        {locationText}
+                      </Text>
+                      {locationDistrict ? (
+                        <Text style={styles.cardSecondaryText} numberOfLines={1}>
+                          {locationDistrict}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <TouchableOpacity
+                  style={styles.infoCard}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(tabs)/hangouts',
+                      params: {
+                        focusId: String(hangout.id),
+                        focusType: 'hangouts',
+                        focusLat: String(lat),
+                        focusLng: String(lng),
+                      },
+                    } as any);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.cardIconBox}>
+                    <MaterialIcons name="pin-drop" size={22} color={colors.primaryContainer} />
+                  </View>
+                  <View style={styles.cardTextCol}>
+                    <Text style={styles.cardPrimaryText} numberOfLines={1}>
+                      {locationText}
+                    </Text>
+                    {locationDistrict ? (
+                      <Text style={styles.cardSecondaryText} numberOfLines={1}>
+                        {locationDistrict}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              );
+            })()}
           </View>
 
           {/* Pending Join Requests for Host */}

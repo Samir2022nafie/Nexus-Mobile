@@ -426,37 +426,66 @@ export default function EventDetailScreen() {
               </View>
             </View>
 
-            {/* Card 2: Location (Tapping forwards to explore map and zooms in) */}
-            <TouchableOpacity
-              style={styles.infoCard}
-              onPress={() => {
-                const lat = event.location?.latitude ?? event.latitude;
-                const lng = event.location?.longitude ?? event.longitude;
-                router.push({
-                  pathname: '/(tabs)/hangouts',
-                  params: {
-                    focusId: String(event.id),
-                    focusType: 'events',
-                    focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
-                    focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
-                  },
-                } as any);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.cardIconBox}>
-                <MaterialIcons name="location-on" size={22} color={colors.secondary} />
-              </View>
-              <View style={styles.cardTextCol}>
-                <Text style={styles.cardPrimaryText} numberOfLines={1}>
-                  {locationName}
-                </Text>
-                <Text style={styles.cardSecondaryText} numberOfLines={1}>
-                  {locationDistrict}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginLeft: 'auto' }} />
-            </TouchableOpacity>
+            {/* Card 2: Location (clickable only if valid coordinates exist) */}
+            {(() => {
+              const lat = event.location?.latitude ?? event.latitude;
+              const lng = event.location?.longitude ?? event.longitude;
+              const hasValidCoords =
+                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+
+              if (!hasValidCoords) {
+                return (
+                  <View style={styles.infoCard}>
+                    <View style={styles.cardIconBox}>
+                      <MaterialIcons name="location-on" size={22} color={colors.secondary} />
+                    </View>
+                    <View style={styles.cardTextCol}>
+                      <Text style={styles.cardPrimaryText} numberOfLines={1}>
+                        {locationName}
+                      </Text>
+                      {locationDistrict ? (
+                        <Text style={styles.cardSecondaryText} numberOfLines={1}>
+                          {locationDistrict}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              }
+
+              return (
+                <TouchableOpacity
+                  style={styles.infoCard}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/(tabs)/hangouts',
+                      params: {
+                        focusId: String(event.id),
+                        focusType: 'events',
+                        focusLat: String(lat),
+                        focusLng: String(lng),
+                      },
+                    } as any);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.cardIconBox}>
+                    <MaterialIcons name="location-on" size={22} color={colors.secondary} />
+                  </View>
+                  <View style={styles.cardTextCol}>
+                    <Text style={styles.cardPrimaryText} numberOfLines={1}>
+                      {locationName}
+                    </Text>
+                    {locationDistrict ? (
+                      <Text style={styles.cardSecondaryText} numberOfLines={1}>
+                        {locationDistrict}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <MaterialIcons name="chevron-right" size={16} color={colors.outline} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+              );
+            })()}
           </View>
 
           {/* 5. Participants in a Unique Container */}

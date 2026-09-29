@@ -558,7 +558,7 @@ export default function CommunityDetailScreen() {
               </View>
             </View>
 
-            {/* Clickable Community Location Pill */}
+            {/* Community Location Pill */}
             {(() => {
               const locName =
                 community.locationName ||
@@ -566,19 +566,34 @@ export default function CommunityDetailScreen() {
                 (community as any).location?.place_name ||
                 (typeof (community as any).location === 'string' ? (community as any).location : null);
               if (!locName) return null;
+
+              const lat = community.latitude ?? (community as any).location?.latitude;
+              const lng = community.longitude ?? (community as any).location?.longitude;
+              const hasValidCoords =
+                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+
+              if (!hasValidCoords) {
+                return (
+                  <View style={styles.locationPillBtn}>
+                    <MaterialIcons name="place" size={14} color="#e8a736" style={{ marginRight: 4 }} />
+                    <Text style={styles.locationPillText} numberOfLines={1}>
+                      {locName}
+                    </Text>
+                  </View>
+                );
+              }
+
               return (
                 <TouchableOpacity
                   style={styles.locationPillBtn}
                   onPress={() => {
-                    const lat = community.latitude ?? (community as any).location?.latitude;
-                    const lng = community.longitude ?? (community as any).location?.longitude;
                     router.push({
                       pathname: '/(tabs)/hangouts',
                       params: {
                         focusId: String(community.id || community.slug),
                         focusType: 'communities',
-                        focusLat: lat !== undefined && lat !== null ? String(lat) : undefined,
-                        focusLng: lng !== undefined && lng !== null ? String(lng) : undefined,
+                        focusLat: String(lat),
+                        focusLng: String(lng),
                       },
                     } as any);
                   }}

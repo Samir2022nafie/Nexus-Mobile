@@ -62,12 +62,12 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   const [modalVisible, setModalVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  // When user edits the text directly
+  // When user edits the text directly (plain text without map picker)
   const handleTextChange = (text: string) => {
     onChangeLocation?.({
       name: text,
-      latitude,
-      longitude,
+      latitude: null,
+      longitude: null,
     });
   };
 

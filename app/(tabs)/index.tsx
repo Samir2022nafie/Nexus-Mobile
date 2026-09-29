@@ -18,19 +18,21 @@ import {
   Image,
   TouchableOpacity,
   Animated,
+  Easing,
   Alert,
   PanResponder,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { useAuth } from '../../src/context/AuthContext';
 import { communitiesService } from '../../src/services/communities';
+import { usersService } from '../../src/services/users';
 import { hangoutsService } from '../../src/services/hangouts';
 import { eventsService } from '../../src/services/events';
 import { postsService } from '../../src/services/posts';
@@ -148,10 +150,37 @@ export default function HomeScreen() {
   const styles = useThemedStyles(getStyles);
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const storiesScrollRef = useRef<ScrollView>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [hangouts, setHangouts] = useState<HangoutItem[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [posts, setPosts] = useState<any[]>([]);
+  const [isLeadershipStackExpanded, setIsLeadershipStackExpanded] = useState(false);
+  const leadershipAnim = useRef(new Animated.Value(0)).current;
+
+  const handleExpandLeadership = () => {
+    setIsLeadershipStackExpanded(true);
+    leadershipAnim.setValue(0);
+    Animated.spring(leadershipAnim, {
+      toValue: 1,
+      tension: 70,
+      friction: 9,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleCollapseLeadership = () => {
+    Animated.timing(leadershipAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.bezier(0.25, 1, 0.5, 1),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsLeadershipStackExpanded(false);
+      storiesScrollRef.current?.scrollTo({ x: 0, animated: true });
+    });
+  };
+
   const { userLocation } = useUserLocation();
 
   const displayHangouts = useMemo(
@@ -166,6 +195,26 @@ export default function HomeScreen() {
     () => sortCommunitiesByLocation(communities, userLocation),
     [communities, userLocation]
   );
+
+  const { leadershipCommunities, memberCommunities } = useMemo(() => {
+    const leaderList: any[] = [];
+    const memberList: any[] = [];
+
+    displayCommunities.forEach((comm: any) => {
+      const role = String(
+        comm.role ||
+          comm.myRole ||
+          (comm.creator_id === user?.id || comm.creatorId === user?.id ? 'owner' : 'member')
+      ).toLowerCase();
+      if (role === 'owner' || role === 'admin' || role === 'moderator') {
+        leaderList.push({ ...comm, role });
+      } else {
+        memberList.push({ ...comm, role });
+      }
+    });
+
+    return { leadershipCommunities: leaderList, memberCommunities: memberList };
+  }, [displayCommunities, user?.id]);
 
   const {
     likedPosts: globalLiked,
@@ -239,13 +288,29 @@ export default function HomeScreen() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [commData, hangData] = await Promise.all([
+      const [commData, managedData, hangData] = await Promise.all([
         communitiesService.list({ limit: 50 }).catch(() => []),
+        usersService.getMyCommunities().catch(() => []),
         hangoutsService.list({ limit: 50 }).catch(() => []),
       ]);
 
-      // Only show communities the user has joined
-      const userJoinedComms = (commData || []).filter((c) => c.isMember);
+      const managedRoleMap = new Map<string, string>();
+      (managedData || []).forEach((m: any) => {
+        if (m.slug) managedRoleMap.set(m.slug, m.role || 'admin');
+        if (m.id) managedRoleMap.set(m.id, m.role || 'admin');
+      });
+
+      // Show communities the user has joined or manages
+      const userJoinedComms = (commData || [])
+        .filter((c: any) => c.isMember || managedRoleMap.has(c.slug) || managedRoleMap.has(c.id))
+        .map((c: any) => ({
+          ...c,
+          role:
+            managedRoleMap.get(c.slug) ||
+            managedRoleMap.get(c.id) ||
+            c.myRole ||
+            (c.creator_id === user?.id || c.creatorId === user?.id ? 'owner' : 'member'),
+        }));
       setCommunities(userJoinedComms);
 
       // Initialize joined and requested hangouts map
@@ -528,7 +593,7 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Section 1: Joined Communities (Instagram Stories style, 76x76, no yellow ring) */}
+        {/* Section 1: Joined & Managed Communities */}
         <View style={styles.storiesSection}>
           {displayCommunities.length === 0 ? (
             <View style={styles.emptyStoryWrap}>
@@ -547,11 +612,137 @@ export default function HomeScreen() {
             </View>
           ) : (
             <ScrollView
+              ref={storiesScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.storiesCarousel}
             >
-              {displayCommunities.map((comm) => (
+              {/* If user manages communities (owner/admin/mod) */}
+              {leadershipCommunities.length > 0 && (
+                <>
+                  {!isLeadershipStackExpanded ? (
+                    /* Overlapped State: 1 stacked circle with up to 4 circles poking out */
+                    <TouchableOpacity
+                      style={styles.communityStackWrap}
+                      onPress={handleExpandLeadership}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.communityStackContainer}>
+                        {leadershipCommunities.slice(0, 4).map((comm, idx) => {
+                          const reverseIdx = Math.min(3, leadershipCommunities.length - 1) - idx;
+                          return (
+                            <View
+                              key={comm.id}
+                              style={[
+                                styles.communityStackCircle,
+                                {
+                                  right: reverseIdx * 6,
+                                  zIndex: idx + 1,
+                                },
+                              ]}
+                            >
+                              {comm.profile_picture_url ? (
+                                <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
+                              ) : (
+                                <View style={styles.storyAvatarFallback}>
+                                  <MaterialIcons name="groups" size={30} color={colors.primary} />
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
+                        {/* Top-Right Badge: Crown for owner, verified tick for admin/mod */}
+                        {leadershipCommunities[0]?.role === 'owner' ? (
+                          <View style={styles.stackCrownBadge}>
+                            <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
+                          </View>
+                        ) : (
+                          <View style={styles.stackVerifiedBadge}>
+                            <MaterialIcons name="verified" size={13} color="#ffffff" />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.storyName} numberOfLines={1}>
+                        Managed ({leadershipCommunities.length})
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    /* Expanded State: Smooth cluster card exploded animation without layout push */
+                    <Animated.View
+                      style={[
+                        styles.leadershipExpandedContainer,
+                        {
+                          opacity: leadershipAnim.interpolate({
+                            inputRange: [0, 0.4, 1],
+                            outputRange: [0.6, 0.9, 1],
+                          }),
+                        },
+                      ]}
+                    >
+                      {/* Leadership Communities with badges — animate out from stack position */}
+                      {leadershipCommunities.map((comm, idx) => {
+                        const isOwner = comm.role === 'owner';
+                        const itemTranslateX = leadershipAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-(idx * 32), 0],
+                        });
+                        const itemScale = leadershipAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [idx === 0 ? 1 : 0.82, 1],
+                        });
+                        return (
+                          <Animated.View
+                            key={comm.id}
+                            style={{
+                              transform: [{ translateX: itemTranslateX }, { scale: itemScale }],
+                            }}
+                          >
+                            <TouchableOpacity
+                              style={styles.storyItem}
+                              onPress={() => router.push(`/community/${comm.slug}`)}
+                              activeOpacity={0.8}
+                            >
+                              <View style={styles.storyRing}>
+                                {comm.profile_picture_url ? (
+                                  <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
+                                ) : (
+                                  <View style={styles.storyAvatarFallback}>
+                                    <MaterialIcons name="groups" size={34} color={colors.primary} />
+                                  </View>
+                                )}
+                                {isOwner ? (
+                                  <View style={styles.stackCrownBadge}>
+                                    <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
+                                  </View>
+                                ) : (
+                                  <View style={styles.stackVerifiedBadge}>
+                                    <MaterialIcons name="verified" size={13} color="#ffffff" />
+                                  </View>
+                                )}
+                              </View>
+                              <Text style={styles.storyName} numberOfLines={1}>
+                                {comm.name}
+                              </Text>
+                            </TouchableOpacity>
+                          </Animated.View>
+                        );
+                      })}
+
+                      {/* Right-most Chevron button: only head, no stem, no text, compact circle */}
+                      <TouchableOpacity
+                        style={styles.stackCollapseChevronBtn}
+                        onPress={handleCollapseLeadership}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+                      </TouchableOpacity>
+                    </Animated.View>
+                  )}
+                </>
+              )}
+
+              {/* Member communities */}
+              {memberCommunities.map((comm) => (
                 <TouchableOpacity
                   key={comm.id}
                   style={styles.storyItem}
@@ -665,17 +856,17 @@ export default function HomeScreen() {
                         <View style={{ alignItems: 'flex-end', gap: 3 }}>
                           {(() => {
                             const coords = extractItemCoordinates(event);
-                            if (userLocation && coords) {
-                              const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
-                              const txt = formatDistance(d);
-                              if (txt) {
-                                return (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
-                                    <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
-                                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
-                                  </View>
-                                );
-                              }
+                            const hasLoc = Boolean(typeof event.location === 'string' ? event.location.trim() : (event.location?.name?.trim() || event.location?.place_name?.trim() || event.locationName?.trim()));
+                            if (!hasLoc || !coords || !userLocation) return null;
+                            const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
+                            const txt = formatDistance(d);
+                            if (txt) {
+                              return (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
+                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                </View>
+                              );
                             }
                             return null;
                           })()}
@@ -696,8 +887,8 @@ export default function HomeScreen() {
         </View>
 
         {/* Section 3: Hangouts Near You (Square cards, no "Open" pill, smart date ordering) */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={[styles.section, { zIndex: 10, overflow: 'visible' }]}>
+          <View style={[styles.sectionHeader, { zIndex: 1 }]}>
             <Text style={styles.sectionTitle}>Hangouts Near You</Text>
             <TouchableOpacity
               onPress={() => router.push('/hangouts' as any)}
@@ -725,95 +916,119 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carousel}
-            >
-              {displayHangouts.map((hangout: any) => {
-                const cat = categorizeItemByDate(hangout);
-                const isJoined =
-                  joinedHangouts[hangout.id] !== undefined
-                    ? joinedHangouts[hangout.id]
-                    : Boolean(hangout.isParticipant);
-                const isRequested =
-                  !isJoined &&
-                  (requestedHangouts[hangout.id] !== undefined
-                    ? requestedHangouts[hangout.id]
-                    : Boolean(
-                        hangout.hasRequested ||
-                          hangout.isRequested ||
-                          (hangout as any).requestStatus === 'pending' ||
-                          (hangout as any).userRequestStatus === 'pending'
-                      ));
-                const isOpen =
-                  hangout.joinType === 'OPEN' ||
-                  hangout.join_type === 'OPEN' ||
-                  hangout.joinType === 'open' ||
-                  hangout.join_type === 'open';
+            <View style={{ zIndex: 10, overflow: 'visible', paddingTop: 8 }}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.carousel, { overflow: 'visible', paddingTop: 8 }]}
+              >
+                {displayHangouts.map((hangout: any) => {
+                  const cat = categorizeItemByDate(hangout);
+                  const isJoined =
+                    joinedHangouts[hangout.id] !== undefined
+                      ? joinedHangouts[hangout.id]
+                      : Boolean(hangout.isParticipant);
+                  const isRequested =
+                    !isJoined &&
+                    (requestedHangouts[hangout.id] !== undefined
+                      ? requestedHangouts[hangout.id]
+                      : Boolean(
+                          hangout.hasRequested ||
+                            hangout.isRequested ||
+                            (hangout as any).requestStatus === 'pending' ||
+                            (hangout as any).userRequestStatus === 'pending'
+                        ));
+                  const isOpen =
+                    hangout.joinType === 'OPEN' ||
+                    hangout.join_type === 'OPEN' ||
+                    hangout.joinType === 'open' ||
+                    hangout.join_type === 'open';
 
-                return (
-                  <TouchableOpacity
-                    key={hangout.id}
-                    style={[styles.hangoutCardSquare, cat.isPassed && styles.itemCardPassed]}
-                    onPress={() => {
-                      router.push(`/hangout/${hangout.id}`);
-                    }}
-                    activeOpacity={cat.isPassed ? 0.38 : 0.85}
-                  >
-                    <View>
-                      <View style={styles.hangoutHeader}>
-                        <View style={styles.hangoutCreatorRow}>
-                          {hangout.creatorAvatar || hangout.creator?.profile_picture_url ? (
-                            <Image
-                              source={{
-                                uri: hangout.creatorAvatar || hangout.creator?.profile_picture_url,
-                              }}
-                              style={styles.hangoutCreatorAvatar}
-                            />
-                          ) : (
-                            <View style={styles.hangoutAvatarFallback}>
-                              <MaterialIcons name="person" size={15} color={colors.tertiary} />
-                            </View>
-                          )}
-                          <Text style={styles.hangoutCreatorName} numberOfLines={1}>
-                            {hangout.creatorName || hangout.creator?.first_name || 'Host'}
-                          </Text>
-                        </View>
-
-                        <View style={[styles.hangoutPill, isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest]}>
-                          <View style={isOpen ? styles.openDot : styles.requestDot} />
-                          <Text style={[styles.hangoutPillText, isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText]}>
-                            {isOpen ? 'Open' : 'Request'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={styles.hangoutTitle} numberOfLines={2}>
-                        {hangout.title}
-                      </Text>
-                      <View style={styles.hangoutScheduleRow}>
-                        <MaterialIcons
-                          name="schedule"
-                          size={13}
-                          color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
-                        />
-                        <Text
+                  return (
+                    <TouchableOpacity
+                      key={hangout.id}
+                      style={[styles.hangoutCardSquare, cat.isPassed && styles.itemCardPassed]}
+                      onPress={() => {
+                        router.push(`/hangout/${hangout.id}`);
+                      }}
+                      activeOpacity={cat.isPassed ? 0.38 : 0.85}
+                    >
+                      {/* Protruding Lock / Open Padlock Badge (Top-Right) — Only on active hangouts */}
+                      {!cat.isPassed && (
+                        <View
                           style={[
-                            styles.hangoutScheduleText,
-                            cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                            styles.protrudingPadlockBadge,
+                            isOpen ? styles.padlockOpenBadge : styles.padlockLockedBadge,
                           ]}
                         >
-                          {cat.dateText}
-                        </Text>
-                      </View>
-                    </View>
+                          <MaterialCommunityIcons
+                            name={isOpen ? 'lock-open-variant' : 'lock'}
+                            size={12}
+                            color="#ffffff"
+                          />
+                        </View>
+                      )}
 
-                    <View style={styles.hangoutFooter}>
-                      <View style={{ gap: 3, justifyContent: 'center', flexShrink: 1 }}>
-                        {(() => {
-                          const coords = extractItemCoordinates(hangout);
-                          if (userLocation && coords) {
+                      <View>
+                        <View style={styles.hangoutHeader}>
+                          <View style={styles.hangoutCreatorRow}>
+                            {hangout.creatorAvatar || hangout.creator?.profile_picture_url ? (
+                              <Image
+                                source={{
+                                  uri: hangout.creatorAvatar || hangout.creator?.profile_picture_url,
+                                }}
+                                style={styles.hangoutCreatorAvatar}
+                              />
+                            ) : (
+                              <View style={styles.hangoutAvatarFallback}>
+                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
+                              </View>
+                            )}
+                            <Text style={styles.hangoutCreatorName} numberOfLines={1}>
+                              {hangout.creatorName || hangout.creator?.first_name || 'Host'}
+                            </Text>
+                          </View>
+
+                          {/* Category Pill in original place of Open/Request */}
+                          <View style={styles.hangoutCategoryPill}>
+                            <Text style={styles.hangoutCategoryPillText} numberOfLines={1}>
+                              {formatCategoryName(
+                                hangout.category?.name ||
+                                  hangout.category ||
+                                  (hangout as any).category_name ||
+                                  'Other',
+                                true
+                              )}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.hangoutTitle} numberOfLines={2}>
+                          {hangout.title}
+                        </Text>
+                        <View style={styles.hangoutScheduleRow}>
+                          <MaterialIcons
+                            name="schedule"
+                            size={13}
+                            color={cat.status === 'today' ? colors.primary : colors.onSurfaceVariant}
+                          />
+                          <Text
+                            style={[
+                              styles.hangoutScheduleText,
+                              cat.status === 'today' && { color: colors.primary, fontWeight: '700' },
+                            ]}
+                          >
+                            {cat.dateText}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.hangoutFooter}>
+                        <View style={{ gap: 3, justifyContent: 'center', flexShrink: 1 }}>
+                          {(() => {
+                            const coords = extractItemCoordinates(hangout);
+                            const hasLoc = Boolean(typeof hangout.location === 'string' ? hangout.location.trim() : (hangout.location?.name?.trim() || hangout.location?.place_name?.trim() || hangout.locationName?.trim()));
+                            if (!hasLoc || !coords || !userLocation) return null;
                             const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
                             const txt = formatDistance(d);
                             if (txt) {
@@ -824,50 +1039,53 @@ export default function HomeScreen() {
                                 </View>
                               );
                             }
-                          }
-                          return null;
-                        })()}
-                        {(() => {
-                          const pCount = hangout.participantsCount ?? hangout.participantCount ?? 0;
-                          const rawMax = hangout.maxParticipants ?? hangout.max_participants;
-                          const hasLimit = typeof rawMax === 'number' && rawMax > 0;
-                          return (
-                            <Text style={styles.hangoutSpotsText}>
-                              {hangout.spotsText || (hasLimit ? `${pCount}/${rawMax} spots` : `${pCount} going`)}
-                            </Text>
-                          );
-                        })()}
-                      </View>
-                      <TouchableOpacity
-                        style={[
-                          styles.hangoutActionIconBtn,
-                          cat.isPassed
-                            ? styles.hangoutActionIconBtnPassed
-                            : isJoined
-                            ? styles.hangoutIconBtnJoined
-                            : isRequested
-                            ? styles.hangoutIconBtnRequested
-                            : isOpen
-                            ? styles.hangoutIconBtnOpen
-                            : styles.hangoutIconBtnRequest,
-                        ]}
-                        onPress={(e) => handleToggleHangoutJoin(e, hangout)}
-                        disabled={cat.isPassed}
-                        activeOpacity={0.8}
-                      >
-                        {isJoined ? (
-                          <MaterialIcons name="directions-walk" size={18} color="#ffffff" />
-                        ) : isRequested ? (
-                          <MaterialIcons name="hourglass-empty" size={15} color={colors.primary} />
+                            return null;
+                          })()}
+                          {(() => {
+                            const pCount = hangout.participantsCount ?? hangout.participantCount ?? 0;
+                            const rawMax = hangout.maxParticipants ?? hangout.max_participants;
+                            const hasLimit = typeof rawMax === 'number' && rawMax > 0;
+                            return (
+                              <Text style={styles.hangoutSpotsText}>
+                                {hangout.spotsText || (hasLimit ? `${pCount}/${rawMax} spots` : `${pCount} going`)}
+                              </Text>
+                            );
+                          })()}
+                        </View>
+                        {cat.isPassed ? (
+                          <View style={styles.passedPill}>
+                            <Text style={styles.passedPillText}>Ended</Text>
+                          </View>
                         ) : (
-                          <RaisingHandIcon size={18} color={colors.onPrimaryContainer} />
+                          <TouchableOpacity
+                            style={[
+                              styles.hangoutActionIconBtn,
+                              isJoined
+                                ? styles.hangoutIconBtnJoined
+                                : isRequested
+                                ? styles.hangoutIconBtnRequested
+                                : isOpen
+                                ? styles.hangoutIconBtnOpen
+                                : styles.hangoutIconBtnRequest,
+                            ]}
+                            onPress={(e) => handleToggleHangoutJoin(e, hangout)}
+                            activeOpacity={0.8}
+                          >
+                            {isJoined ? (
+                              <MaterialIcons name="directions-walk" size={18} color="#ffffff" />
+                            ) : isRequested ? (
+                              <MaterialIcons name="hourglass-empty" size={15} color={colors.primary} />
+                            ) : (
+                              <RaisingHandIcon size={18} color={colors.onPrimaryContainer} />
+                            )}
+                          </TouchableOpacity>
                         )}
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
         </View>
 
@@ -960,8 +1178,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
 
     // Section 1: Communities (Stories) — Enlarged 76x76, no yellow ring
     storiesSection: {
-      paddingTop: Spacing.xs,
+      paddingTop: 10,
       paddingBottom: Spacing.xs,
+      overflow: 'visible',
     },
     storiesCarousel: {
       paddingHorizontal: Spacing.md,
@@ -1087,6 +1306,84 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '600',
     },
 
+    // Leadership Community Stack & Expanded Container
+    communityStackWrap: {
+      alignItems: 'center',
+      width: 86,
+      marginRight: Spacing.sm,
+    },
+    communityStackContainer: {
+      width: 76,
+      height: 76,
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    communityStackCircle: {
+      position: 'absolute',
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      borderWidth: 2,
+      borderColor: colors.surface,
+      backgroundColor: colors.surfaceContainerHigh,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...Shadows.sm,
+    },
+    stackCrownBadge: {
+      position: 'absolute',
+      top: -3,
+      right: -3,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: '#eab308',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 30,
+      borderWidth: 1.5,
+      borderColor: colors.surface,
+    },
+    stackVerifiedBadge: {
+      position: 'absolute',
+      top: -3,
+      right: -3,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: '#3b82f6',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 30,
+      borderWidth: 1.5,
+      borderColor: colors.surface,
+    },
+    leadershipExpandedContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.12)' : 'rgba(232, 167, 54, 0.16)',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.35)',
+      borderRadius: 44,
+      paddingHorizontal: 8,
+      paddingVertical: 0,
+      gap: 12,
+      marginRight: 14,
+    },
+    stackCollapseChevronBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: colors.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 4,
+    },
+
     // Section 3: Hangouts — Square cards (~180x180)
     hangoutCardSquare: {
       width: 180,
@@ -1097,7 +1394,47 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'space-between',
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      overflow: 'visible',
       ...Shadows.sm,
+    },
+    protrudingPadlockBadge: {
+      position: 'absolute',
+      top: -7,
+      right: -7,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 0,
+      borderColor: 'transparent',
+      zIndex: 20,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.25,
+      shadowRadius: 2,
+    },
+    padlockOpenBadge: {
+      backgroundColor: '#16a34a',
+    },
+    padlockLockedBadge: {
+      backgroundColor: '#d97706',
+    },
+    hangoutCategoryPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: BorderRadius.full,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.22)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.4)',
+      maxWidth: 95,
+    },
+    hangoutCategoryPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: isDark ? '#f6c368' : '#92400e',
+      letterSpacing: 0.3,
     },
     hangoutHeader: {
       flexDirection: 'row',
@@ -1204,13 +1541,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       ...Shadows.sm,
     },
     hangoutActionIconBtnPassed: {
-      elevation: 0,
-      shadowOpacity: 0,
-      shadowColor: 'transparent',
-      backgroundColor: isDark ? '#33302c' : '#e2e8f0',
-      opacity: 0.5,
-      borderWidth: 0,
-      borderColor: 'transparent',
+      elevation: 2,
+      shadowOpacity: 0.15,
+      backgroundColor: isDark ? '#3d3835' : '#cbd5e1',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#524b45' : '#94a3b8',
     },
     hangoutIconBtnOpen: {
       backgroundColor: colors.primaryContainer,
@@ -1245,9 +1580,24 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       right: -2,
     },
 
-    // Passed state
+    // Passed state — clearly grayed out and distinguished from active items
     itemCardPassed: {
-      opacity: 0.48,
+      opacity: isDark ? 0.38 : 0.45,
+      backgroundColor: isDark ? 'rgba(28, 25, 23, 0.45)' : 'rgba(226, 232, 240, 0.6)',
+    },
+    passedPill: {
+      paddingHorizontal: 9,
+      paddingVertical: 3.5,
+      borderRadius: BorderRadius.full,
+      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+      alignSelf: 'center',
+    },
+    passedPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.outline,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
 
     // Section 4: Discussions

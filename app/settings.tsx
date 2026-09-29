@@ -31,7 +31,6 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth();
   const { themeMode, setThemeMode, isDark, colors } = useTheme();
   const styles = useThemedStyles(getStyles);
-  const [pushEnabled, setPushEnabled] = useState(true);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out of Nexus?', [
@@ -134,20 +133,22 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionHeading}>Notifications</Text>
           <View style={styles.sectionCard}>
-            <View style={styles.rowItem}>
+            <TouchableOpacity
+              style={styles.rowItem}
+              onPress={() => router.push('/notification-settings')}
+              activeOpacity={0.7}
+            >
               <View style={styles.rowLeft}>
                 <View style={styles.iconCircle}>
-                  <MaterialIcons name="notifications" size={18} color={colors.outline} />
+                  <MaterialIcons name="notifications" size={18} color={colors.primary} />
                 </View>
-                <Text style={styles.rowTitle}>Push Notifications</Text>
+                <View style={styles.textCol}>
+                  <Text style={styles.rowTitle}>Notification Settings</Text>
+                  <Text style={styles.rowSubtitle}>Configure push notification triggers</Text>
+                </View>
               </View>
-              <Switch
-                value={pushEnabled}
-                onValueChange={setPushEnabled}
-                trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
-                thumbColor={colors.white}
-              />
-            </View>
+              <MaterialIcons name="chevron-right" size={20} color={colors.outline} />
+            </TouchableOpacity>
           </View>
         </View>
 

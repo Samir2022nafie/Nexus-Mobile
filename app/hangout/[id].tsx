@@ -20,12 +20,14 @@ import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
+import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { hangoutsService } from '../../src/services/hangouts';
 import { HangoutItem } from '../../src/types';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
+import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
+import { formatCategoryName } from '../../src/utils/categories';
 import { useAuth } from '../../src/context/AuthContext';
 
 export default function HangoutDetailScreen() {
@@ -369,49 +371,54 @@ export default function HangoutDetailScreen() {
             </TouchableOpacity>
 
             {isHangoutHost && (
-              <View style={styles.authorActionsRow}>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: '/new-hangout',
-                      params: { hangoutId: hangout.id },
-                    } as any)
-                  }
-                  style={styles.navBtn}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons name="edit" size={20} color={colors.secondary} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleDeleteHangout}
-                  style={styles.navBtn}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons name="delete-outline" size={22} color={colors.error} />
-                </TouchableOpacity>
-              </View>
+              <DropdownMenu
+                items={[
+                  {
+                    label: 'Edit Hangout',
+                    icon: 'edit',
+                    onPress: () =>
+                      router.push({
+                        pathname: '/new-hangout',
+                        params: { hangoutId: hangout.id },
+                      } as any),
+                  },
+                  {
+                    label: 'Delete Hangout',
+                    icon: 'delete-outline',
+                    destructive: true,
+                    onPress: handleDeleteHangout,
+                  },
+                ]}
+                iconColor={colors.onSurface}
+                triggerStyle={styles.navBtn}
+              />
             )}
           </View>
 
-          {/* Banner Status Pill (Bottom Right) with Distinct Colors */}
-          <View
-            style={[
-              styles.bannerStatusPill,
-              isOpen ? styles.bannerStatusPillOpen : styles.bannerStatusPillRequest,
-            ]}
+          {/* Banner Notification Button (Bottom Left inside Banner Image) */}
+          <TouchableOpacity
+            style={styles.bannerNotificationBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/hangout-notifications',
+                params: { id: hangout.id, title: hangout.title },
+              } as any)
+            }
+            activeOpacity={0.8}
           >
-            {isOpen && <View style={styles.openPillDot} />}
-            {!isOpen && (
-              <MaterialIcons
-                name="lock-outline"
-                size={13}
-                color="#ffffff"
-                style={{ marginRight: 2 }}
-              />
-            )}
-            <Text style={styles.bannerStatusPillText}>
-              {isOpen ? 'Open Meetup' : 'Request to Join'}
+            <MaterialIcons name="notifications-none" size={20} color="#ffffff" />
+          </TouchableOpacity>
+
+          {/* Banner Category Pill (Bottom Right) with Distinct Colors */}
+          <View style={styles.bannerCategoryPill}>
+            <Text style={styles.bannerCategoryPillText}>
+              {formatCategoryName(
+                hangout.category?.name ||
+                  hangout.category ||
+                  (hangout as any).category_name ||
+                  'Other',
+                true
+              )}
             </Text>
           </View>
         </View>
@@ -420,7 +427,34 @@ export default function HangoutDetailScreen() {
         <View style={styles.body}>
           {/* Header Block */}
           <View style={styles.headerBlock}>
-            <Text style={styles.titleText}>{hangout.title}</Text>
+            <View style={styles.titleCategoryRow}>
+              <Text style={styles.titleText}>{hangout.title}</Text>
+              <View
+                style={[
+                  styles.statusBadgePill,
+                  isOpen ? styles.statusBadgePillOpen : styles.statusBadgePillRequest,
+                ]}
+              >
+                {isOpen ? (
+                  <View style={styles.openPillDot} />
+                ) : (
+                  <MaterialIcons
+                    name="lock-outline"
+                    size={12}
+                    color={isDark ? '#fde68a' : '#92400e'}
+                    style={{ marginRight: 2 }}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.statusBadgePillText,
+                    isOpen ? styles.statusBadgePillOpenText : styles.statusBadgePillRequestText,
+                  ]}
+                >
+                  {isOpen ? 'Open Meetup' : 'Request based'}
+                </Text>
+              </View>
+            </View>
 
             <TouchableOpacity
               style={styles.creatorRow}
@@ -1220,32 +1254,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       gap: 8,
     },
-    bannerStatusPill: {
-      position: 'absolute',
-      bottom: 12,
-      right: Spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: BorderRadius.full,
-      zIndex: 10,
-      borderWidth: 1,
-      borderColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    bannerStatusPillOpen: {
-      backgroundColor: 'rgba(5, 150, 105, 0.9)',
-    },
-    bannerStatusPillRequest: {
-      backgroundColor: 'rgba(217, 119, 6, 0.9)',
-    },
-    bannerStatusPillText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: '#ffffff',
-      letterSpacing: 0.3,
-    },
+
     openPillDot: {
       width: 6,
       height: 6,
@@ -1366,5 +1375,79 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       ...Typography.labelSm,
       color: isDark ? '#4ade80' : '#16a34a',
       fontWeight: '700',
+    },
+    bannerNotificationBtn: {
+      position: 'absolute',
+      bottom: Spacing.md,
+      left: Spacing.md,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.25)',
+      zIndex: 10,
+    },
+    bannerCategoryPill: {
+      position: 'absolute',
+      bottom: 12,
+      right: Spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: BorderRadius.full,
+      zIndex: 10,
+      backgroundColor: isDark ? 'rgba(28, 25, 23, 0.92)' : 'rgba(255, 255, 255, 0.94)',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.65)' : 'rgba(217, 119, 6, 0.6)',
+      ...Shadows.sm,
+    },
+    bannerCategoryPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDark ? '#feba48' : '#92400e',
+      letterSpacing: 0.3,
+    },
+    titleCategoryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    statusBadgePill: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 3.5,
+      borderRadius: BorderRadius.full,
+      gap: 5,
+    },
+    statusBadgePillText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    statusBadgePillOpen: {
+      backgroundColor: isDark ? 'rgba(22, 163, 74, 0.2)' : '#dcfce7',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(34, 197, 94, 0.4)' : '#86efac',
+    },
+    statusBadgePillRequest: {
+      backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : '#fef3c7',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(245, 158, 11, 0.4)' : '#fde68a',
+    },
+    statusBadgePillOpenText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? '#4ade80' : '#15803d',
+    },
+    statusBadgePillRequestText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? '#fbbf24' : '#b45309',
     },
   });

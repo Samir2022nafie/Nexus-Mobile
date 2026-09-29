@@ -31,6 +31,7 @@ import { hangoutsService } from '../src/services/hangouts';
 import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
+import { BACKEND_CATEGORIES } from '../src/utils/categories';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -136,6 +137,7 @@ export default function NewHangoutScreen() {
     endsAt: undefined as string | undefined,
     maxParticipants: '',
     joinType: 'open' as 'open' | 'request_based',
+    categoryId: '3eb224da-e96f-44ad-a231-0d449e3ac69e',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -168,6 +170,7 @@ export default function NewHangoutScreen() {
               .includes('open')
               ? 'open'
               : 'request_based',
+            categoryId: h.categoryId || h.category_id || h.category?.id || '3eb224da-e96f-44ad-a231-0d449e3ac69e',
           });
         }
       })
@@ -300,6 +303,12 @@ export default function NewHangoutScreen() {
     setLoading(true);
     setGeneralError('');
     try {
+      const validStartsAt = new Date(form.startsAt).toISOString();
+      const validEndsAt =
+        form.endsAt && !isNaN(new Date(form.endsAt).getTime()) && new Date(form.endsAt) > new Date(form.startsAt)
+          ? new Date(form.endsAt).toISOString()
+          : undefined;
+
       if (isEditing && params.hangoutId) {
         await hangoutsService.update(params.hangoutId, {
           title: form.title.trim(),
@@ -308,12 +317,14 @@ export default function NewHangoutScreen() {
           locationName: (form.locationName || form.location).trim() || undefined,
           latitude: form.latitude ?? undefined,
           longitude: form.longitude ?? undefined,
-          coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : (null as any),
-          startsAt: new Date(form.startsAt).toISOString(),
-          endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
+          coverImageUrl: form.coverImageUrl.trim() ? form.coverImageUrl.trim() : null,
+          startsAt: validStartsAt,
+          endsAt: validEndsAt,
           maxParticipants: form.maxParticipants && form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : null,
           joinType: form.joinType,
-        });
+          categoryId: form.categoryId || undefined,
+          category_id: form.categoryId || undefined,
+        } as any);
       } else {
         await hangoutsService.create({
           title: form.title.trim(),
@@ -323,19 +334,24 @@ export default function NewHangoutScreen() {
           latitude: form.latitude ?? undefined,
           longitude: form.longitude ?? undefined,
           coverImageUrl: form.coverImageUrl.trim() || undefined,
-          startsAt: new Date(form.startsAt).toISOString(),
-          endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
-          maxParticipants: form.maxParticipants ? parseInt(form.maxParticipants) : undefined,
+          startsAt: validStartsAt,
+          endsAt: validEndsAt,
+          maxParticipants: form.maxParticipants && form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : undefined,
           visibility: 'public',
           joinType: form.joinType,
-        });
+          categoryId: form.categoryId || undefined,
+          category_id: form.categoryId || undefined,
+        } as any);
       }
       router.back();
-    } catch (err) {
-      if (err instanceof ApiRequestError) {
-        setGeneralError(err.message);
+    } catch (err: any) {
+      if (err instanceof ApiRequestError && err.details && Array.isArray(err.details) && err.details.length > 0) {
+        const issues = err.details.map((d: any) => `${d.path?.join('.') || 'field'}: ${d.message}`).join(', ');
+        setGeneralError(`Validation failed (${issues})`);
+      } else if (err instanceof ApiRequestError) {
+        setGeneralError(err.message || 'Validation failed');
       } else {
-        router.back();
+        setGeneralError(err?.message || 'Failed to save hangout changes');
       }
     } finally {
       setLoading(false);
@@ -393,6 +409,32 @@ export default function NewHangoutScreen() {
             <MaterialIcons name="local-cafe" size={20} color={colors.primaryContainer} />
           </View>
           {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
+        </View>
+
+        {/* Category Selector Chips */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>CATEGORY</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryChipsRow}
+          >
+            {BACKEND_CATEGORIES.map((cat) => {
+              const isSelected = form.categoryId === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={[styles.catChip, isSelected && styles.catChipActive]}
+                  onPress={() => updateField('categoryId', cat.id)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* Location with Free Map Picker */}
@@ -815,6 +857,29 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     backgroundColor: 'rgba(0, 0, 0, 0.65)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  categoryChipsRow: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  catChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: BorderRadius.full,
+    backgroundColor: colors.tertiaryFixed,
+  },
+  catChipActive: {
+    backgroundColor: colors.primaryContainer,
+    ...Shadows.sm,
+  },
+  catChipText: {
+    ...Typography.captionMd,
+    color: colors.onSurface,
+    fontWeight: '500',
+  },
+  catChipTextActive: {
+    color: colors.onPrimaryContainer,
+    fontWeight: '700',
   },
 });
 

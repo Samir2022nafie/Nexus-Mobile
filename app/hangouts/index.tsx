@@ -17,7 +17,7 @@ import {
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
@@ -32,6 +32,7 @@ import {
   getDistanceInKm,
 } from '../../src/utils/distance';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
+import { formatCategoryName } from '../../src/utils/categories';
 
 export default function HangoutsPage() {
   const router = useSafeRouter();
@@ -284,6 +285,22 @@ export default function HangoutsPage() {
                   activeOpacity={dateInfo.isPassed ? 0.38 : 0.88}
                   onPress={() => router.push(`/hangout/${h.id}`)}
                 >
+                  {/* Protruding Lock / Open Padlock Badge (Top-Right) — Only on active hangouts */}
+                  {!dateInfo.isPassed && (
+                    <View
+                      style={[
+                        styles.protrudingPadlockBadge,
+                        isOpen ? styles.padlockOpenBadge : styles.padlockLockedBadge,
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={isOpen ? 'lock-open-variant' : 'lock'}
+                        size={12}
+                        color="#ffffff"
+                      />
+                    </View>
+                  )}
+
                   {/* Header Row */}
                   <View style={styles.cardHeader}>
                     <View style={styles.hostGroup}>
@@ -305,26 +322,32 @@ export default function HangoutsPage() {
                     </View>
 
                     <View style={styles.headerRightBadges}>
-                      <View style={[styles.hangoutPill, isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest]}>
-                        <View style={isOpen ? styles.openDot : styles.requestDot} />
-                        <Text style={[styles.hangoutPillText, isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText]}>
-                          {isOpen ? 'Open Meet' : 'Request to Join'}
+                      <View style={styles.hangoutCategoryPill}>
+                        <Text style={styles.hangoutCategoryPillText} numberOfLines={1}>
+                          {formatCategoryName(
+                            h.category?.name ||
+                              h.category ||
+                              h.categoryName ||
+                              (h as any).category_name ||
+                              'Other',
+                            true
+                          )}
                         </Text>
                       </View>
-                      <View style={styles.distanceBadge}>
-                        <MaterialIcons name="near-me" size={13} color={colors.tertiary} />
-                        <Text style={styles.distanceText}>
-                          {(() => {
-                            const coords = extractItemCoordinates(h);
-                            if (userLocation && coords) {
-                              const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
-                              const txt = formatDistance(d);
-                              if (txt) return txt;
-                            }
-                            return h.distanceText || (h.location?.place_name ? h.location.place_name.slice(0, 12) : 'Nearby');
-                          })()}
-                        </Text>
-                      </View>
+                      {(() => {
+                        const coords = extractItemCoordinates(h);
+                        const hasLoc = Boolean(typeof h.location === 'string' ? h.location.trim() : (h.location?.name?.trim() || h.location?.place_name?.trim() || h.locationName?.trim()));
+                        if (!hasLoc || !coords || !userLocation) return null;
+                        const d = getDistanceInKm(userLocation.latitude, userLocation.longitude, coords.latitude, coords.longitude);
+                        const txt = formatDistance(d);
+                        if (!txt) return null;
+                        return (
+                          <View style={styles.distanceBadge}>
+                            <MaterialIcons name="near-me" size={13} color={colors.tertiary} />
+                            <Text style={styles.distanceText}>{txt}</Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   </View>
 
@@ -502,10 +525,51 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: 8,
       borderWidth: 1,
       borderColor: colors.cardBorder,
+      overflow: 'visible',
       ...Shadows.sm,
     },
+    protrudingPadlockBadge: {
+      position: 'absolute',
+      top: -7,
+      right: -7,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 0,
+      borderColor: 'transparent',
+      zIndex: 20,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.25,
+      shadowRadius: 2,
+    },
+    padlockOpenBadge: {
+      backgroundColor: '#16a34a',
+    },
+    padlockLockedBadge: {
+      backgroundColor: '#d97706',
+    },
+    hangoutCategoryPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 2.5,
+      borderRadius: BorderRadius.full,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.22)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.4)',
+      maxWidth: 105,
+    },
+    hangoutCategoryPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: isDark ? '#f6c368' : '#92400e',
+      letterSpacing: 0.3,
+    },
     itemCardPassed: {
-      opacity: 0.48,
+      opacity: isDark ? 0.38 : 0.45,
+      backgroundColor: isDark ? 'rgba(28, 25, 23, 0.45)' : 'rgba(226, 232, 240, 0.6)',
     },
     cardHeader: {
       flexDirection: 'row',

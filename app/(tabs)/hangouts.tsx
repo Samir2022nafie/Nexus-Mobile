@@ -4,7 +4,7 @@
  * Globe on zoom out, flat map on zoom in.
  * Completely free (MapLibre GL v5 + OpenFreeMap vector styles). Zero billing.
  */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Image,
   ActivityIndicator,
   Animated,
+  Easing,
   Platform,
   ScrollView,
 } from 'react-native';
@@ -32,6 +33,7 @@ import {
   MapHangoutItem,
   MapUserItem,
 } from '../../src/services/locations';
+import { BACKEND_CATEGORIES } from '../../src/utils/categories';
 
 // Ordered tabs: All -> Hangouts -> Events -> Communities -> People (Users)
 type FilterType = 'all' | 'hangouts' | 'events' | 'communities' | 'users';
@@ -40,6 +42,45 @@ interface SelectedMapEntity {
   type: 'user' | 'hangout' | 'event' | 'community';
   data: any;
 }
+
+export interface SelectedCity {
+  id: string;
+  name: string;
+  isCurrent: boolean;
+  lat: number;
+  lng: number;
+}
+
+// Module-level cache to persist camera position across tab switches and app minimize
+let lastExploreCameraState: {
+  center: [number, number];
+  zoom: number;
+  pitch: number;
+  bearing: number;
+} | null = null;
+
+export const CATEGORY_FILTER_ITEMS: {
+  id: string;
+  name: string;
+  label: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+}[] = [
+  { id: 'movies_tv', name: 'movies', label: 'Movies', icon: 'movie' },
+  { id: 'sports', name: 'sports', label: 'Sports', icon: 'sports-soccer' },
+  { id: 'music_entertainment', name: 'music', label: 'Music', icon: 'music-note' },
+  { id: 'gaming', name: 'gaming', label: 'Gaming', icon: 'sports-esports' },
+  { id: 'technology', name: 'tech', label: 'Tech', icon: 'computer' },
+  { id: 'food', name: 'food', label: 'Food', icon: 'restaurant' },
+  { id: 'arts_creativity', name: 'art', label: 'Art', icon: 'palette' },
+  { id: 'outdoor_adventure', name: 'outdoor', label: 'Outdoor', icon: 'terrain' },
+  { id: 'health_fitness', name: 'fitness', label: 'Fitness', icon: 'fitness-center' },
+  { id: 'education_study_groups', name: 'education', label: 'Education', icon: 'school' },
+  { id: 'books_writing', name: 'books', label: 'Books', icon: 'menu-book' },
+  { id: 'anime_manga', name: 'anime', label: 'Anime', icon: 'auto-stories' },
+  { id: 'social_lifestyle', name: 'social', label: 'Social', icon: 'groups' },
+  { id: 'culture_language', name: 'culture', label: 'Culture', icon: 'translate' },
+  { id: 'other', name: 'other', label: 'Others', icon: 'category' },
+];
 
 export default function ExploreMapScreen() {
   const insets = useSafeAreaInsets();
@@ -55,31 +96,101 @@ export default function ExploreMapScreen() {
   const { userLocation, requestLocation, isLoadingLocation } = useUserLocation();
   const webViewRef = useRef<WebView>(null);
 
-  const initialFilter: FilterType = (() => {
+  const initialEntityTypes: string[] = (() => {
     const ft = params.focusType ? params.focusType.toLowerCase() : '';
-    if (ft === 'hangout' || ft === 'hangouts') return 'hangouts';
-    if (ft === 'event' || ft === 'events') return 'events';
-    if (ft === 'community' || ft === 'communities') return 'communities';
-    if (ft === 'user' || ft === 'users') return 'users';
-    return 'all';
+    if (ft === 'hangout' || ft === 'hangouts') return ['hangouts'];
+    if (ft === 'event' || ft === 'events') return ['events'];
+    if (ft === 'community' || ft === 'communities') return ['communities'];
+    if (ft === 'user' || ft === 'users') return ['users'];
+    return ['all'];
   })();
 
-  const [filter, setFilter] = useState<FilterType>(initialFilter);
+  const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>(initialEntityTypes);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
+  const [isCategoryStackExpanded, setIsCategoryStackExpanded] = useState<boolean>(false);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const categoryStackAnim = useRef(new Animated.Value(0)).current;
+
+  const handleExpandCategories = useCallback(() => {
+    setIsCategoryStackExpanded(true);
+    categoryStackAnim.setValue(0);
+    Animated.spring(categoryStackAnim, {
+      toValue: 1,
+      tension: 65,
+      friction: 9,
+      useNativeDriver: true,
+    }).start();
+  }, [categoryStackAnim]);
+
+  const handleCollapseCategories = useCallback(() => {
+    Animated.timing(categoryStackAnim, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.bezier(0.25, 1, 0.5, 1),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsCategoryStackExpanded(false);
+      categoryScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  }, [categoryStackAnim]);
+
+  const activeCategoriesList = useMemo(() => {
+    return CATEGORY_FILTER_ITEMS.filter(
+      (c) => selectedCategories.includes(c.id) || selectedCategories.includes(c.name)
+    );
+  }, [selectedCategories]);
+
   const [mapData, setMapData] = useState<ExploreMapResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [locatingGps, setLocatingGps] = useState<boolean>(false);
   const [selectedEntity, setSelectedEntity] = useState<SelectedMapEntity | null>(null);
   const [mapReady, setMapReady] = useState<boolean>(false);
 
+  // User's default or current coordinates
+  const userLat = userLocation?.latitude ?? user?.location?.latitude ?? 9.0222;
+  const userLng = userLocation?.longitude ?? user?.location?.longitude ?? 38.7468;
+  const currentCityName = 'Addis Ababa';
+  const currentCityId = 'addis-ababa';
+
+  // Horizontally scrollable city pills state.
+  // Initially user's current city is rendered and appears first!
+  const [selectedCities, setSelectedCities] = useState<SelectedCity[]>([
+    {
+      id: currentCityId,
+      name: currentCityName,
+      isCurrent: true,
+      lat: userLat,
+      lng: userLng,
+    },
+  ]);
+
   // Initial target coordinates for MapLibre map initialization
   const targetLat = params.focusLat ? parseFloat(params.focusLat) : null;
   const targetLng = params.focusLng ? parseFloat(params.focusLng) : null;
   const hasValidTarget = targetLat !== null && targetLng !== null && !isNaN(targetLat) && !isNaN(targetLng);
 
-  const initialCenterLng = hasValidTarget ? targetLng : 20;
-  const initialCenterLat = hasValidTarget ? targetLat : 20;
-  const initialZoom = hasValidTarget ? 15.5 : 1.5;
-  const initialPitch = hasValidTarget ? 35 : 0;
+  // Requirement 1: Restore camera position from lastExploreCameraState if available
+  const initialCenterLng = hasValidTarget
+    ? targetLng
+    : lastExploreCameraState
+    ? lastExploreCameraState.center[0]
+    : userLng;
+  const initialCenterLat = hasValidTarget
+    ? targetLat
+    : lastExploreCameraState
+    ? lastExploreCameraState.center[1]
+    : userLat;
+  const initialZoom = hasValidTarget
+    ? 15.5
+    : lastExploreCameraState
+    ? lastExploreCameraState.zoom
+    : 12.8;
+  const initialPitch = hasValidTarget
+    ? 35
+    : lastExploreCameraState
+    ? lastExploreCameraState.pitch
+    : 0;
+  const initialBearing = lastExploreCameraState ? lastExploreCameraState.bearing : 0;
 
   // Track pending focus request across lifecycle
   const pendingFocusRef = useRef<{
@@ -101,28 +212,45 @@ export default function ExploreMapScreen() {
   );
   const handledCardKeyRef = useRef<string | null>(null);
 
-  // Bottom card slide animation
+  // Bottom card slide animation & City pills slide animation
   const cardSlideAnim = useRef(new Animated.Value(300)).current;
+  const cityPillsSlideAnim = useRef(new Animated.Value(0)).current;
 
+  // Requirement 14: When preview card slides in from bottom, city pills slide down behind it.
   const openSelectedCard = useCallback((entity: SelectedMapEntity) => {
     setSelectedEntity(entity);
-    Animated.spring(cardSlideAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 65,
-    }).start();
-  }, [cardSlideAnim]);
+    Animated.parallel([
+      Animated.spring(cardSlideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        friction: 8,
+        tension: 65,
+      }),
+      Animated.timing(cityPillsSlideAnim, {
+        toValue: 120, // slides down behind preview card & navigation bar
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [cardSlideAnim, cityPillsSlideAnim]);
 
+  // When preview card is closed, city pills slide back up behind it to original position just above navigation bar
   const closeSelectedCard = useCallback(() => {
-    Animated.timing(cardSlideAnim, {
-      toValue: 300,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => setSelectedEntity(null));
+    Animated.parallel([
+      Animated.timing(cardSlideAnim, {
+        toValue: 300,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cityPillsSlideAnim, {
+        toValue: 0, // slides back up
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setSelectedEntity(null));
     const js = `if (window.clearHighlight) { window.clearHighlight(); } true;`;
     webViewRef.current?.injectJavaScript(js);
-  }, [cardSlideAnim]);
+  }, [cardSlideAnim, cityPillsSlideAnim]);
 
   // Try opening preview card for targeted focus item
   const tryOpenPendingCard = useCallback((data: ExploreMapResponse | null, pending: typeof pendingFocusRef.current) => {
@@ -164,20 +292,30 @@ export default function ExploreMapScreen() {
     }
   }, [openSelectedCard]);
 
-  // Send data to WebView when mapData or filter changes
-  const sendDataToWebView = useCallback((data: ExploreMapResponse | null, currentFilter: FilterType) => {
-    if (!data) return;
-    const payload = {
-      type: 'set_items',
-      filter: currentFilter,
-      communities: data.communities,
-      events: data.events,
-      hangouts: data.hangouts,
-      users: data.users,
-    };
-    const js = `if (window.updateMapMarkers) { window.updateMapMarkers(${JSON.stringify(payload)}); } true;`;
-    webViewRef.current?.injectJavaScript(js);
-  }, []);
+  // Send data & selected cities to WebView
+  const sendDataToWebView = useCallback(
+    (
+      data: ExploreMapResponse | null,
+      entityTypes: string[],
+      categories: string[],
+      cities: SelectedCity[]
+    ) => {
+      if (!data) return;
+      const payload = {
+        type: 'set_items',
+        selectedEntityTypes: entityTypes,
+        selectedCategories: categories,
+        communities: data.communities,
+        events: data.events,
+        hangouts: data.hangouts,
+        users: data.users,
+        selectedCities: cities,
+      };
+      const js = `if (window.updateMapMarkers) { window.updateMapMarkers(${JSON.stringify(payload)}); } true;`;
+      webViewRef.current?.injectJavaScript(js);
+    },
+    []
+  );
 
   // Fetch explore map items from backend
   const loadMapData = useCallback(async () => {
@@ -185,14 +323,14 @@ export default function ExploreMapScreen() {
     try {
       const data = await locationsService.getExploreMap();
       setMapData(data);
-      sendDataToWebView(data, filter);
+      sendDataToWebView(data, selectedEntityTypes, selectedCategories, selectedCities);
       tryOpenPendingCard(data, pendingFocusRef.current);
     } catch (err) {
       console.error('Failed to load explore map items:', err);
     } finally {
       setLoading(false);
     }
-  }, [filter, sendDataToWebView, tryOpenPendingCard]);
+  }, [selectedEntityTypes, selectedCategories, selectedCities, sendDataToWebView, tryOpenPendingCard]);
 
   useEffect(() => {
     loadMapData();
@@ -219,18 +357,18 @@ export default function ExploreMapScreen() {
         }
 
         const ft = params.focusType ? params.focusType.toLowerCase() : '';
-        const mappedFilter: FilterType =
+        const mappedTypes: string[] =
           ft === 'hangout' || ft === 'hangouts'
-            ? 'hangouts'
+            ? ['hangouts']
             : ft === 'event' || ft === 'events'
-            ? 'events'
+            ? ['events']
             : ft === 'community' || ft === 'communities'
-            ? 'communities'
+            ? ['communities']
             : ft === 'user' || ft === 'users'
-            ? 'users'
-            : 'all';
+            ? ['users']
+            : ['all'];
 
-        setFilter(mappedFilter);
+        setSelectedEntityTypes(mappedTypes);
 
         if (mapReady) {
           const js = `if (window.focusEntityOnMap) {
@@ -246,13 +384,32 @@ export default function ExploreMapScreen() {
     }
   }, [params.focusLat, params.focusLng, params.focusId, params.focusType, mapReady, mapData, tryOpenPendingCard]);
 
-  const handleFilterChange = (newFilter: FilterType) => {
-    setFilter(newFilter);
-    sendDataToWebView(mapData, newFilter);
+  // Requirement 14: Multi-select entity tabs
+  const handleToggleEntityType = (entityType: string) => {
+    setSelectedEntityTypes((prev) => {
+      let next: string[];
+      if (entityType === 'all') {
+        next = ['all'];
+      } else {
+        const isAll = prev.includes('all');
+        const hasType = prev.includes(entityType);
+        if (isAll) {
+          next = [entityType];
+        } else if (hasType) {
+          next = prev.filter((t) => t !== entityType);
+          if (next.length === 0) {
+            next = ['all'];
+          }
+        } else {
+          next = [...prev.filter((t) => t !== 'all'), entityType];
+        }
+      }
+      sendDataToWebView(mapData, next, selectedCategories, selectedCities);
+      return next;
+    });
     closeSelectedCard();
     pendingFocusRef.current = null;
     handledCardKeyRef.current = null;
-    // Clear route focus params so tab switches freely without lock
     router.setParams({
       focusLat: undefined,
       focusLng: undefined,
@@ -261,7 +418,37 @@ export default function ExploreMapScreen() {
     });
   };
 
-  // Handle message from WebView (e.g. marker tapped, map ready)
+  // Requirement 14: Multi-select category filter tabs
+  const handleToggleCategory = (catId: string) => {
+    setSelectedCategories((prev) => {
+      const isAll = prev.includes('all');
+      const hasCat = prev.includes(catId);
+      let next: string[];
+      if (isAll) {
+        next = [catId];
+      } else if (hasCat) {
+        next = prev.filter((c) => c !== catId);
+        if (next.length === 0) {
+          next = ['all'];
+        }
+      } else {
+        next = [...prev.filter((c) => c !== 'all'), catId];
+      }
+      sendDataToWebView(mapData, selectedEntityTypes, next, selectedCities);
+      return next;
+    });
+    closeSelectedCard();
+  };
+
+  // Requirement 8c-iv: Remove city pill
+  const handleRemoveCity = (cityId: string) => {
+    const nextCities = selectedCities.filter((c) => c.id !== cityId);
+    setSelectedCities(nextCities);
+    const js = `if (window.syncSelectedCities) { window.syncSelectedCities(${JSON.stringify(nextCities)}); } true;`;
+    webViewRef.current?.injectJavaScript(js);
+  };
+
+  // Handle message from WebView (marker tapped, map ready, city selected, camera moved)
   const onWebViewMessage = (event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -272,6 +459,35 @@ export default function ExploreMapScreen() {
         });
       } else if (msg.type === 'map_click') {
         closeSelectedCard();
+      } else if (msg.type === 'camera_move') {
+        // Requirement 1: Persist camera position across navigation and app minimize
+        lastExploreCameraState = {
+          center: msg.center,
+          zoom: msg.zoom,
+          pitch: msg.pitch,
+          bearing: msg.bearing,
+        };
+      } else if (msg.type === 'city_selected') {
+        const rawName = String(msg.city || 'City Area');
+        const cId = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const isCurrent = cId === currentCityId || (Math.abs(msg.lat - userLat) < 0.35 && Math.abs(msg.lng - userLng) < 0.35);
+
+        setSelectedCities((prev) => {
+          if (prev.some((c) => c.id === cId)) return prev;
+          const newCityObj: SelectedCity = {
+            id: cId,
+            name: rawName,
+            isCurrent,
+            lat: msg.lat,
+            lng: msg.lng,
+          };
+          const next = isCurrent
+            ? [newCityObj, ...prev.filter((c) => c.id !== cId)]
+            : [...prev, newCityObj];
+          const js = `if (window.syncSelectedCities) { window.syncSelectedCities(${JSON.stringify(next)}); } true;`;
+          webViewRef.current?.injectJavaScript(js);
+          return next;
+        });
       } else if (msg.type === 'map_ready') {
         setMapReady(true);
         if (pendingFocusRef.current) {
@@ -282,7 +498,7 @@ export default function ExploreMapScreen() {
           webViewRef.current?.injectJavaScript(js);
         }
         if (mapData) {
-          sendDataToWebView(mapData, filter);
+          sendDataToWebView(mapData, selectedEntityTypes, selectedCategories, selectedCities);
           tryOpenPendingCard(mapData, pendingFocusRef.current);
         }
       }
@@ -291,36 +507,73 @@ export default function ExploreMapScreen() {
     }
   };
 
-  // Zoom into user's real phone GPS location instantly with battery & timeout optimization
+  // Requirement 8c-iv: Top GPS Current Location button:
+  // Zooms map to current location, selects current city, renders elements, and ensures its pill is placed FIRST!
   const handleFlyToGpsLocation = async () => {
-    // 1. If we already have a cached location from context, fly to it immediately!
-    if (userLocation?.latitude && userLocation?.longitude) {
-      const js = `if (window.map) {
-        window.map.flyTo({ center: [${userLocation.longitude}, ${userLocation.latitude}], zoom: 15, essential: true });
-        if (window.setUserGpsMarker) { window.setUserGpsMarker(${userLocation.latitude}, ${userLocation.longitude}); }
-      } true;`;
-      webViewRef.current?.injectJavaScript(js);
-    }
+    const lat = userLocation?.latitude ?? userLat;
+    const lng = userLocation?.longitude ?? userLng;
+
+    const js = `if (window.map) {
+      window.map.flyTo({ center: [${lng}, ${lat}], zoom: 15, essential: true });
+      if (window.setUserGpsMarker) { window.setUserGpsMarker(${lat}, ${lng}); }
+    } true;`;
+    webViewRef.current?.injectJavaScript(js);
+
+    const currentCityObj: SelectedCity = {
+      id: currentCityId,
+      name: currentCityName,
+      isCurrent: true,
+      lat,
+      lng,
+    };
+
+    setSelectedCities((prev) => {
+      const rest = prev.filter((c) => c.id !== currentCityId);
+      return [currentCityObj, ...rest];
+    });
+
+    const updatedCities = [currentCityObj, ...selectedCities.filter((c) => c.id !== currentCityId)];
+    const syncJs = `if (window.syncSelectedCities) { window.syncSelectedCities(${JSON.stringify(updatedCities)}); } true;`;
+    webViewRef.current?.injectJavaScript(syncJs);
 
     setLocatingGps(true);
     try {
       const loc = await requestLocation(true, true);
-      if (loc && loc.latitude && loc.longitude) {
-        const js = `if (window.map) {
+      if (loc?.latitude && loc?.longitude) {
+        const freshJs = `if (window.map) {
           window.map.flyTo({ center: [${loc.longitude}, ${loc.latitude}], zoom: 15, essential: true });
           if (window.setUserGpsMarker) { window.setUserGpsMarker(${loc.latitude}, ${loc.longitude}); }
         } true;`;
-        webViewRef.current?.injectJavaScript(js);
-      } else if (user?.location?.latitude && user?.location?.longitude) {
-        // Fallback to home address if GPS permission denied
-        const js = `if (window.map) { window.map.flyTo({ center: [${user.location.longitude}, ${user.location.latitude}], zoom: 14, essential: true }); } true;`;
-        webViewRef.current?.injectJavaScript(js);
+        webViewRef.current?.injectJavaScript(freshJs);
       }
     } catch (e) {
       console.warn('GPS location fly error:', e);
     } finally {
-      // Guaranteed immediate reset so button never gets stuck
       setLocatingGps(false);
+    }
+  };
+
+  // Requirement 8d: Refresh button to the right of globe button
+  // ONLY updates locations of all elements and user's GPS in place; does NOT move camera or zoom!
+  const handleRefreshDataInPlace = async () => {
+    setLoading(true);
+    try {
+      const [freshData, loc] = await Promise.all([
+        locationsService.getExploreMap().catch(() => null),
+        requestLocation(false, true).catch(() => null),
+      ]);
+      if (freshData) {
+        setMapData(freshData);
+        sendDataToWebView(freshData, selectedEntityTypes, selectedCategories, selectedCities);
+      }
+      if (loc?.latitude && loc?.longitude) {
+        const js = `if (window.setUserGpsMarker) { window.setUserGpsMarker(${loc.latitude}, ${loc.longitude}); } true;`;
+        webViewRef.current?.injectJavaScript(js);
+      }
+    } catch (e) {
+      console.warn('Refresh error:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -346,10 +599,8 @@ export default function ExploreMapScreen() {
     closeSelectedCard();
   };
 
-  // Free OpenFreeMap vector styles: Dark mode style for dark theme, Liberty style for light theme
-  const mapStyleUrl = isDark
-    ? 'https://tiles.openfreemap.org/styles/dark'
-    : 'https://tiles.openfreemap.org/styles/liberty';
+  // Requirement 8f: Even if the app is on light mode, ALWAYS use dark mode version of map & globe!
+  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/dark';
 
   // Primary yellow accent & dark brown companion tokens
   const yellowAccent = '#e8a736';
@@ -357,7 +608,8 @@ export default function ExploreMapScreen() {
   const darkBrownBg = isDark ? '#201e1c' : '#ffffff';
   const darkBrownBorder = isDark ? '#38332d' : '#e5d5c3';
 
-  const mapHtml = `
+  const mapHtml = useMemo(() => {
+    return `
     <!DOCTYPE html>
     <html>
       <head>
@@ -369,7 +621,7 @@ export default function ExploreMapScreen() {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: ${isDark ? '#02040a' : '#f8f9fa'};
+            background: #02040a;
           }
           #map {
             width: 100%;
@@ -378,65 +630,55 @@ export default function ExploreMapScreen() {
             top: 0;
             left: 0;
             z-index: 1;
-            background: transparent !important;
           }
-          .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { display: none !important; }
 
-          /* Cosmic Starry Atmosphere for Dark Mode */
+          /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(ellipse at 50% 50%, #0d1538 0%, #070c20 60%, #02040a 100%);
+            inset: 0;
             z-index: 0;
+            background: radial-gradient(ellipse at 50% 50%, #0a1128 0%, #02040a 100%);
+            overflow: hidden;
             pointer-events: none;
           }
           .cosmos-stars {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image:
-              radial-gradient(1.2px 1.2px at 30px 40px, #ffffff, transparent),
-              radial-gradient(1.5px 1.5px at 100px 140px, #38bdf8, transparent),
-              radial-gradient(1px 1px at 170px 80px, #ffffff, transparent),
-              radial-gradient(2px 2px at 230px 210px, #fde047, transparent),
-              radial-gradient(1.2px 1.2px at 340px 90px, #ffffff, transparent),
-              radial-gradient(1.8px 1.8px at 290px 260px, #38bdf8, transparent),
-              radial-gradient(1px 1px at 110px 310px, #ffffff, transparent),
-              radial-gradient(2px 2px at 200px 360px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 360px 330px, #fde047, transparent);
+            inset: -350px;
+            background-image: 
+              radial-gradient(2.5px 2.5px at 25px 35px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(3.5px 3.5px at 140px 75px, #ffffff, rgba(255,255,255,0.4) 50%, rgba(0,0,0,0)),
+              radial-gradient(2.2px 2.2px at 80px 180px, #fde047, rgba(0,0,0,0)),
+              radial-gradient(3px 3px at 280px 130px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 220px 290px, #93c5fd, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 45px 260px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(3.2px 3.2px at 320px 40px, #e0f2fe, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 190px 170px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 110px 310px, #fed7aa, rgba(0,0,0,0)),
+              radial-gradient(3.5px 3.5px at 50px 120px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
+              radial-gradient(2.2px 2.2px at 165px 230px, #93c5fd, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 310px 250px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 260px 320px, #fde047, rgba(0,0,0,0)),
+              radial-gradient(3px 3px at 340px 180px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 15px 210px, #bae6fd, rgba(0,0,0,0)),
+              radial-gradient(3px 3px at 130px 15px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.5px 2.5px at 240px 85px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(2.2px 2.2px at 300px 335px, #fef08a, rgba(0,0,0,0));
             background-repeat: repeat;
-            background-size: 380px 380px;
-            opacity: 0.85;
-            pointer-events: none;
-            z-index: 0;
+            background-size: 350px 350px;
+            opacity: 1;
+            will-change: transform;
+            transition: transform 0.05s linear;
           }
           .cosmos-atmosphere {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 360px;
-            height: 360px;
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(99, 102, 241, 0.14) 50%, transparent 72%);
-            filter: blur(28px);
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 38%, rgba(2, 6, 23, 0.7) 72%, #02040a 100%);
             pointer-events: none;
-            z-index: 0;
           }
 
-          :root {
-            --map-zoom-scale: 1;
-          }
-
-          /* Clean Marker Containers - Zero transforms on root to protect MapLibre anchor placement */
           .marker-container {
-            user-select: none;
             cursor: pointer;
+            user-select: none;
             -webkit-tap-highlight-color: transparent;
           }
           .marker-inner {
@@ -450,7 +692,7 @@ export default function ExploreMapScreen() {
             will-change: transform;
           }
 
-          /* Smooth Label Hiding when zoomed out so pins fit within city/country borders */
+          /* Smooth Label Hiding when zoomed out */
           .hide-labels .hangout-label,
           .hide-labels .event-label,
           .hide-labels .community-label,
@@ -465,35 +707,44 @@ export default function ExploreMapScreen() {
             transition: opacity 0.2s ease, max-height 0.2s ease;
           }
 
-          /* Explosive Outward Burst for Expanded Cluster Items */
-          .explode-bloom {
-            animation: explodeOut 0.44s cubic-bezier(0.18, 0.92, 0.28, 1.26) forwards;
+          /* Requirement 8b: Card Deck Sliding Out & In Animation (like cards sliding to and from a deck of cards) */
+          .card-slide-out {
+            animation: cardSlideOutAnim 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
             will-change: transform, opacity;
           }
-          @keyframes explodeOut {
+          @keyframes cardSlideOutAnim {
             0% {
-              opacity: 0.15;
-              transform: translate(0px, 0px) scale(0.22);
-            }
-            64% {
-              opacity: 1;
-              transform: translate(calc(var(--target-x) * 1.18), calc(var(--target-y) * 1.18)) scale(1.08);
-            }
-            84% {
-              transform: translate(calc(var(--target-x) * 0.96), calc(var(--target-y) * 0.96)) scale(0.98);
+              opacity: 0.82;
+              transform: translate(0px, 0px) rotate(var(--card-deck-rot, 0deg));
             }
             100% {
               opacity: 1;
-              transform: translate(var(--target-x), var(--target-y)) scale(1);
+              transform: translate(var(--target-x), var(--target-y)) rotate(0deg);
             }
           }
+
+          .card-slide-in {
+            animation: cardSlideInAnim 0.32s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+            will-change: transform, opacity;
+          }
+          @keyframes cardSlideInAnim {
+            0% {
+              opacity: 1;
+              transform: translate(var(--target-x), var(--target-y)) rotate(0deg);
+            }
+            100% {
+              opacity: 0;
+              transform: translate(0px, 0px) rotate(var(--card-deck-rot, 0deg));
+            }
+          }
+
           .stacked-return {
-            animation: stackedReturnIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation: stackedReturnIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
             will-change: transform, opacity;
           }
           @keyframes stackedReturnIn {
-            0% { opacity: 0.2; transform: scale(0.4); }
-            100% { opacity: 1; transform: scale(var(--map-zoom-scale, 1)); }
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
           }
 
           /* Pin Wrap allowing badge to protrude cleanly outside */
@@ -503,7 +754,7 @@ export default function ExploreMapScreen() {
             overflow: visible;
           }
 
-          /* Overlapping Diamond Badge - Protrudes ~50% outside the corner like messaging online dot */
+          /* Overlapping Diamond Badge - Protrudes ~50% outside the corner */
           .overlap-badge {
             position: absolute;
             top: -9px;
@@ -554,7 +805,7 @@ export default function ExploreMapScreen() {
             z-index: 0;
           }
 
-          /* User / People Marker (Circle - Made SMALLER: 36px x 36px) */
+          /* User / People Marker (Circle: 36px x 36px) */
           .user-pin {
             width: 36px;
             height: 36px;
@@ -590,7 +841,7 @@ export default function ExploreMapScreen() {
             text-overflow: ellipsis;
           }
 
-          /* Hangout Marker (Made BETTER & PROMINENT: 58px x 58px) */
+          /* Hangout Marker (58px x 58px) */
           .hangout-pin {
             width: 58px;
             height: 58px;
@@ -626,7 +877,7 @@ export default function ExploreMapScreen() {
             text-overflow: ellipsis;
           }
 
-          /* Event Marker (Made BIGGER: 80px x 52px) */
+          /* Event Marker (80px x 52px) */
           .event-pin {
             width: 80px;
             height: 52px;
@@ -698,15 +949,24 @@ export default function ExploreMapScreen() {
             text-overflow: ellipsis;
           }
 
-          /* Active selection glow in expanded state - Stays strictly in place with brilliant luminous aura */
+          /* Requirement 8c-i: Grayed out element styling for events and hangouts whose end dates/times passed */
+          .item-passed {
+            filter: grayscale(100%) opacity(0.48) !important;
+            border-color: #64748b !important;
+            box-shadow: none !important;
+          }
+          .item-passed-label {
+            filter: grayscale(100%) opacity(0.65) !important;
+            color: #94a3b8 !important;
+            border-color: rgba(148, 163, 184, 0.4) !important;
+          }
+
+          /* Active selection glow in expanded state */
           .active-pin {
             border-color: #ffffff !important;
             box-shadow: 0 0 28px #e8a736, 0 0 12px #ffffff, 0 0 45px rgba(232, 167, 54, 0.85) !important;
             outline: 2.5px solid #ffffff !important;
             outline-offset: 1px !important;
-            z-index: 9999 !important;
-          }
-          .marker-container:has(.active-pin) {
             z-index: 9999 !important;
           }
 
@@ -742,10 +1002,64 @@ export default function ExploreMapScreen() {
             70% { transform: scale(1.6); opacity: 0; }
             100% { transform: scale(1.6); opacity: 0; }
           }
+
+          /* Requirement 8c-iii: Special UI for rendering elements of a tapped city (Radar Pulse Scanner) */
+          .city-radar-container {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transform: translate(-50%, -50%);
+          }
+          .city-radar-ring {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: 2px solid #e8a736;
+            box-shadow: 0 0 24px rgba(232, 167, 54, 0.9), inset 0 0 16px rgba(232, 167, 54, 0.4);
+            animation: radarScan 1.6s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+          }
+          .city-radar-core {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2.5px solid #e8a736;
+            box-shadow: 0 0 16px #e8a736;
+          }
+          .city-radar-label {
+            margin-top: 14px;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(232, 167, 54, 0.8);
+            border-radius: 20px;
+            padding: 4px 12px;
+            color: #feba48;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
+            animation: radarFade 1.8s forwards;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+          }
+          @keyframes radarScan {
+            0% { transform: scale(0.2); opacity: 1; }
+            100% { transform: scale(2.4); opacity: 0; }
+          }
+          @keyframes radarFade {
+            0% { opacity: 0; transform: translateY(6px); }
+            25% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-4px); }
+          }
         </style>
       </head>
       <body>
-        ${isDark ? '<div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>' : ''}
+        <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>
         <div id="map"></div>
 
         <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
@@ -757,11 +1071,12 @@ export default function ExploreMapScreen() {
             center: [${initialCenterLng}, ${initialCenterLat}],
             zoom: ${initialZoom},
             pitch: ${initialPitch},
+            bearing: ${initialBearing},
             projection: { type: 'globe' },
             antialias: true
           });
 
-          // Decremental smooth zoom scale calculation (Snapchat Bitmoji style)
+          // Decremental smooth zoom scale calculation
           function updateZoomScale() {
             var z = map.getZoom();
             var minZ = 1.5;
@@ -772,7 +1087,6 @@ export default function ExploreMapScreen() {
             var scale = 0.44 + (1.0 - 0.44) * smoothT;
             document.documentElement.style.setProperty('--map-zoom-scale', scale.toFixed(3));
 
-            // Smooth label hiding when zoomed out to keep globe clean and fit inside city/country borders
             if (z < 10.5) {
               document.body.classList.add('hide-labels');
             } else {
@@ -783,97 +1097,336 @@ export default function ExploreMapScreen() {
           map.on('zoom', updateZoomScale);
           updateZoomScale();
 
-          // Style load: Set dark mode globe contrast and clean up labels
+          // Requirement 1e: Starry background responsive to swiping / parallax like Snapchat
+          function updateCosmicParallax() {
+            var starEl = document.querySelector('.cosmos-stars');
+            if (!starEl) return;
+            var center = map.getCenter();
+            var bearing = map.getBearing() || 0;
+            var pitch = map.getPitch() || 0;
+            var shiftX = (center.lng * 2.2 + bearing * 0.9) % 350;
+            var shiftY = (center.lat * 2.2 + pitch * 0.6) % 350;
+            starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
+          }
+          map.on('move', updateCosmicParallax);
+          map.on('rotate', updateCosmicParallax);
+          map.on('pitch', updateCosmicParallax);
+
+          // Style load: Set dark mode globe contrast and distinguish boundaries
           map.on('style.load', function() {
             try {
               map.setProjection({ type: 'globe' });
             } catch(e) {}
 
-            var isDark = ${isDark ? 'true' : 'false'};
-            if (isDark) {
-              try {
-                if (map.getLayer('water')) {
-                  map.setPaintProperty('water', 'fill-color', '#0e1d44');
-                }
-                if (map.getLayer('background')) {
-                  map.setPaintProperty('background', 'background-color', '#131826');
-                }
-              } catch(e) {}
-            }
+            var allStyleLayers = map.getStyle().layers || [];
 
-            // Country Borders & Boundary Presentation:
-            // 1. Hide state, county, maritime, and sub-national clutter
-            // 2. Make country borders clearly visible, crisp, solid lines (removes blue dotted effect)
+            // Requirement 1b: Snapchat & Google Maps dark skin (deep navy water, charcoal land, dark emerald parks)
             try {
-              var allStyleLayers = map.getStyle().layers || [];
-              allStyleLayers.forEach(function(l) {
-                if (!l.id) return;
-                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1;
-                if (!isBoundary) return;
-
-                var isCountryBorder = l.id === 'boundary_country' || 
-                                     l.id === 'boundary_country_z0-4' || 
-                                     (l.id.indexOf('country') !== -1 && l.type === 'line');
-
-                if (isCountryBorder) {
+              if (map.getLayer('water')) {
+                map.setPaintProperty('water', 'fill-color', '#0b1426');
+              }
+              if (map.getLayer('background')) {
+                map.setPaintProperty('background', 'background-color', '#161922');
+              }
+              if (map.getLayer('landuse_park')) {
+                map.setPaintProperty('landuse_park', 'fill-color', '#11231c');
+              }
+              if (map.getLayer('landcover_wood')) {
+                map.setPaintProperty('landcover_wood', 'fill-color', '#11231c');
+              }
+              // Muted roads matching Google Maps / Snapchat UI
+              allStyleLayers.forEach(function(lay) {
+                if (lay.id && lay.id.indexOf('highway') !== -1 && lay.type === 'line') {
                   try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                  } catch(e) {}
-                  try {
-                    // Remove dotted / dashed pattern so lines are solid and clean
-                    map.setPaintProperty(l.id, 'line-dasharray', null);
-                  } catch(e) {
-                    try { map.setPaintProperty(l.id, 'line-dasharray', [1, 0]); } catch(e2) {}
-                  }
-                  try {
-                    // High-contrast visible borders: luminous white in dark mode, crisp slate in light mode
-                    map.setPaintProperty(l.id, 'line-color', isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(30, 41, 59, 0.80)');
-                  } catch(e) {}
-                  try {
-                    var w = l.id.indexOf('z0-4') !== -1 ? 1.5 : 2.0;
-                    map.setPaintProperty(l.id, 'line-width', w);
-                  } catch(e) {}
-                  try {
-                    map.setPaintProperty(l.id, 'line-opacity', 0.95);
-                  } catch(e) {}
-                } else {
-                  // Hide county, state, maritime, and sub-national clutter
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'none');
-                  } catch(e) {}
+                    if (lay.id.indexOf('casing') !== -1) {
+                      map.setPaintProperty(lay.id, 'line-color', '#18202e');
+                    } else {
+                      map.setPaintProperty(lay.id, 'line-color', '#232b3c');
+                    }
+                  } catch(e){}
                 }
               });
             } catch(e) {}
 
-            var labelConfigs = {
-              'place_country_major': { minzoom: 0, maxzoom: 6 },
-              'place_country_minor': { minzoom: 3.8, maxzoom: 8 },
-              'place_country_other': { minzoom: 4.8, maxzoom: 9 },
-              'place_state': { minzoom: 4.8, maxzoom: 12 },
-              'place_city_large': { minzoom: 5.2, maxzoom: 12 },
-              'place_city': { minzoom: 6.8, maxzoom: 14 },
-              'place_town': { minzoom: 9.0, maxzoom: 15 },
-              'place_village': { minzoom: 11.0, maxzoom: 15 },
-              'place_suburb': { minzoom: 12.0, maxzoom: 15 },
-              'place_other': { minzoom: 12.5, maxzoom: 15 }
-            };
-
-            Object.keys(labelConfigs).forEach(function(layerId) {
-              if (map.getLayer(layerId)) {
-                var cfg = labelConfigs[layerId];
-                try {
-                  map.setLayerZoomRange(layerId, cfg.minzoom, cfg.maxzoom);
-                  map.setLayoutProperty(layerId, 'text-field', [
-                    'coalesce',
-                    ['get', 'name:en'],
-                    ['get', 'name:latin'],
-                    ['get', 'name']
-                  ]);
-                  map.setLayoutProperty(layerId, 'text-padding', 10);
-                  map.setLayoutProperty(layerId, 'text-optional', true);
-                } catch(e) {}
+            // Requirement 1b: 3D extruded buildings when zoomed in
+            try {
+              if (!map.getLayer('3d-buildings') && map.getSource('openmaptiles')) {
+                map.addLayer({
+                  id: '3d-buildings',
+                  source: 'openmaptiles',
+                  'source-layer': 'building',
+                  type: 'fill-extrusion',
+                  minzoom: 14.8,
+                  paint: {
+                    'fill-extrusion-color': '#1c2333',
+                    'fill-extrusion-height': [
+                      'interpolate', ['linear'], ['zoom'],
+                      14.8, 0,
+                      15.5, ['case', ['has', 'render_height'], ['get', 'render_height'], 12]
+                    ],
+                    'fill-extrusion-opacity': 0.72
+                  }
+                });
               }
-            });
+            } catch(e) {}
+
+            // Requirement 1a: Country borders fade in only when zoomed in, soft tone, not plastered on globe
+            try {
+              allStyleLayers.forEach(function(l) {
+                if (!l.id) return;
+                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1 || l.id.indexOf('admin') !== -1;
+                if (!isBoundary) return;
+
+                var isCountry = l.id === 'boundary_country' || 
+                               l.id === 'boundary_country_z0-4' || 
+                               l.id === 'boundary_country_z5-' ||
+                               (l.id.indexOf('country') !== -1 && l.type === 'line');
+
+                var isState = l.id === 'boundary_state' || 
+                             l.id === 'boundary_state_z0-4' || 
+                             l.id.indexOf('province') !== -1 ||
+                             (l.id.indexOf('state') !== -1 && l.type === 'line');
+
+                var isCity = l.id === 'boundary_city' || 
+                            l.id === 'boundary_county' || 
+                            l.id === 'boundary_district' ||
+                            l.id.indexOf('county') !== -1 ||
+                            l.id.indexOf('admin_level_6') !== -1 ||
+                            l.id.indexOf('admin_level_8') !== -1 ||
+                            (l.id.indexOf('admin') !== -1 && l.type === 'line' && !isCountry && !isState);
+
+                if (isCountry) {
+                  // Requirement 1a: Country: Soft white-blue line, visible ONLY when zoomed in enough (fade in zoom 3.2+)
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'visible');
+                    map.setPaintProperty(l.id, 'line-dasharray', null);
+                    map.setPaintProperty(l.id, 'line-color', 'rgba(255, 255, 255, 0.65)');
+                    map.setPaintProperty(l.id, 'line-width', 1.2);
+                    map.setPaintProperty(l.id, 'line-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      3.2, 0,
+                      4.2, 0.45,
+                      7.0, 0.75
+                    ]);
+                  } catch(e) {}
+                } else if (isState) {
+                  // State / Region: Softer golden dashed line
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'visible');
+                    map.setPaintProperty(l.id, 'line-dasharray', [3, 2]);
+                    map.setPaintProperty(l.id, 'line-color', '#d99726');
+                    map.setPaintProperty(l.id, 'line-width', 1.2);
+                    map.setPaintProperty(l.id, 'line-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      4.8, 0,
+                      5.6, 0.45,
+                      8.0, 0.65
+                    ]);
+                  } catch(e) {}
+                } else if (isCity) {
+                  // City / Urban: Distinct periwinkle/indigo dotted line
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'visible');
+                    map.setPaintProperty(l.id, 'line-dasharray', [2, 2]);
+                    map.setPaintProperty(l.id, 'line-color', '#818cf8');
+                    map.setPaintProperty(l.id, 'line-width', 1.5);
+                    map.setPaintProperty(l.id, 'line-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      8.8, 0,
+                      9.6, 0.75,
+                      13.0, 0.85
+                    ]);
+                  } catch(e) {}
+                } else {
+                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
+                }
+              });
+            } catch(e) {}
+
+            // Requirement 1c: Add Google Maps places (hospitals, buildings, cafes, schools, etc.)
+            // Rendered selectively in moderation with small circles smaller than people elements, and appropriate icons
+            try {
+              if (!map.getLayer('poi-circles') && map.getSource('openmaptiles')) {
+                // (a) Circle layer: small colored circles with 1.5px white ring
+                map.addLayer({
+                  id: 'poi-circles',
+                  source: 'openmaptiles',
+                  'source-layer': 'poi',
+                  type: 'circle',
+                  minzoom: 13.5,
+                  filter: [
+                    'step', ['zoom'],
+                    ['all', ['<=', ['get', 'rank'], 2], ['in', ['get', 'class'], ['literal', ['hospital', 'university', 'college', 'railway', 'airport']]]],
+                    14.5, ['<=', ['get', 'rank'], 4],
+                    15.8, ['all']
+                  ],
+                  paint: {
+                    'circle-radius': [
+                      'interpolate', ['linear'], ['zoom'],
+                      13.5, 7,
+                      15.0, 8.5,
+                      17.0, 10
+                    ],
+                    'circle-color': [
+                      'match', ['get', 'class'],
+                      ['hospital', 'doctors'], '#ef4444',
+                      ['pharmacy'], '#14b8a6',
+                      ['cafe', 'coffee'], '#f97316',
+                      ['restaurant', 'fast_food', 'food', 'bar'], '#ea580c',
+                      ['school', 'college', 'university', 'library'], '#3b82f6',
+                      ['bank', 'atm'], '#10b981',
+                      ['park', 'pitch'], '#22c55e',
+                      ['hotel', 'lodging'], '#8b5cf6',
+                      ['shop', 'supermarket', 'grocery', 'mall'], '#ec4899',
+                      ['cinema', 'theatre', 'museum'], '#a855f7',
+                      '#64748b'
+                    ],
+                    'circle-stroke-width': 1.5,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-opacity': 0.95
+                  }
+                });
+
+                // (b) Symbol layer: Appropriate icons inside the circle
+                map.addLayer({
+                  id: 'poi-icons',
+                  source: 'openmaptiles',
+                  'source-layer': 'poi',
+                  type: 'symbol',
+                  minzoom: 13.5,
+                  filter: [
+                    'step', ['zoom'],
+                    ['all', ['<=', ['get', 'rank'], 2], ['in', ['get', 'class'], ['literal', ['hospital', 'university', 'college', 'railway', 'airport']]]],
+                    14.5, ['<=', ['get', 'rank'], 4],
+                    15.8, ['all']
+                  ],
+                  layout: {
+                    'text-field': [
+                      'match', ['get', 'class'],
+                      ['hospital', 'doctors'], '✚',
+                      ['pharmacy'], '💊',
+                      ['cafe', 'coffee'], '☕',
+                      ['restaurant', 'fast_food', 'food', 'bar'], '🍴',
+                      ['school', 'college', 'university', 'library'], '🎓',
+                      ['bank', 'atm'], '$',
+                      ['park', 'pitch'], '🌲',
+                      ['hotel', 'lodging'], '🛏',
+                      ['shop', 'supermarket', 'grocery', 'mall'], '🛍',
+                      ['cinema', 'theatre', 'museum'], '🎬',
+                      '🏢'
+                    ],
+                    'text-size': [
+                      'interpolate', ['linear'], ['zoom'],
+                      13.5, 9,
+                      16.0, 11
+                    ],
+                    'text-allow-overlap': false,
+                    'text-ignore-placement': false
+                  },
+                  paint: {
+                    'text-color': '#ffffff'
+                  }
+                });
+
+                // (c) Text labels under the circles (only when zoomed in close, non-overlapping)
+                map.addLayer({
+                  id: 'poi-labels',
+                  source: 'openmaptiles',
+                  'source-layer': 'poi',
+                  type: 'symbol',
+                  minzoom: 14.8,
+                  filter: ['<=', ['get', 'rank'], 4],
+                  layout: {
+                    'text-field': ['get', 'name'],
+                    'text-font': ['Noto Sans Regular'],
+                    'text-size': 9.5,
+                    'text-offset': [0, 1.4],
+                    'text-anchor': 'top',
+                    'text-max-width': 8,
+                    'text-optional': true,
+                    'text-allow-overlap': false
+                  },
+                  paint: {
+                    'text-color': '#e2e8f0',
+                    'text-halo-color': '#0b1426',
+                    'text-halo-width': 1.5
+                  }
+                });
+              }
+            } catch(e) {}
+
+            // Requirement 1d: Selective non-overlapping texts for countries, regions/states, cities, sub-cities
+            try {
+              // Country texts: Only zoom 0 to 4.2
+              ['place_country_major', 'place_country_minor', 'place_country_other'].forEach(function(cId) {
+                if (map.getLayer(cId)) {
+                  try {
+                    map.setPaintProperty(cId, 'text-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      1.0, 0.92,
+                      3.8, 0.92,
+                      4.4, 0
+                    ]);
+                  } catch(e){}
+                }
+              });
+
+              // Region / State texts: Only zoom 4.2 to 6.8
+              if (map.getLayer('place_state')) {
+                try {
+                  map.setPaintProperty('place_state', 'text-opacity', [
+                    'interpolate', ['linear'], ['zoom'],
+                    4.2, 0,
+                    4.8, 0.85,
+                    6.8, 0.85,
+                    7.4, 0
+                  ]);
+                } catch(e){}
+              }
+
+              // City texts: Only zoom 6.8 to 11.5
+              ['place_city_large', 'place_city'].forEach(function(cityId) {
+                if (map.getLayer(cityId)) {
+                  try {
+                    map.setPaintProperty(cityId, 'text-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      6.8, 0,
+                      7.6, 0.9,
+                      11.2, 0.9,
+                      12.0, 0
+                    ]);
+                  } catch(e){}
+                }
+              });
+
+              // Sub-cities / Towns / Districts: Only zoom 11.2 to 14.0
+              ['place_town', 'place_suburb'].forEach(function(subId) {
+                if (map.getLayer(subId)) {
+                  try {
+                    map.setPaintProperty(subId, 'text-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      11.2, 0,
+                      12.0, 0.85,
+                      14.0, 0.85,
+                      14.6, 0
+                    ]);
+                  } catch(e){}
+                }
+              });
+
+              // Villages / Neighborhoods / Local: Only zoom 13.8+
+              ['place_village', 'place_other'].forEach(function(vId) {
+                if (map.getLayer(vId)) {
+                  try {
+                    map.setPaintProperty(vId, 'text-opacity', [
+                      'interpolate', ['linear'], ['zoom'],
+                      13.8, 0,
+                      14.5, 0.85
+                    ]);
+                  } catch(e){}
+                }
+              });
+            } catch(e) {}
           });
 
           // Reset to 3D Globe
@@ -895,13 +1448,12 @@ export default function ExploreMapScreen() {
 
           window.map = map;
           var currentPayload = null;
-          var activeMarkers = [];
+          var currentSelectedCities = [];
+          var activeItemMarkers = [];
           var expandedMarkers = [];
-          var prevItemCoords = {};
           var currentlyHiddenMarker = null;
           var userGpsMarker = null;
           var lastActionTime = 0;
-          var reclusterTimer = null;
           var isProgrammaticFlight = false;
           window.pendingFocus = null;
 
@@ -919,19 +1471,44 @@ export default function ExploreMapScreen() {
             }
           };
 
-          function collapseExpanded() {
-            expandedMarkers.forEach(function(m) { m.remove(); });
-            expandedMarkers = [];
-            if (currentlyHiddenMarker && currentlyHiddenMarker._element) {
-              currentlyHiddenMarker._element.style.display = 'block';
-              var inEl = currentlyHiddenMarker._element.querySelector('.marker-inner');
-              if (inEl) {
-                inEl.classList.remove('stacked-return');
-                void inEl.offsetWidth;
-                inEl.classList.add('stacked-return');
+          // Requirement 13: Collapse expanded cluster with smooth card slide back into deck without glitches
+          function collapseExpanded(callback) {
+            if (!expandedMarkers.length) {
+              if (currentlyHiddenMarker && currentlyHiddenMarker._element) {
+                currentlyHiddenMarker._element.style.display = 'block';
+                currentlyHiddenMarker = null;
               }
-              currentlyHiddenMarker = null;
+              if (callback) callback();
+              return;
             }
+
+            // Animate expanded cards back into the deck smoothly
+            expandedMarkers.forEach(function(m) {
+              if (m._element) {
+                var inEl = m._element.querySelector('.marker-inner');
+                if (inEl) {
+                  inEl.style.animationDelay = '0ms';
+                  inEl.classList.remove('card-slide-out');
+                  inEl.classList.add('card-slide-in');
+                }
+              }
+            });
+
+            setTimeout(function() {
+              expandedMarkers.forEach(function(m) { m.remove(); });
+              expandedMarkers = [];
+              if (currentlyHiddenMarker && currentlyHiddenMarker._element) {
+                currentlyHiddenMarker._element.style.display = 'block';
+                var inEl = currentlyHiddenMarker._element.querySelector('.marker-inner');
+                if (inEl) {
+                  inEl.classList.remove('stacked-return');
+                  void inEl.offsetWidth;
+                  inEl.classList.add('stacked-return');
+                }
+                currentlyHiddenMarker = null;
+              }
+              if (callback) callback();
+            }, 320);
           }
 
           function highlightPin(pinEl) {
@@ -950,28 +1527,13 @@ export default function ExploreMapScreen() {
             });
           };
 
-          // Clicking anywhere on map collapses expanded state and clears selection glow
-          map.on('click', function(e) {
-            if (Date.now() - lastActionTime < 450) {
-              return;
-            }
-            window.pendingFocus = null;
-            isProgrammaticFlight = false;
-            collapseExpanded();
-            window.clearHighlight();
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_click' }));
-            }
-          });
-
-          function sendMarkerClick(entityType, data) {
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'marker_click',
-                entityType: entityType,
-                data: data
-              }));
-            }
+          // Requirement 8c-i: Helper to determine if an event or hangout has ended
+          function checkIsPassed(item) {
+            if (!item || (item.entityType !== 'event' && item.entityType !== 'hangout')) return false;
+            var endStr = item.endsAt || item.ends_at || item.startsAt || item.starts_at;
+            if (!endStr) return false;
+            var t = new Date(endStr).getTime();
+            return !isNaN(t) && t < Date.now();
           }
 
           // Build clean marker DOM with protruding badge
@@ -987,6 +1549,7 @@ export default function ExploreMapScreen() {
             var labelClass = '';
             var contentHtml = '';
             var title = '';
+            var isPassed = checkIsPassed(item);
 
             if (type === 'hangout') {
               pinClass = 'hangout-pin';
@@ -1021,13 +1584,16 @@ export default function ExploreMapScreen() {
               }
               pinWrapHtml += '<div class="stack-card stack-card-1 ' + pinClass + '-stack"></div>';
             }
-            pinWrapHtml += '<div class="' + pinClass + '">' + contentHtml + '</div>';
+
+            var appliedPinClasses = pinClass + (isPassed ? ' item-passed' : '');
+            pinWrapHtml += '<div class="' + appliedPinClasses + '">' + contentHtml + '</div>';
             if (isOverlapping && count > 1) {
               pinWrapHtml += '<div class="overlap-badge">✦ ' + count + '</div>';
             }
             pinWrapHtml += '</div>';
 
-            var labelHtml = '<div class="' + labelClass + '">' + title + '</div>';
+            var appliedLabelClasses = labelClass + (isPassed ? ' item-passed-label' : '');
+            var labelHtml = '<div class="' + appliedLabelClasses + '">' + title + '</div>';
 
             inner.innerHTML = pinWrapHtml + labelHtml;
             container.appendChild(inner);
@@ -1039,144 +1605,102 @@ export default function ExploreMapScreen() {
             };
           }
 
-          // Adaptive responsive layout calculation for exploded stack at same venue
+          // Adaptive offsets for card deck fan / exploded stack
           function computeAdaptiveOffsets(count) {
             var offsets = [];
-            if (count <= 1) {
-              return [{ dx: 0, dy: 0, delay: 0 }];
-            }
+            if (count <= 1) return [{ dx: 0, dy: 0, delay: 0, rot: 0 }];
             if (count === 2) {
               return [
-                { dx: -56, dy: 0, delay: 0 },
-                { dx: 56, dy: 0, delay: 35 }
+                { dx: -56, dy: 0, delay: 0, rot: -4 },
+                { dx: 56, dy: 0, delay: 35, rot: 4 }
               ];
             }
             if (count === 3) {
               var r = 66;
               return [
-                { dx: 0, dy: -r, delay: 0 },
-                { dx: Math.round(r * 0.866), dy: Math.round(r * 0.5), delay: 35 },
-                { dx: Math.round(-r * 0.866), dy: Math.round(r * 0.5), delay: 70 }
+                { dx: 0, dy: -r, delay: 0, rot: 0 },
+                { dx: Math.round(r * 0.866), dy: Math.round(r * 0.5), delay: 35, rot: 6 },
+                { dx: Math.round(-r * 0.866), dy: Math.round(r * 0.5), delay: 70, rot: -6 }
               ];
             }
             if (count === 4) {
               var r = 78;
               return [
-                { dx: 0, dy: -r, delay: 0 },
-                { dx: r, dy: 0, delay: 25 },
-                { dx: 0, dy: r, delay: 50 },
-                { dx: -r, dy: 0, delay: 75 }
+                { dx: 0, dy: -r, delay: 0, rot: 0 },
+                { dx: r, dy: 0, delay: 25, rot: 6 },
+                { dx: 0, dy: r, delay: 50, rot: 0 },
+                { dx: -r, dy: 0, delay: 75, rot: -6 }
               ];
             }
-            if (count === 5) {
-              var r = 92;
-              for (var i = 0; i < 5; i++) {
-                var angle = (i / 5) * 2 * Math.PI - Math.PI / 2;
-                offsets.push({
-                  dx: Math.round(Math.cos(angle) * r),
-                  dy: Math.round(Math.sin(angle) * r),
-                  delay: i * 22
-                });
-              }
-              return offsets;
-            }
-            if (count <= 8) {
-              var r = 48 + count * 10;
-              for (var i = 0; i < count; i++) {
-                var angle = (i / count) * 2 * Math.PI - Math.PI / 2;
-                offsets.push({
-                  dx: Math.round(Math.cos(angle) * r),
-                  dy: Math.round(Math.sin(angle) * r),
-                  delay: i * 20
-                });
-              }
-              return offsets;
-            }
-
-            // Stacks with 9 to 20+ items: Concentric Dual Rings
-            var innerCount = Math.max(3, Math.min(5, Math.round(count * 0.35)));
-            var outerCount = count - innerCount;
-            var rInner = 78;
-            var rOuter = 152 + Math.min(outerCount * 3, 30);
-
-            for (var i = 0; i < innerCount; i++) {
-              var angle = (i / innerCount) * 2 * Math.PI - Math.PI / 2;
+            var r = 50 + count * 9;
+            for (var i = 0; i < count; i++) {
+              var angle = (i / count) * 2 * Math.PI - Math.PI / 2;
+              var rot = Math.round((angle * 180) / Math.PI / 8);
               offsets.push({
-                dx: Math.round(Math.cos(angle) * rInner),
-                dy: Math.round(Math.sin(angle) * rInner),
-                delay: i * 18
-              });
-            }
-            var phase = Math.PI / outerCount;
-            for (var j = 0; j < outerCount; j++) {
-              var angle = (j / outerCount) * 2 * Math.PI - Math.PI / 2 + phase;
-              offsets.push({
-                dx: Math.round(Math.cos(angle) * rOuter),
-                dy: Math.round(Math.sin(angle) * rOuter),
-                delay: 70 + j * 18
+                dx: Math.round(Math.cos(angle) * r),
+                dy: Math.round(Math.sin(angle) * r),
+                delay: i * 20,
+                rot: rot
               });
             }
             return offsets;
           }
 
-          // Expand overlapping elements with explosive burst outward from center point (NO orange dot!)
+          // Requirement 8b: Expand overlapping elements with smooth card deck sliding
           function expandCluster(cluster, markerRef) {
-            collapseExpanded();
+            collapseExpanded(function() {
+              if (markerRef && markerRef._element) {
+                markerRef._element.style.display = 'none';
+                currentlyHiddenMarker = markerRef;
+              }
 
-            if (markerRef && markerRef._element) {
-              markerRef._element.style.display = 'none';
-              currentlyHiddenMarker = markerRef;
-            }
+              var items = cluster.items;
+              var offsets = computeAdaptiveOffsets(items.length);
 
-            var items = cluster.items;
-            var offsets = computeAdaptiveOffsets(items.length);
+              items.forEach(function(item, idx) {
+                var off = offsets[idx] || { dx: 0, dy: 0, delay: 0, rot: 0 };
+                var itemDom = createItemDom(item, false, 1);
 
-            items.forEach(function(item, idx) {
-              var off = offsets[idx] || { dx: 0, dy: 0, delay: 0 };
-              var itemDom = createItemDom(item, false, 1);
+                itemDom.inner.style.setProperty('--target-x', off.dx + 'px');
+                itemDom.inner.style.setProperty('--target-y', off.dy + 'px');
+                itemDom.inner.style.setProperty('--card-deck-rot', off.rot + 'deg');
+                itemDom.inner.style.animationDelay = off.delay + 'ms';
+                itemDom.inner.classList.add('card-slide-out');
 
-              itemDom.inner.style.setProperty('--target-x', off.dx + 'px');
-              itemDom.inner.style.setProperty('--target-y', off.dy + 'px');
-              itemDom.inner.style.animationDelay = off.delay + 'ms';
-              itemDom.inner.classList.add('explode-bloom');
+                itemDom.container.addEventListener('click', function(ev) {
+                  ev.stopPropagation();
+                  lastActionTime = Date.now();
+                  highlightPin(itemDom.pin);
+                  sendMarkerClick(item.entityType, item);
+                });
 
-              itemDom.container.addEventListener('click', function(ev) {
-                ev.stopPropagation();
-                lastActionTime = Date.now();
-                highlightPin(itemDom.pin);
-                sendMarkerClick(item.entityType, item);
+                itemDom.container.addEventListener('touchend', function(ev) {
+                  ev.stopPropagation();
+                  lastActionTime = Date.now();
+                });
+
+                var expandedMarker = new maplibregl.Marker({
+                  element: itemDom.container,
+                  offset: [0, 0]
+                })
+                  .setLngLat([cluster.lng, cluster.lat])
+                  .addTo(map);
+
+                expandedMarker._item = item;
+                expandedMarker._pin = itemDom.pin;
+                expandedMarkers.push(expandedMarker);
               });
-
-              itemDom.container.addEventListener('touchend', function(ev) {
-                ev.stopPropagation();
-                lastActionTime = Date.now();
-              });
-
-              var expandedMarker = new maplibregl.Marker({
-                element: itemDom.container,
-                offset: [0, 0]
-              })
-                .setLngLat([cluster.lng, cluster.lat])
-                .addTo(map);
-
-              expandedMarker._item = item;
-              expandedMarker._pin = itemDom.pin;
-              expandedMarkers.push(expandedMarker);
             });
           }
 
-          var activeItemMarkers = [];
-
-          // Continuous Smooth Clustering Function (Fish-Swarm Interpolation)
-          // As user zooms out, elements smoothly converge toward their regional center like fish approaching food.
-          // As user zooms in, they smoothly disperse into their exact venues. Rational number precise!
+          // Continuous Smooth Clustering
           function updateContinuousClustering() {
             if (!activeItemMarkers.length) return;
             var z = map.getZoom();
             var maxZ = 13.5;
             var minZ = 1.5;
             var t = Math.max(0, Math.min(1, (maxZ - z) / (maxZ - minZ)));
-            var alpha = t * t * (3 - 2 * t) * 0.94; // Smooth cubic S-curve
+            var alpha = t * t * (3 - 2 * t) * 0.94;
 
             for (var i = 0; i < activeItemMarkers.length; i++) {
               var m = activeItemMarkers[i];
@@ -1188,46 +1712,112 @@ export default function ExploreMapScreen() {
             }
           }
 
-          // Dynamic Marker Rendering with Hierarchical Regional Clustering
+          // Check if an item belongs to one of the selected cities
+          function itemMatchesSelectedCities(item) {
+            if (!currentSelectedCities || !currentSelectedCities.length) return false;
+            var lat = item.location && typeof item.location.latitude === 'number' ? item.location.latitude : null;
+            var lng = item.location && typeof item.location.longitude === 'number' ? item.location.longitude : null;
+            if (lat === null || lng === null) return false;
+
+            var locName = (item.location && item.location.name ? item.location.name : '').toLowerCase();
+
+            for (var i = 0; i < currentSelectedCities.length; i++) {
+              var city = currentSelectedCities[i];
+              var dLat = Math.abs(lat - city.lat);
+              var dLng = Math.abs(lng - city.lng);
+              if (dLat < 0.35 && dLng < 0.35) return true;
+              if (city.name && locName.indexOf(city.name.toLowerCase()) !== -1) return true;
+            }
+            return false;
+          }
+
+          // Dynamic Marker Rendering with City Scoping
           function renderMarkers() {
             if (!currentPayload) return;
-            collapseExpanded();
+            if (!isProgrammaticFlight && !window.pendingFocus) {
+              collapseExpanded();
+            }
             activeItemMarkers.forEach(function(m) { m.marker.remove(); });
             activeItemMarkers = [];
 
-            var filter = currentPayload.filter || 'all';
+            var entityTypes = currentPayload.selectedEntityTypes || ['all'];
+            var categories = currentPayload.selectedCategories || ['all'];
             var allItems = [];
 
-            if (filter === 'all' || filter === 'hangouts') {
-              (currentPayload.hangouts || []).forEach(function(h) {
-                if (h.location && typeof h.location.latitude === 'number' && typeof h.location.longitude === 'number') {
-                  allItems.push(Object.assign({}, h, { entityType: 'hangout' }));
-                }
-              });
+            function isEntityActive(type) {
+              if (!entityTypes || !entityTypes.length || entityTypes.indexOf('all') !== -1) return true;
+              return entityTypes.indexOf(type) !== -1;
             }
-            if (filter === 'all' || filter === 'events') {
-              (currentPayload.events || []).forEach(function(e) {
-                if (e.location && typeof e.location.latitude === 'number' && typeof e.location.longitude === 'number') {
-                  allItems.push(Object.assign({}, e, { entityType: 'event' }));
-                }
-              });
-            }
-            if (filter === 'all' || filter === 'communities') {
-              (currentPayload.communities || []).forEach(function(c) {
-                if (c.location && typeof c.location.latitude === 'number' && typeof c.location.longitude === 'number') {
-                  allItems.push(Object.assign({}, c, { entityType: 'community' }));
-                }
-              });
-            }
-            if (filter === 'all' || filter === 'users') {
-              (currentPayload.users || []).forEach(function(u) {
-                if (u.location && typeof u.location.latitude === 'number' && typeof u.location.longitude === 'number') {
-                  allItems.push(Object.assign({}, u, { entityType: 'user' }));
-                }
+
+            function itemMatchesCategory(item) {
+              if (!categories || !categories.length || categories.indexOf('all') !== -1) {
+                return true;
+              }
+              var cat = (item.category || item.categoryName || '').toLowerCase().trim();
+              if (!cat) return false;
+              return categories.some(function(sc) {
+                var norm = sc.toLowerCase().trim();
+                return cat === norm ||
+                       cat.indexOf(norm) !== -1 ||
+                       norm.indexOf(cat) !== -1 ||
+                       (norm === 'movies_tv' && (cat.indexOf('movie') !== -1 || cat.indexOf('tv') !== -1)) ||
+                       (norm === 'movies' && cat.indexOf('movie') !== -1) ||
+                       (norm === 'sports' && cat.indexOf('sport') !== -1) ||
+                       (norm === 'music_entertainment' && cat.indexOf('music') !== -1) ||
+                       (norm === 'music' && cat.indexOf('music') !== -1) ||
+                       (norm === 'gaming' && (cat.indexOf('game') !== -1 || cat.indexOf('gaming') !== -1)) ||
+                       (norm === 'technology' && (cat.indexOf('tech') !== -1 || cat.indexOf('computer') !== -1)) ||
+                       (norm === 'tech' && cat.indexOf('tech') !== -1) ||
+                       (norm === 'arts_creativity' && cat.indexOf('art') !== -1) ||
+                       (norm === 'art' && cat.indexOf('art') !== -1) ||
+                       (norm === 'health_fitness' && (cat.indexOf('fit') !== -1 || cat.indexOf('health') !== -1)) ||
+                       (norm === 'fitness' && cat.indexOf('fit') !== -1) ||
+                       (norm === 'outdoor_adventure' && (cat.indexOf('outdoor') !== -1 || cat.indexOf('adventure') !== -1)) ||
+                       (norm === 'outdoor' && cat.indexOf('outdoor') !== -1) ||
+                       (norm === 'food' && (cat.indexOf('food') !== -1 || cat.indexOf('dine') !== -1 || cat.indexOf('restaurant') !== -1)) ||
+                       (norm === 'anime_manga' && (cat.indexOf('anime') !== -1 || cat.indexOf('manga') !== -1)) ||
+                       (norm === 'education_study_groups' && (cat.indexOf('edu') !== -1 || cat.indexOf('study') !== -1)) ||
+                       (norm === 'books_writing' && (cat.indexOf('book') !== -1 || cat.indexOf('writ') !== -1)) ||
+                       (norm === 'social_lifestyle' && (cat.indexOf('social') !== -1 || cat.indexOf('life') !== -1)) ||
+                       (norm === 'culture_language' && (cat.indexOf('cultur') !== -1 || cat.indexOf('lang') !== -1)) ||
+                       (norm === 'other' && (cat.indexOf('other') !== -1 || cat.indexOf('misc') !== -1));
               });
             }
 
-            // 1. Group items that share the EXACT same location into venue units
+            function pushIfSelected(item, type) {
+              if (item.location && typeof item.location.latitude === 'number' && typeof item.location.longitude === 'number') {
+                var wrapped = Object.assign({}, item, { entityType: type });
+                // Requirement 8c-ii: Only render elements inside selected cities
+                if (itemMatchesSelectedCities(wrapped)) {
+                  allItems.push(wrapped);
+                }
+              }
+            }
+
+            if (isEntityActive('hangouts')) {
+              (currentPayload.hangouts || []).forEach(function(h) {
+                if (itemMatchesCategory(h)) pushIfSelected(h, 'hangout');
+              });
+            }
+            if (isEntityActive('events')) {
+              (currentPayload.events || []).forEach(function(e) {
+                if (itemMatchesCategory(e)) pushIfSelected(e, 'event');
+              });
+            }
+            if (isEntityActive('communities')) {
+              (currentPayload.communities || []).forEach(function(c) {
+                if (itemMatchesCategory(c)) pushIfSelected(c, 'community');
+              });
+            }
+            // Requirement 14: People do NOT have categories. If a specific category filter is active, exclude users completely!
+            var hasSpecificCategory = categories && categories.length > 0 && categories.indexOf('all') === -1;
+            if (isEntityActive('users') && !hasSpecificCategory) {
+              (currentPayload.users || []).forEach(function(u) {
+                pushIfSelected(u, 'user');
+              });
+            }
+
+            // 1. Group items that share the EXACT same location
             var venueUnits = [];
             for (var i = 0; i < allItems.length; i++) {
               var item = allItems[i];
@@ -1253,7 +1843,7 @@ export default function ExploreMapScreen() {
               }
             }
 
-            // 2. Group venue units by regional proximity for continuous zoom clustering (~2.2 degrees)
+            // 2. Group venue units by regional proximity
             var regionalGroups = [];
             for (var i = 0; i < venueUnits.length; i++) {
               var vu = venueUnits[i];
@@ -1281,7 +1871,7 @@ export default function ExploreMapScreen() {
               }
             }
 
-            // 3. Build markers for each venue unit with continuous swarm metadata
+            // 3. Build markers
             regionalGroups.forEach(function(group) {
               var vCount = group.venues.length;
               var cLat = group.centerLat;
@@ -1310,7 +1900,6 @@ export default function ExploreMapScreen() {
                   var z = map.getZoom();
 
                   if (z < 11.0) {
-                    // Zoomed out in regional cluster: fly directly into this venue's exact location!
                     map.flyTo({
                       center: [vu.lng, vu.lat],
                       zoom: 14.5,
@@ -1319,9 +1908,7 @@ export default function ExploreMapScreen() {
                       essential: true
                     });
                   } else {
-                    // At street level:
                     if (isOverlapping) {
-                      // Items share exact same location: explode into radial expanded petal state!
                       expandCluster(vu, marker);
                     } else {
                       collapseExpanded();
@@ -1355,11 +1942,9 @@ export default function ExploreMapScreen() {
               });
             });
 
-            // Immediately apply smooth continuous clustering according to current map zoom
             updateZoomScale();
             updateContinuousClustering();
 
-            // If a detail screen requested focus, automatically expand cluster & highlight target!
             if (window.pendingFocus) {
               performFocusEntity(
                 window.pendingFocus.id,
@@ -1372,9 +1957,18 @@ export default function ExploreMapScreen() {
 
           window.updateMapMarkers = function(payload) {
             currentPayload = payload;
+            if (payload.selectedCities) {
+              currentSelectedCities = payload.selectedCities;
+            }
             renderMarkers();
           };
 
+          window.syncSelectedCities = function(cities) {
+            currentSelectedCities = cities;
+            renderMarkers();
+          };
+
+          // Requirement 8a: Direct expansion and solid selection glow without flickering
           function performFocusEntity(targetId, targetType, targetLat, targetLng) {
             if (!activeItemMarkers.length) return false;
             var tId = targetId ? String(targetId) : '';
@@ -1418,7 +2012,6 @@ export default function ExploreMapScreen() {
 
             function doExpandAndHighlight() {
               if (targetVu.items.length > 1) {
-                // Target item belongs to a cluster: auto-expand cluster and activate selection glow on target pin!
                 expandCluster(targetVu, markerRef);
                 setTimeout(function() {
                   var targetPin = null;
@@ -1431,12 +2024,13 @@ export default function ExploreMapScreen() {
                     highlightPin(targetPin);
                   }
                   isProgrammaticFlight = false;
-                }, 100);
+                  window.pendingFocus = null;
+                }, 120);
               } else {
-                // Standalone item: activate selection glow directly!
                 collapseExpanded();
                 highlightPin(foundEntry.dom.pin);
                 isProgrammaticFlight = false;
+                window.pendingFocus = null;
               }
             }
 
@@ -1445,14 +2039,13 @@ export default function ExploreMapScreen() {
             var zoom = map.getZoom();
 
             if (zoom >= 14 && dist < 0.005) {
-              // Already at target location: expand & glow immediately!
               doExpandAndHighlight();
             } else {
               isProgrammaticFlight = true;
               map.once('moveend', function() {
                 setTimeout(function() {
                   doExpandAndHighlight();
-                }, 70);
+                }, 80);
               });
               map.flyTo({
                 center: [targetVu.lng, targetVu.lat],
@@ -1462,7 +2055,6 @@ export default function ExploreMapScreen() {
                 curve: 1.4,
                 essential: true
               });
-              // Safety timeout in case moveend doesn't fire
               setTimeout(function() {
                 if (isProgrammaticFlight) {
                   doExpandAndHighlight();
@@ -1473,7 +2065,6 @@ export default function ExploreMapScreen() {
             return true;
           }
 
-          // Programmatic focus & selection (e.g. forwarded by tapping location on a specific detail page)
           window.focusEntityOnMap = function(targetId, targetType, targetLat, targetLng) {
             window.pendingFocus = {
               id: targetId ? String(targetId) : '',
@@ -1484,15 +2075,144 @@ export default function ExploreMapScreen() {
             performFocusEntity(targetId, targetType, targetLat, targetLng);
           };
 
+          // Requirement 8c-iii: Progressive Zoom & Empty Space Tapping Logic
+          map.on('click', function(e) {
+            if (Date.now() - lastActionTime < 450) return;
+            if (isProgrammaticFlight) return;
+
+            // 1. Invalidate ocean taps completely
+            var features = map.queryRenderedFeatures(e.point);
+            var isWater = features.some(function(f) {
+              return f.layer && (
+                f.layer.id.indexOf('water') !== -1 ||
+                f.layer.id.indexOf('ocean') !== -1 ||
+                f.layer['source-layer'] === 'water'
+              );
+            });
+            if (isWater) {
+              return; // Avoid taking tap inputs on water bodies / oceans
+            }
+
+            window.pendingFocus = null;
+            collapseExpanded();
+            window.clearHighlight();
+
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_click' }));
+            }
+
+            var z = map.getZoom();
+
+            // Progressive Zoom on Land:
+            if (z < 4.0) {
+              // Globe / Continent level -> Zoom to Country level
+              map.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 5.8, essential: true });
+            } else if (z < 7.0) {
+              // Country level -> Zoom to Region / State level
+              map.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 8.8, essential: true });
+            } else if (z < 10.5) {
+              // Region / State level -> Zoom to City level
+              map.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 12.8, essential: true });
+            } else {
+              // City level (z >= 10.5): Check city empty space tap
+              var cityName = '';
+              var cityFeature = features.find(function(f) {
+                return f.layer && f.layer.id && (
+                  f.layer.id.indexOf('place_city') !== -1 ||
+                  f.layer.id.indexOf('place_town') !== -1 ||
+                  f.layer.id.indexOf('place_suburb') !== -1
+                );
+              });
+              if (cityFeature && cityFeature.properties) {
+                cityName = cityFeature.properties['name:en'] || cityFeature.properties.name || '';
+              }
+              if (!cityName) {
+                var nearbyPlaces = map.queryRenderedFeatures([
+                  [e.point.x - 120, e.point.y - 120],
+                  [e.point.x + 120, e.point.y + 120]
+                ], {
+                  layers: ['place_city_large', 'place_city', 'place_town', 'place_suburb']
+                });
+                if (nearbyPlaces.length && nearbyPlaces[0].properties) {
+                  cityName = nearbyPlaces[0].properties['name:en'] || nearbyPlaces[0].properties.name || '';
+                }
+              }
+              if (!cityName) {
+                cityName = 'Selected Area';
+              }
+
+              // Check if already selected:
+              var isAlreadySelected = (currentSelectedCities || []).some(function(c) {
+                var cName = (c.name || '').toLowerCase();
+                var hitName = cityName.toLowerCase();
+                if (cName === hitName) return true;
+                var dLat = Math.abs(c.lat - e.lngLat.lat);
+                var dLng = Math.abs(c.lng - e.lngLat.lng);
+                return dLat < 0.35 && dLng < 0.35;
+              });
+
+              if (isAlreadySelected) {
+                // Tapping in empty space inside already selected city should do nothing
+                return;
+              }
+
+              // Trigger special UI: Radar Scanner Animation at tap coordinate!
+              var radarEl = document.createElement('div');
+              radarEl.className = 'city-radar-container';
+              radarEl.innerHTML = '<div class="city-radar-ring"></div><div class="city-radar-core"></div><div class="city-radar-label">Scanning & Rendering ' + cityName + '...</div>';
+
+              var radarMarker = new maplibregl.Marker({ element: radarEl })
+                .setLngLat([e.lngLat.lng, e.lngLat.lat])
+                .addTo(map);
+
+              setTimeout(function() {
+                radarMarker.remove();
+              }, 1800);
+
+              // Notify React Native that this city was selected
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'city_selected',
+                  city: cityName,
+                  lat: e.lngLat.lat,
+                  lng: e.lngLat.lng
+                }));
+              }
+            }
+          });
+
+          function sendMarkerClick(entityType, data) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'marker_click',
+                entityType: entityType,
+                data: data
+              }));
+            }
+          }
+
           map.on('move', function() {
             updateContinuousClustering();
+          });
+          map.on('moveend', function() {
+            if (isProgrammaticFlight) return;
+            var c = map.getCenter();
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'camera_move',
+                center: [c.lng, c.lat],
+                zoom: map.getZoom(),
+                pitch: map.getPitch(),
+                bearing: map.getBearing()
+              }));
+            }
           });
           map.on('zoom', function() {
             updateZoomScale();
             updateContinuousClustering();
           });
           map.on('zoomstart', function() {
-            if (isProgrammaticFlight) return;
+            if (isProgrammaticFlight || window.pendingFocus) return;
             collapseExpanded();
           });
 
@@ -1504,7 +2224,8 @@ export default function ExploreMapScreen() {
         </script>
       </body>
     </html>
-  `;
+    `;
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -1516,7 +2237,7 @@ export default function ExploreMapScreen() {
         onMessage={onWebViewMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        onLoadEnd={() => sendDataToWebView(mapData, filter)}
+        onLoadEnd={() => sendDataToWebView(mapData, selectedEntityTypes, selectedCategories, selectedCities)}
       />
 
       {/* Floating Header Controls with App's Yellow Accent & Dark Brown Theme */}
@@ -1551,10 +2272,10 @@ export default function ExploreMapScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Refresh Map Data Button */}
+          {/* Refresh Map Data Button: updates locations in place without moving camera */}
           <TouchableOpacity
             style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '50' }]}
-            onPress={loadMapData}
+            onPress={handleRefreshDataInPlace}
             activeOpacity={0.8}
           >
             {loading ? (
@@ -1566,7 +2287,7 @@ export default function ExploreMapScreen() {
         </View>
       </View>
 
-      {/* Horizontally Scrollable Filter Category Chips */}
+      {/* Horizontally Scrollable Multi-Select Entity Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -1578,162 +2299,407 @@ export default function ExploreMapScreen() {
           style={[
             styles.filterChip,
             { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
-            filter === 'all' && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
+            (selectedEntityTypes.includes('all') || selectedEntityTypes.length === 0) && [
+              styles.filterChipActive,
+              { backgroundColor: yellowAccent, borderColor: '#feba48' },
+            ],
           ]}
-          onPress={() => handleFilterChange('all')}
+          onPress={() => handleToggleEntityType('all')}
           activeOpacity={0.8}
         >
           <Text
             style={[
               styles.filterText,
               { color: isDark ? '#d5c4b4' : '#695c50' },
-              filter === 'all' && [styles.filterTextActive, { color: darkBrown }],
+              (selectedEntityTypes.includes('all') || selectedEntityTypes.length === 0) && [
+                styles.filterTextActive,
+                { color: darkBrown },
+              ],
             ]}
           >
             All
           </Text>
         </TouchableOpacity>
 
-        {/* 2. Hangouts */}
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
-            filter === 'hangouts' && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
-          ]}
-          onPress={() => handleFilterChange('hangouts')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons
-            name="local-cafe"
-            size={14}
-            color={filter === 'hangouts' ? darkBrown : isDark ? '#d5c4b4' : '#695c50'}
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={[
-              styles.filterText,
-              { color: isDark ? '#d5c4b4' : '#695c50' },
-              filter === 'hangouts' && [styles.filterTextActive, { color: darkBrown }],
-            ]}
-          >
-            Hangouts
-          </Text>
-        </TouchableOpacity>
+        {/* 2. Hangouts (Item 12: icon color yellowAccent / darkBrown) */}
+        {(() => {
+          const isActive = selectedEntityTypes.includes('hangouts') && !selectedEntityTypes.includes('all');
+          return (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
+                isActive && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
+              ]}
+              onPress={() => handleToggleEntityType('hangouts')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="local-cafe"
+                size={14}
+                color={isActive ? darkBrown : yellowAccent}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: isDark ? '#d5c4b4' : '#695c50' },
+                  isActive && [styles.filterTextActive, { color: darkBrown }],
+                ]}
+              >
+                Hangouts
+              </Text>
+            </TouchableOpacity>
+          );
+        })()}
 
-        {/* 3. Events */}
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
-            filter === 'events' && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
-          ]}
-          onPress={() => handleFilterChange('events')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons
-            name="event"
-            size={14}
-            color={filter === 'events' ? darkBrown : isDark ? '#d5c4b4' : '#695c50'}
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={[
-              styles.filterText,
-              { color: isDark ? '#d5c4b4' : '#695c50' },
-              filter === 'events' && [styles.filterTextActive, { color: darkBrown }],
-            ]}
-          >
-            Events
-          </Text>
-        </TouchableOpacity>
+        {/* 3. Events (Item 12: icon color yellowAccent / darkBrown) */}
+        {(() => {
+          const isActive = selectedEntityTypes.includes('events') && !selectedEntityTypes.includes('all');
+          return (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
+                isActive && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
+              ]}
+              onPress={() => handleToggleEntityType('events')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="event"
+                size={14}
+                color={isActive ? darkBrown : yellowAccent}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: isDark ? '#d5c4b4' : '#695c50' },
+                  isActive && [styles.filterTextActive, { color: darkBrown }],
+                ]}
+              >
+                Events
+              </Text>
+            </TouchableOpacity>
+          );
+        })()}
 
-        {/* 4. Communities */}
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
-            filter === 'communities' && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
-          ]}
-          onPress={() => handleFilterChange('communities')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons
-            name="groups"
-            size={14}
-            color={filter === 'communities' ? darkBrown : isDark ? '#d5c4b4' : '#695c50'}
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={[
-              styles.filterText,
-              { color: isDark ? '#d5c4b4' : '#695c50' },
-              filter === 'communities' && [styles.filterTextActive, { color: darkBrown }],
-            ]}
-          >
-            Communities
-          </Text>
-        </TouchableOpacity>
+        {/* 4. Communities (Item 12: icon color yellowAccent / darkBrown) */}
+        {(() => {
+          const isActive = selectedEntityTypes.includes('communities') && !selectedEntityTypes.includes('all');
+          return (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
+                isActive && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
+              ]}
+              onPress={() => handleToggleEntityType('communities')}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="groups"
+                size={14}
+                color={isActive ? darkBrown : yellowAccent}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: isDark ? '#d5c4b4' : '#695c50' },
+                  isActive && [styles.filterTextActive, { color: darkBrown }],
+                ]}
+              >
+                Communities
+              </Text>
+            </TouchableOpacity>
+          );
+        })()}
 
-        {/* 5. People */}
-        <TouchableOpacity
-          style={[
-            styles.filterChip,
-            { backgroundColor: darkBrownBg, borderColor: darkBrownBorder },
-            filter === 'users' && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
-          ]}
-          onPress={() => handleFilterChange('users')}
-          activeOpacity={0.8}
-        >
-          <MaterialIcons
-            name="person"
-            size={14}
-            color={filter === 'users' ? darkBrown : isDark ? '#d5c4b4' : '#695c50'}
-            style={{ marginRight: 4 }}
-          />
-          <Text
-            style={[
-              styles.filterText,
-              { color: isDark ? '#d5c4b4' : '#695c50' },
-              filter === 'users' && [styles.filterTextActive, { color: darkBrown }],
-            ]}
-          >
-            People
-          </Text>
-        </TouchableOpacity>
+        {/* 5. People / Users (Item 12: icon color yellowAccent / darkBrown; Item 14: Dimmed when category filter active) */}
+        {(() => {
+          const hasSpecificCategory = selectedCategories.length > 0 && !selectedCategories.includes('all');
+          const isActive = selectedEntityTypes.includes('users') && !selectedEntityTypes.includes('all');
+          return (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                { backgroundColor: darkBrownBg, borderColor: darkBrownBorder, opacity: hasSpecificCategory ? 0.45 : 1 },
+                isActive && !hasSpecificCategory && [styles.filterChipActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }],
+              ]}
+              onPress={() => {
+                if (hasSpecificCategory) {
+                  // Tapping People resets specific category filter since people do not have categories
+                  setSelectedCategories(['all']);
+                  handleToggleEntityType('users');
+                } else {
+                  handleToggleEntityType('users');
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="person"
+                size={14}
+                color={isActive && !hasSpecificCategory ? darkBrown : yellowAccent}
+                style={{ marginRight: 4 }}
+              />
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: isDark ? '#d5c4b4' : '#695c50' },
+                  isActive && !hasSpecificCategory && [styles.filterTextActive, { color: darkBrown }],
+                ]}
+              >
+                People
+              </Text>
+            </TouchableOpacity>
+          );
+        })()}
       </ScrollView>
 
-      {/* Snapchat-Style Sliding Entity Preview Card */}
-      {selectedEntity && (
+      {/* Requirement 14 & 1h: Category Filter Stack & Horizontal Category Text Pills */}
+      <View
+        style={[
+          styles.categoryStackWrapper,
+          {
+            top: Math.max(insets.top, 16) + 104,
+            left: Spacing.md,
+            right: Spacing.md,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            pointerEvents: 'box-none',
+          },
+        ]}
+      >
+        {/* Left: Category Icon Circles Stack */}
+        {!isCategoryStackExpanded ? (
+          // Overlapped State: Max 4 circles poking out vertically downwards
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handleExpandCategories}
+            style={styles.categoryStackOverlapBox}
+          >
+            {/* 4th circle */}
+            <View style={[styles.categoryOverlapPill, styles.categoryOverlap4, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '30' }]} />
+            {/* 3rd circle */}
+            <View style={[styles.categoryOverlapPill, styles.categoryOverlap3, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '45' }]} />
+            {/* 2nd circle */}
+            <View style={[styles.categoryOverlapPill, styles.categoryOverlap2, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '65' }]} />
+            {/* Top 1st circle */}
+            <View
+              style={[
+                styles.categoryOverlapPill,
+                styles.categoryOverlap1,
+                {
+                  backgroundColor: selectedCategories.length > 0 && !selectedCategories.includes('all') ? yellowAccent : darkBrownBg,
+                  borderColor: yellowAccent,
+                },
+              ]}
+            >
+              <MaterialIcons
+                name={
+                  selectedCategories.length > 0 && !selectedCategories.includes('all')
+                    ? (CATEGORY_FILTER_ITEMS.find((c) => selectedCategories.includes(c.id) || selectedCategories.includes(c.name))?.icon || 'category')
+                    : 'category'
+                }
+                size={18}
+                color={selectedCategories.length > 0 && !selectedCategories.includes('all') ? darkBrown : yellowAccent}
+              />
+              {selectedCategories.length > 0 && !selectedCategories.includes('all') && (
+                <View style={styles.categoryStackBadge}>
+                  <Text style={styles.categoryStackBadgeText}>{selectedCategories.length}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        ) : (
+          // Expanded State: Smooth cluster card animation, top arrow REMOVED per requirement 1h!
+          <Animated.View
+            style={[
+              styles.categoryStackExpandedBox,
+              {
+                backgroundColor: isDark ? 'rgba(32, 28, 24, 0.95)' : 'rgba(255, 255, 255, 0.96)',
+                borderColor: yellowAccent + '70',
+                opacity: categoryStackAnim.interpolate({
+                  inputRange: [0, 0.4, 1],
+                  outputRange: [0.6, 0.9, 1],
+                }),
+              },
+            ]}
+          >
+            {/* Top arrow removed per requirement 1h */}
+
+            {/* Scrollable list of categories with smooth deck slide out animation */}
+            <ScrollView
+              ref={categoryScrollRef}
+              showsVerticalScrollIndicator={false}
+              style={styles.categoryScrollList}
+              contentContainerStyle={styles.categoryScrollContent}
+            >
+              {CATEGORY_FILTER_ITEMS.map((item, idx) => {
+                const isSelected = selectedCategories.includes(item.id) || selectedCategories.includes(item.name);
+                const itemTranslateY = categoryStackAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-(idx * 16), 0],
+                });
+                const itemScale = categoryStackAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.82, 1],
+                });
+                return (
+                  <Animated.View
+                    key={item.id}
+                    style={{
+                      transform: [{ translateY: itemTranslateY }, { scale: itemScale }],
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.categoryItemCircle,
+                        isSelected
+                          ? [styles.categoryItemActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }]
+                          : [styles.categoryItemInactive, { backgroundColor: darkBrownBg, borderColor: isDark ? '#3d3835' : '#e5d5c3' }],
+                      ]}
+                      onPress={() => handleToggleCategory(item.id)}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialIcons
+                        name={item.icon}
+                        size={17}
+                        color={isSelected ? darkBrown : yellowAccent}
+                      />
+                    </TouchableOpacity>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
+
+            {/* Bottom Pull Tab Arrow: Collapses stack with smooth slide back */}
+            <TouchableOpacity
+              style={[styles.categoryActionCircle, styles.categoryPullTabBottom, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '60' }]}
+              onPress={handleCollapseCategories}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="keyboard-arrow-up" size={20} color={yellowAccent} />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* Right: "Categories" text pill or horizontally stacking selected categories pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categorySelectedPillsScroll}
+          style={styles.categorySelectedPillsWrap}
+        >
+          {activeCategoriesList.length === 0 ? (
+            <View style={styles.categoryLabelPill}>
+              <MaterialIcons name="category" size={13} color={yellowAccent} style={{ marginRight: 4 }} />
+              <Text style={styles.categoryLabelPillText}>Categories</Text>
+            </View>
+          ) : (
+            activeCategoriesList.map((catItem) => (
+              <View key={catItem.id} style={styles.categoryActivePill}>
+                <MaterialIcons name={catItem.icon} size={13} color={darkBrown} style={{ marginRight: 4 }} />
+                <Text style={styles.categoryActivePillText}>{catItem.label}</Text>
+                <TouchableOpacity
+                  onPress={() => handleToggleCategory(catItem.id)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={styles.categoryActivePillClose}
+                >
+                  <MaterialIcons name="close" size={12} color={darkBrown} />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </View>
+
+      {/* Requirement 14 & 1g: Horizontally Scrollable City Pills Bar positioned a teeny tiny amount higher above navigation bar and teeny tiny amount to the left */}
+      {selectedCities.length > 0 && (
         <Animated.View
           style={[
-            styles.previewCardWrap,
+            styles.cityPillsWrapper,
             {
-              bottom: Math.max(insets.bottom, 16) + 56,
-              transform: [{ translateY: cardSlideAnim }],
-              backgroundColor: isDark ? '#1e1c1a' : colors.surfaceContainerLowest,
-              borderColor: isDark ? '#38332d' : colors.cardBorder,
+              bottom: Math.max(insets.bottom, 12) + 63,
+              transform: [{ translateY: cityPillsSlideAnim }],
             },
           ]}
         >
-          {/* Card Close */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.cityPillsContent}
+          >
+            {selectedCities.map((city) => (
+              <View
+                key={city.id}
+                style={[
+                  styles.cityPill,
+                  city.isCurrent ? styles.cityPillCurrent : styles.cityPillNormal,
+                ]}
+              >
+                <MaterialIcons
+                  name={city.isCurrent ? 'my-location' : 'location-city'}
+                  size={14}
+                  color={city.isCurrent ? '#feba48' : '#e2e8f0'}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.cityPillText,
+                    city.isCurrent ? styles.cityPillTextCurrent : styles.cityPillTextNormal,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {city.isCurrent ? `Current: ${city.name}` : city.name}
+                </Text>
+                <TouchableOpacity
+                  style={styles.cityPillCloseBtn}
+                  onPress={() => handleRemoveCity(city.id)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons name="close" size={13} color={city.isCurrent ? '#feba48' : '#94a3b8'} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </Animated.View>
+      )}
+
+      {/* Bottom Selected Entity Preview Card */}
+      {selectedEntity && (
+        <Animated.View
+          style={[
+            styles.bottomCard,
+            {
+              backgroundColor: isDark ? '#1a1816' : '#ffffff',
+              borderColor: yellowAccent + '70',
+              transform: [{ translateY: cardSlideAnim }],
+              bottom: 16,
+            },
+          ]}
+        >
+          {/* Close button */}
           <TouchableOpacity style={styles.cardCloseBtn} onPress={closeSelectedCard}>
-            <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
+            <MaterialIcons name="close" size={18} color={colors.onSurface} />
           </TouchableOpacity>
 
-          <View style={styles.cardContentRow}>
-            {/* Entity Avatar / Image */}
+          <View style={styles.cardMainRow}>
+            {/* Visual Thumbnail */}
             <View style={styles.entityImageWrap}>
               {selectedEntity.type === 'user' ? (
                 selectedEntity.data.profilePictureUrl ? (
                   <Image
                     source={{ uri: selectedEntity.data.profilePictureUrl }}
-                    style={styles.entityImageRound}
+                    style={styles.entityAvatarCircle}
                   />
                 ) : (
                   <View
                     style={[
-                      styles.entityImageRound,
+                      styles.entityAvatarCircle,
                       {
                         backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
                         alignItems: 'center',
@@ -1842,13 +2808,23 @@ export default function ExploreMapScreen() {
               </View>
 
               <Text style={[styles.entityTitle, { color: colors.onSurface }]} numberOfLines={1}>
-                {selectedEntity.data.title || selectedEntity.data.name || selectedEntity.data.username}
+                {selectedEntity.type === 'user'
+                  ? selectedEntity.data.name || selectedEntity.data.username
+                  : selectedEntity.type === 'community'
+                  ? selectedEntity.data.name
+                  : selectedEntity.data.title}
               </Text>
 
               <View style={styles.locationPillRow}>
-                <MaterialIcons name="place" size={13} color={colors.outline} style={{ marginRight: 3 }} />
-                <Text style={[styles.entityLocationText, { color: colors.outline }]} numberOfLines={1}>
-                  {selectedEntity.data.location?.name || 'Selected Area'}
+                <MaterialIcons name="place" size={13} color={yellowAccent} style={{ marginRight: 3 }} />
+                <Text style={[styles.entityLocationText, { color: colors.tertiary }]} numberOfLines={1}>
+                  {selectedEntity.data.location?.name ||
+                    selectedEntity.data.location?.place_name ||
+                    (selectedEntity.type === 'user'
+                      ? 'Nearby Member'
+                      : selectedEntity.type === 'community'
+                      ? `${selectedEntity.data.memberCount || 0} members`
+                      : 'Nearby venue')}
                 </Text>
               </View>
             </View>
@@ -1939,92 +2915,286 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: BorderRadius.full,
-    borderWidth: 1,
+    borderWidth: 1.5,
     ...Shadows.sm,
   },
   filterChipActive: {
     ...Shadows.md,
   },
   filterText: {
-    fontSize: 12,
+    ...Typography.captionMd,
     fontWeight: '700',
   },
   filterTextActive: {
     fontWeight: '800',
   },
-  previewCardWrap: {
+  // Vertical Category Stack
+  categoryStackWrapper: {
+    position: 'absolute',
+    zIndex: 96,
+  },
+  categoryStackOverlapBox: {
+    width: 44,
+    height: 70,
+    position: 'relative',
+    alignItems: 'center',
+  },
+  categoryOverlapPill: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.md,
+  },
+  categoryOverlap1: {
+    top: 0,
+    zIndex: 4,
+  },
+  categoryOverlap2: {
+    top: 8,
+    zIndex: 3,
+    transform: [{ scale: 0.94 }],
+  },
+  categoryOverlap3: {
+    top: 16,
+    zIndex: 2,
+    transform: [{ scale: 0.88 }],
+  },
+  categoryOverlap4: {
+    top: 24,
+    zIndex: 1,
+    transform: [{ scale: 0.82 }],
+  },
+  categoryStackBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#281800',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#e8a736',
+  },
+  categoryStackBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#e8a736',
+  },
+  categoryStackExpandedBox: {
+    width: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    paddingVertical: 6,
+    ...Shadows.lg,
+  },
+  categoryActionCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  categoryPullTabBottom: {
+    marginTop: 4,
+    marginBottom: 0,
+  },
+  categoryScrollList: {
+    maxHeight: 280,
+  },
+  categoryScrollContent: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  categoryItemCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  categoryItemActive: {
+    ...Shadows.md,
+  },
+  categoryItemInactive: {},
+  categorySelectedPillsWrap: {
+    marginLeft: 8,
+    maxHeight: 38,
+    marginTop: 2,
+    flex: 1,
+  },
+  categorySelectedPillsScroll: {
+    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 16,
+  },
+  categoryLabelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 10,
+    backgroundColor: '#281800',
+    borderWidth: 1.5,
+    borderColor: '#e8a736',
+    ...Shadows.sm,
+  },
+  categoryLabelPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#e8a736',
+    letterSpacing: 0.2,
+  },
+  categoryActivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 9,
+    paddingRight: 6,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: '#e8a736',
+    borderWidth: 1.5,
+    borderColor: '#feba48',
+    ...Shadows.sm,
+  },
+  categoryActivePillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#281800',
+    marginRight: 4,
+  },
+  categoryActivePillClose: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(40, 24, 0, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // City Pills Bar
+  cityPillsWrapper: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 95,
+  },
+  cityPillsContent: {
+    paddingLeft: 10,
+    paddingRight: Spacing.md,
+    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    paddingRight: 6,
+    paddingVertical: 6,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1.5,
+    ...Shadows.sm,
+  },
+  cityPillCurrent: {
+    backgroundColor: '#281800',
+    borderColor: '#e8a736',
+  },
+  cityPillNormal: {
+    backgroundColor: '#1e293b',
+    borderColor: '#334155',
+  },
+  cityPillText: {
+    ...Typography.captionSm,
+    fontWeight: '700',
+    marginRight: 6,
+  },
+  cityPillTextCurrent: {
+    color: '#feba48',
+  },
+  cityPillTextNormal: {
+    color: '#f1f5f9',
+  },
+  cityPillCloseBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  bottomCard: {
     position: 'absolute',
     left: Spacing.md,
     right: Spacing.md,
-    padding: Spacing.md,
     borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    borderWidth: 1.5,
+    zIndex: 1000,
     ...Shadows.lg,
-    zIndex: 110,
-    borderWidth: 1,
   },
   cardCloseBtn: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
+    top: 12,
+    right: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(128, 128, 128, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
-  cardContentRow: {
+  cardMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    gap: 12,
+    marginBottom: 12,
   },
   entityImageWrap: {
-    marginRight: Spacing.md,
+    position: 'relative',
   },
-  entityImageRound: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
+  entityAvatarCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   entityImageSquare: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
   },
   entityImageRect: {
     width: 76,
     height: 54,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#e8a736',
-  },
-  hangoutIconBox: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: BorderRadius.md,
   },
   entityInfoCol: {
     flex: 1,
-    paddingRight: 20,
+    gap: 3,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   typeBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: BorderRadius.full,
   },
   typeBadgeUser: {
-    backgroundColor: 'rgba(232, 167, 54, 0.2)',
+    backgroundColor: 'rgba(236, 72, 153, 0.2)',
   },
   typeBadgeHangout: {
     backgroundColor: 'rgba(16, 185, 129, 0.2)',

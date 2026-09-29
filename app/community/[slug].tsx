@@ -33,6 +33,8 @@ import { communitiesService } from '../../src/services/communities';
 import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
 import { Community, EventItem } from '../../src/types';
+import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
+import notificationPreferences from '../../src/services/notificationPreferences';
 import { formatCategoryName } from '../../src/utils/categories';
 import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
@@ -98,6 +100,24 @@ export default function CommunityDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [communityNotificationsEnabled, setCommunityNotificationsEnabled] = useState(true);
+
+  useEffect(() => {
+    if (community?.id || slug) {
+      (async () => {
+        const enabled = await notificationPreferences.getCommunityNotification(community?.id || (slug as string));
+        setCommunityNotificationsEnabled(enabled);
+      })();
+    }
+  }, [community?.id, slug]);
+
+  const toggleCommunityNotifications = async () => {
+    const nextVal = !communityNotificationsEnabled;
+    setCommunityNotificationsEnabled(nextVal);
+    if (community?.id || slug) {
+      await notificationPreferences.setCommunityNotification(community?.id || (slug as string), nextVal);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!slug) return;
@@ -437,13 +457,18 @@ export default function CommunityDetailScreen() {
                   (community as any)?.creatorId === user.id ||
                   (community as any)?.creator_id === user.id)
             ) && (
-              <TouchableOpacity
-                onPress={() => router.push({ pathname: '/new-community', params: { slug: community.slug } })}
-                style={styles.navCircleBtn}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons name="edit" size={20} color={colors.onSurface} />
-              </TouchableOpacity>
+              <DropdownMenu
+                items={[
+                  {
+                    label: 'Edit Community',
+                    icon: 'edit',
+                    onPress: () =>
+                      router.push({ pathname: '/new-community', params: { slug: community.slug } }),
+                  },
+                ]}
+                iconColor={colors.onSurface}
+                triggerStyle={styles.navCircleBtn}
+              />
             )}
           </View>
 
@@ -464,30 +489,49 @@ export default function CommunityDetailScreen() {
                 )}
               </View>
 
-              {/* Membership State Action */}
-              <TouchableOpacity
-                style={[
-                  styles.membershipBtn,
-                  community.isMember ? styles.btnJoinedState : styles.btnJoinState,
-                ]}
-                onPress={handleJoinLeave}
-                disabled={joining}
-                activeOpacity={0.8}
-              >
-                <MaterialIcons
-                  name={community.isMember ? 'check' : 'add'}
-                  size={18}
-                  color={community.isMember ? '#2e7d32' : colors.onPrimaryContainer}
-                />
-                <Text
+              {/* Membership State Action & Notification Toggle */}
+              <View style={styles.actionButtonsRight}>
+                <TouchableOpacity
                   style={[
-                    styles.membershipBtnText,
-                    community.isMember ? styles.textJoinedState : styles.textJoinState,
+                    styles.communityBellBtn,
+                    communityNotificationsEnabled
+                      ? styles.communityBellBtnActive
+                      : styles.communityBellBtnInactive,
                   ]}
+                  onPress={toggleCommunityNotifications}
+                  activeOpacity={0.8}
                 >
-                  {community.isMember ? 'Joined' : 'Join'}
-                </Text>
-              </TouchableOpacity>
+                  <MaterialIcons
+                    name={communityNotificationsEnabled ? 'notifications-active' : 'notifications-none'}
+                    size={20}
+                    color={communityNotificationsEnabled ? colors.primary : colors.onSurfaceVariant}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.membershipBtn,
+                    community.isMember ? styles.btnJoinedState : styles.btnJoinState,
+                  ]}
+                  onPress={handleJoinLeave}
+                  disabled={joining}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons
+                    name={community.isMember ? 'check' : 'add'}
+                    size={18}
+                    color={community.isMember ? '#2e7d32' : colors.onPrimaryContainer}
+                  />
+                  <Text
+                    style={[
+                      styles.membershipBtnText,
+                      community.isMember ? styles.textJoinedState : styles.textJoinState,
+                    ]}
+                  >
+                    {community.isMember ? 'Joined' : 'Join'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Title */}
@@ -1079,7 +1123,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     ...Shadows.sm,
   },
   itemCardPassed: {
-    opacity: 0.48,
+    opacity: 0.38,
+    backgroundColor: 'rgba(28, 25, 23, 0.45)',
   },
   eventCover: {
     width: '100%',
@@ -1334,5 +1379,26 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  actionButtonsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  communityBellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  communityBellBtnActive: {
+    backgroundColor: colors.primaryContainer,
+    borderColor: colors.primary,
+  },
+  communityBellBtnInactive: {
+    backgroundColor: colors.surfaceContainerHighest,
+    borderColor: colors.surfaceVariant,
   },
 });

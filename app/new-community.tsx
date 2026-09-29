@@ -221,28 +221,41 @@ export default function NewCommunityScreen() {
 
         {/* Category Selector Chips */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>CATEGORY</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryChipsRow}
-          >
-            {BACKEND_CATEGORIES.map((cat) => {
-              const isSelected = form.categoryId === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.catChip, isSelected && styles.catChipActive]}
-                  onPress={() => updateField('categoryId', cat.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={styles.label}>CATEGORY</Text>
+            {isEditing ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <MaterialIcons name="lock" size={13} color={colors.outline} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.outline }}>
+                  Category is locked
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={isEditing ? { opacity: 0.45 } : undefined} pointerEvents={isEditing ? 'none' : 'auto'}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryChipsRow}
+            >
+              {BACKEND_CATEGORIES.map((cat) => {
+                const isSelected = form.categoryId === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    disabled={isEditing}
+                    style={[styles.catChip, isSelected && styles.catChipActive]}
+                    onPress={() => updateField('categoryId', cat.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.catChipText, isSelected && styles.catChipTextActive]}>
+                      {cat.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
 
         {/* Description */}

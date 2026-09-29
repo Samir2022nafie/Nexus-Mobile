@@ -24,6 +24,7 @@ import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/
 import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { notificationsService } from '../src/services/notifications';
+import { hangoutsService } from '../src/services/hangouts';
 import { NotificationItem as NotifType } from '../src/types';
 
 function formatTimeAgo(rawDate?: string) {
@@ -45,6 +46,41 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [respondingIds, setRespondingIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const markSingleRead = async (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true, is_read: true } : n))
+    );
+    try {
+      await notificationsService.markAsRead(id);
+    } catch {}
+  };
+
+  const handleRespondJoinRequest = async (notif: any, status: 'approved' | 'rejected') => {
+    const hangoutId = notif.relatedEntityId || notif.related_entity_id;
+    const targetUserId = notif.data?.userId || notif.senderId || notif.sender_id;
+    if (hangoutId && targetUserId) {
+      setRespondingIds((prev) => ({ ...prev, [notif.id]: true }));
+      try {
+        await hangoutsService.respondToJoinRequest(hangoutId, targetUserId, status);
+        await markSingleRead(notif.id);
+        Alert.alert('Success', `Join request ${status === 'approved' ? 'approved' : 'declined'}.`);
+      } catch {
+        Alert.alert('Error', `Failed to ${status} join request.`);
+      } finally {
+        setRespondingIds((prev) => ({ ...prev, [notif.id]: false }));
+      }
+    } else if (hangoutId) {
+      await markSingleRead(notif.id);
+      router.push(`/hangout/${hangoutId}`);
+    }
+  };
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -123,50 +159,66 @@ export default function NotificationsScreen() {
     switch (type) {
       case 'post_reaction':
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.primaryFixed }]}>
-            <MaterialIcons name="favorite" size={22} color={colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2' }]}>
+            <MaterialIcons name="favorite" size={22} color={isDark ? '#f87171' : '#dc2626'} />
           </View>
         );
       case 'comment_reply':
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
-            <MaterialIcons name="chat-bubble" size={22} color={colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(14, 165, 233, 0.2)' : '#e0f2fe' }]}>
+            <MaterialIcons name="chat-bubble" size={22} color={isDark ? '#38bdf8' : '#0284c7'} />
           </View>
         );
       case 'follow':
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
-            <MaterialIcons name="person-add" size={22} color={colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.22)' : '#dbeafe' }]}>
+            <MaterialIcons name="person-add" size={22} color={isDark ? '#60a5fa' : '#2563eb'} />
+          </View>
+        );
+      case 'community_member':
+      case 'community_join':
+      case 'new_member':
+      case 'new_community_member':
+        return (
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.22)' : '#f3e8ff' }]}>
+            <MaterialIcons name="group-add" size={22} color={isDark ? '#c084fc' : '#9333ea'} />
           </View>
         );
       case 'hangout_request':
         return (
-          <View style={[styles.iconBox, { backgroundColor: '#fef3c7' }]}>
-            <MaterialIcons name="person-add" size={22} color="#d97706" />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.22)' : '#fef3c7' }]}>
+            <MaterialIcons name="person-add" size={22} color={isDark ? '#fbbf24' : '#d97706'} />
           </View>
         );
       case 'hangout_approved':
         return (
-          <View style={[styles.iconBox, { backgroundColor: '#dcfce7' }]}>
-            <MaterialIcons name="check-circle" size={22} color="#16a34a" />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.22)' : '#dcfce7' }]}>
+            <MaterialIcons name="check-circle" size={22} color={isDark ? '#4ade80' : '#16a34a'} />
           </View>
         );
       case 'event_approved':
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.secondaryFixed }]}>
-            <MaterialIcons name="event-available" size={22} color={colors.secondary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.22)' : '#dcfce7' }]}>
+            <MaterialIcons name="event-available" size={22} color={isDark ? '#4ade80' : '#16a34a'} />
           </View>
         );
       case 'mention':
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.primaryFixed }]}>
-            <MaterialIcons name="groups" size={22} color={colors.primary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(234, 179, 8, 0.22)' : '#fef9c3' }]}>
+            <MaterialIcons name="alternate-email" size={22} color={isDark ? '#facc15' : '#ca8a04'} />
+          </View>
+        );
+      case 'event_reminder':
+      case 'hangout_reminder':
+        return (
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(249, 115, 22, 0.22)' : '#ffedd5' }]}>
+            <MaterialIcons name="alarm" size={22} color={isDark ? '#fb923c' : '#ea580c'} />
           </View>
         );
       default:
         return (
-          <View style={[styles.iconBox, { backgroundColor: colors.surfaceContainer }]}>
-            <MaterialIcons name="notifications" size={22} color={colors.tertiary} />
+          <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(148, 163, 184, 0.2)' : '#f1f5f9' }]}>
+            <MaterialIcons name="notifications" size={22} color={isDark ? '#cbd5e1' : '#475569'} />
           </View>
         );
     }
@@ -255,40 +307,112 @@ export default function NotificationsScreen() {
             </View>
 
             <View style={styles.itemsList}>
-              {unreadNotifications.map((notif) => (
-                <TouchableOpacity
-                  key={notif.id}
-                  style={[styles.itemCard, styles.unreadCard]}
-                  onPress={() => handlePress(notif)}
-                  activeOpacity={0.8}
-                >
-                  {renderIcon(notif.type)}
+              {unreadNotifications.map((notif) => {
+                const isExpanded = Boolean(expandedIds[notif.id]);
+                const isJoinRequest = notif.type === 'hangout_request';
+                const isResponding = Boolean(respondingIds[notif.id]);
 
-                  <View style={styles.itemTextCol}>
-                    <Text style={styles.itemTitle}>{notif.title}</Text>
-                    {notif.message ? (
-                      <Text style={styles.itemMessage} numberOfLines={2}>
-                        {notif.message}
-                      </Text>
-                    ) : null}
-                    <View style={styles.itemMetaRow}>
-                      <Text style={styles.itemTime}>
-                        {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
-                      </Text>
-                      <View style={styles.metaDot} />
-                      <Text style={styles.itemCategory}>
-                        {notif.type === 'hangout_request'
-                          ? 'Join Request'
-                          : notif.type === 'hangout_approved'
-                          ? 'Approved'
-                          : notif.category || 'Notification'}
-                      </Text>
+                return (
+                  <View
+                    key={notif.id}
+                    style={[styles.itemCard, styles.unreadCard]}
+                  >
+                    <View style={styles.cardHeaderRow}>
+                      <TouchableOpacity
+                        style={styles.cardMainTouch}
+                        onPress={() => handlePress(notif)}
+                        activeOpacity={0.8}
+                      >
+                        {renderIcon(notif.type)}
+
+                        <View style={styles.itemTextCol}>
+                          <Text style={styles.itemTitle}>{notif.title}</Text>
+                          {notif.message ? (
+                            <Text
+                              style={styles.itemMessage}
+                              numberOfLines={isExpanded ? undefined : 2}
+                            >
+                              {notif.message}
+                            </Text>
+                          ) : null}
+                          <View style={styles.itemMetaRow}>
+                            <Text style={styles.itemTime}>
+                              {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
+                            </Text>
+                            <View style={styles.metaDot} />
+                            <Text style={styles.itemCategory}>
+                              {notif.type === 'hangout_request'
+                                ? 'Join Request'
+                                : notif.type === 'hangout_approved'
+                                ? 'Approved'
+                                : notif.category || 'Notification'}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+
+                      <View style={styles.cardRightControls}>
+                        <View style={styles.unreadBlueDot} />
+                        <TouchableOpacity
+                          style={styles.expandChevronBtn}
+                          onPress={() => toggleExpand(notif.id)}
+                          activeOpacity={0.7}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <MaterialIcons
+                            name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                            size={22}
+                            color={colors.onSurfaceVariant}
+                          />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
 
-                  <View style={styles.unreadBlueDot} />
-                </TouchableOpacity>
-              ))}
+                    {/* EXPANDED SECTION */}
+                    {isExpanded && (
+                      <View style={styles.expandedContainer}>
+                        <View style={styles.expandedDivider} />
+
+                        {isJoinRequest && (
+                          <View style={styles.requestActionRow}>
+                            <Text style={styles.requestPromptText}>Participant Join Request:</Text>
+                            <View style={styles.requestButtonPair}>
+                              <TouchableOpacity
+                                style={styles.declineBtn}
+                                onPress={() => handleRespondJoinRequest(notif, 'rejected')}
+                                disabled={isResponding}
+                                activeOpacity={0.8}
+                              >
+                                <MaterialIcons name="close" size={15} color={colors.error} />
+                                <Text style={styles.declineBtnText}>Reject</Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.approveBtn}
+                                onPress={() => handleRespondJoinRequest(notif, 'approved')}
+                                disabled={isResponding}
+                                activeOpacity={0.8}
+                              >
+                                <MaterialIcons name="check" size={15} color="#16a34a" />
+                                <Text style={styles.approveBtnText}>Accept</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
+
+                        <TouchableOpacity
+                          style={styles.cardMarkReadBtn}
+                          onPress={() => markSingleRead(notif.id)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialIcons name="done" size={16} color={colors.primary} />
+                          <Text style={styles.cardMarkReadText}>Mark as read</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -302,28 +426,97 @@ export default function NotificationsScreen() {
                 </View>
 
                 <View style={styles.itemsList}>
-                  {readNotifications.map((notif) => (
-                    <TouchableOpacity
-                      key={notif.id}
-                      style={[styles.itemCard, styles.readCard]}
-                      onPress={() => handlePress(notif)}
-                      activeOpacity={0.8}
-                    >
-                      {renderIcon(notif.type)}
+                  {readNotifications.map((notif) => {
+                    const isExpanded = Boolean(expandedIds[notif.id]);
+                    const isJoinRequest = notif.type === 'hangout_request';
+                    const isResponding = Boolean(respondingIds[notif.id]);
 
-                      <View style={styles.itemTextCol}>
-                        <Text style={styles.itemTitle}>{notif.title}</Text>
-                        {notif.message ? (
-                          <Text style={styles.itemMessage} numberOfLines={2}>
-                            {notif.message}
-                          </Text>
-                        ) : null}
-                        <Text style={styles.itemTime}>
-                          {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
-                        </Text>
+                    return (
+                      <View
+                        key={notif.id}
+                        style={[styles.itemCard, styles.readCard]}
+                      >
+                        <View style={styles.cardHeaderRow}>
+                          <TouchableOpacity
+                            style={styles.cardMainTouch}
+                            onPress={() => handlePress(notif)}
+                            activeOpacity={0.8}
+                          >
+                            {renderIcon(notif.type)}
+
+                            <View style={styles.itemTextCol}>
+                              <Text style={styles.itemTitle}>{notif.title}</Text>
+                              {notif.message ? (
+                                <Text
+                                  style={styles.itemMessage}
+                                  numberOfLines={isExpanded ? undefined : 2}
+                                >
+                                  {notif.message}
+                                </Text>
+                              ) : null}
+                              <Text style={styles.itemTime}>
+                                {notif.timeAgo || formatTimeAgo(notif.createdAt || notif.created_at)}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+
+                          <View style={styles.cardRightControls}>
+                            <TouchableOpacity
+                              style={styles.expandChevronBtn}
+                              onPress={() => toggleExpand(notif.id)}
+                              activeOpacity={0.7}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <MaterialIcons
+                                name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                                size={22}
+                                color={colors.onSurfaceVariant}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* EXPANDED SECTION */}
+                        {isExpanded && (
+                          <View style={styles.expandedContainer}>
+                            <View style={styles.expandedDivider} />
+
+                            {isJoinRequest && (
+                              <View style={styles.requestActionRow}>
+                                <Text style={styles.requestPromptText}>Participant Join Request:</Text>
+                                <View style={styles.requestButtonPair}>
+                                  <TouchableOpacity
+                                    style={styles.declineBtn}
+                                    onPress={() => handleRespondJoinRequest(notif, 'rejected')}
+                                    disabled={isResponding}
+                                    activeOpacity={0.8}
+                                  >
+                                    <MaterialIcons name="close" size={15} color={colors.error} />
+                                    <Text style={styles.declineBtnText}>Reject</Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={styles.approveBtn}
+                                    onPress={() => handleRespondJoinRequest(notif, 'approved')}
+                                    disabled={isResponding}
+                                    activeOpacity={0.8}
+                                  >
+                                    <MaterialIcons name="check" size={15} color="#16a34a" />
+                                    <Text style={styles.approveBtnText}>Accept</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            )}
+
+                            <View style={styles.readIndicatorRow}>
+                              <MaterialIcons name="check-circle" size={15} color={colors.tertiary} />
+                              <Text style={styles.readIndicatorText}>Already read</Text>
+                            </View>
+                          </View>
+                        )}
                       </View>
-                    </TouchableOpacity>
-                  ))}
+                    );
+                  })}
                 </View>
               </View>
             )}
@@ -453,13 +646,115 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     gap: 8,
   },
   itemCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     padding: Spacing.md,
     borderRadius: BorderRadius.xl,
-    gap: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  cardMainTouch: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  cardRightControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 2,
+  },
+  expandChevronBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandedContainer: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.xs,
+  },
+  expandedDivider: {
+    height: 1,
+    backgroundColor: colors.surfaceVariant,
+    marginBottom: Spacing.sm,
+  },
+  cardMarkReadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    backgroundColor: 'transparent',
+    marginTop: Spacing.xs,
+  },
+  cardMarkReadText: {
+    fontSize: Typography.labelSmall.fontSize,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  readIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 4,
+    paddingTop: 2,
+  },
+  readIndicatorText: {
+    fontSize: Typography.captionSm.fontSize,
+    color: colors.tertiary,
+    fontWeight: '500',
+  },
+  requestActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    marginBottom: 6,
+  },
+  requestPromptText: {
+    fontSize: Typography.labelSmall.fontSize,
+    fontWeight: '600',
+    color: colors.onSurface,
+  },
+  requestButtonPair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  declineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    backgroundColor: colors.surfaceContainerHighest,
+  },
+  declineBtnText: {
+    fontSize: Typography.labelSmall.fontSize,
+    fontWeight: '600',
+    color: colors.error,
+  },
+  approveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    backgroundColor: isDark ? 'rgba(22, 163, 74, 0.2)' : '#dcfce7',
+  },
+  approveBtnText: {
+    fontSize: Typography.labelSmall.fontSize,
+    fontWeight: '700',
+    color: isDark ? '#4ade80' : '#16a34a',
   },
   unreadCard: {
     backgroundColor: colors.surfaceContainerHigh,

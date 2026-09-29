@@ -54,11 +54,15 @@ export function formatDistance(distanceKm: number): string {
   return `${distanceKm.toFixed(1)} km away`;
 }
 
-/**
- * Safely extracts latitude and longitude numbers from any event, hangout, community or user object.
- */
 export function extractItemCoordinates(item: any): Coordinates | null {
   if (!item) return null;
+
+  // Verify that a location was actually inputted
+  const locVal = item.location;
+  const locName =
+    typeof locVal === 'string'
+      ? locVal.trim()
+      : (locVal?.name || locVal?.place_name || item.locationName || '').trim();
 
   // Direct lat/lng
   const rawLat =
@@ -79,6 +83,12 @@ export function extractItemCoordinates(item: any): Coordinates | null {
   const lng = typeof rawLng === 'number' ? rawLng : parseFloat(rawLng);
 
   if (isNaN(lat) || isNaN(lng)) return null;
+
+  // If item has no location name inputted and coordinates are 0,0 or missing, omit
+  if (!locName && Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) {
+    return null;
+  }
+
   return { latitude: lat, longitude: lng };
 }
 

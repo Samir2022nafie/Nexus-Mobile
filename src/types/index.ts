@@ -362,6 +362,9 @@ export interface HangoutItem {
   isParticipant: boolean;
   isSaved: boolean;
   creator: PostAuthor;
+  categoryId?: string | null;
+  category_id?: string | null;
+  category?: { id: string; name: string } | string | null;
   location?: {
     placeName?: string;
     place_name?: string;
@@ -381,6 +384,8 @@ export interface CreateHangoutDto {
   joinType?: HangoutJoinType;
   maxParticipants?: number | null;
   communityId?: string;
+  categoryId?: string | null;
+  category_id?: string | null;
   location?: string;
   locationName?: string;
   locationId?: string;
@@ -410,7 +415,18 @@ export type NotificationType =
   | 'report_resolved'
   | 'moderation_action'
   | 'follow'
-  | 'mention';
+  | 'mention'
+  | 'event_update'
+  | 'event_deleted'
+  | 'event_join'
+  | 'event_leave'
+  | 'event_ended'
+  | 'hangout_update'
+  | 'hangout_deleted'
+  | 'hangout_join'
+  | 'hangout_leave'
+  | 'hangout_ended'
+  | 'community_new_event';
 
 export interface NotificationItem {
   id: string;

@@ -29,7 +29,7 @@ import {
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -1107,6 +1107,22 @@ export default function ProfileScreen() {
                       }}
                       activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
+                      {/* Protruding Lock / Open Padlock Badge (Top-Right) — Only on active hangouts */}
+                      {!cat.isPassed && (
+                        <View
+                          style={[
+                            styles.protrudingPadlockBadge,
+                            isOpen ? styles.padlockOpenBadge : styles.padlockLockedBadge,
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={isOpen ? 'lock-open-variant' : 'lock'}
+                            size={11}
+                            color="#ffffff"
+                          />
+                        </View>
+                      )}
+
                       <View>
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
@@ -1127,20 +1143,16 @@ export default function ProfileScreen() {
                             </Text>
                           </View>
 
-                          <View
-                            style={[
-                              styles.hangoutPill,
-                              isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
-                            ]}
-                          >
-                            <View style={isOpen ? styles.openDot : styles.requestDot} />
-                            <Text
-                              style={[
-                                styles.hangoutPillText,
-                                isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                              ]}
-                            >
-                              {isOpen ? 'Open' : 'Request'}
+                          <View style={styles.hangoutCategoryPill}>
+                            <Text style={styles.hangoutCategoryPillText} numberOfLines={1}>
+                              {formatCategoryName(
+                                h.category?.name ||
+                                  h.category ||
+                                  h.categoryName ||
+                                  (h as any).category_name ||
+                                  'Other',
+                                true
+                              )}
                             </Text>
                           </View>
                         </View>
@@ -1230,6 +1242,22 @@ export default function ProfileScreen() {
                       }}
                       activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
+                      {/* Protruding Lock / Open Padlock Badge (Top-Right) — Only on active hangouts */}
+                      {!cat.isPassed && (
+                        <View
+                          style={[
+                            styles.protrudingPadlockBadge,
+                            isOpen ? styles.padlockOpenBadge : styles.padlockLockedBadge,
+                          ]}
+                        >
+                          <MaterialCommunityIcons
+                            name={isOpen ? 'lock-open-variant' : 'lock'}
+                            size={11}
+                            color="#ffffff"
+                          />
+                        </View>
+                      )}
+
                       <View>
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
@@ -1250,20 +1278,16 @@ export default function ProfileScreen() {
                             </Text>
                           </View>
 
-                          <View
-                            style={[
-                              styles.hangoutPill,
-                              isOpen ? styles.hangoutPillOpen : styles.hangoutPillRequest,
-                            ]}
-                          >
-                            <View style={isOpen ? styles.openDot : styles.requestDot} />
-                            <Text
-                              style={[
-                                styles.hangoutPillText,
-                                isOpen ? styles.hangoutPillOpenText : styles.hangoutPillRequestText,
-                              ]}
-                            >
-                              {isOpen ? 'Open' : 'Request'}
+                          <View style={styles.hangoutCategoryPill}>
+                            <Text style={styles.hangoutCategoryPillText} numberOfLines={1}>
+                              {formatCategoryName(
+                                h.category?.name ||
+                                  h.category ||
+                                  h.categoryName ||
+                                  (h as any).category_name ||
+                                  'Other',
+                                true
+                              )}
                             </Text>
                           </View>
                         </View>
@@ -1950,7 +1974,48 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: colors.cardBorder,
+    overflow: 'visible',
+    position: 'relative',
     ...Shadows.sm,
+  },
+  protrudingPadlockBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    zIndex: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+  },
+  padlockOpenBadge: {
+    backgroundColor: '#16a34a',
+  },
+  padlockLockedBadge: {
+    backgroundColor: '#d97706',
+  },
+  hangoutCategoryPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.full,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.22)',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.4)',
+    maxWidth: 90,
+  },
+  hangoutCategoryPillText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: isDark ? '#f6c368' : '#92400e',
+    letterSpacing: 0.3,
   },
   savedCardUnsaveIcon: {
     padding: 2,
@@ -2133,7 +2198,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     fontWeight: '600',
   },
   itemCardPassed: {
-    opacity: 0.48,
+    opacity: 0.38,
+    backgroundColor: 'rgba(28, 25, 23, 0.45)',
   },
 
   // Discussion / Post card styles (exact match to home feed)

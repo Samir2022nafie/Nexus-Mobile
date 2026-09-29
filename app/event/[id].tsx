@@ -31,6 +31,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { eventsService } from '../../src/services/events';
 import { communitiesService } from '../../src/services/communities';
 import { formatCategoryName } from '../../src/utils/categories';
+import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
 
 export default function EventDetailScreen() {
   const router = useSafeRouter();
@@ -338,30 +339,43 @@ export default function EventDetailScreen() {
             </TouchableOpacity>
 
             {isEventOrganizer && (
-              <View style={styles.authorActionsRow}>
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: '/new-event',
-                      params: { eventId: event.id, slug: communitySlug },
-                    } as any)
-                  }
-                  style={styles.heroCircleBtn}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons name="edit" size={20} color={colors.white} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleDeleteEvent}
-                  style={styles.heroCircleBtn}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons name="delete-outline" size={22} color={colors.error} />
-                </TouchableOpacity>
-              </View>
+              <DropdownMenu
+                items={[
+                  {
+                    label: 'Edit Event',
+                    icon: 'edit',
+                    onPress: () =>
+                      router.push({
+                        pathname: '/new-event',
+                        params: { eventId: event.id, slug: communitySlug },
+                      } as any),
+                  },
+                  {
+                    label: 'Delete Event',
+                    icon: 'delete-outline',
+                    destructive: true,
+                    onPress: handleDeleteEvent,
+                  },
+                ]}
+                iconColor={colors.white}
+                triggerStyle={styles.heroCircleBtn}
+              />
             )}
           </View>
+
+          {/* Banner Notification Button (Bottom Left inside Banner Image) */}
+          <TouchableOpacity
+            style={styles.bannerNotificationBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/event-notifications',
+                params: { id: event.id, title: event.title },
+              } as any)
+            }
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="notifications-none" size={20} color="#ffffff" />
+          </TouchableOpacity>
 
           {/* Banner Category Pill (Bottom Right) */}
           <View style={styles.categoryChipBadge}>
@@ -958,5 +972,19 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     backgroundColor: colors.surfaceContainerHigh,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bannerNotificationBtn: {
+    position: 'absolute',
+    bottom: Spacing.md,
+    left: Spacing.md,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    zIndex: 10,
   },
 });

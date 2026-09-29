@@ -230,6 +230,46 @@ export const Typography = {
     lineHeight: 16,
     fontWeight: '400' as const,
   },
+  titleSmall: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600' as const,
+  },
+  titleMedium: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '600' as const,
+  },
+  bodyLarge: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '400' as const,
+  },
+  bodyMedium: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '400' as const,
+  },
+  bodySmall: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '400' as const,
+  },
+  labelSmall: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '600' as const,
+  },
+  labelMedium: {
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '600' as const,
+  },
+  labelLarge: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '600' as const,
+  },
 } as const;
 
 export const Spacing = {

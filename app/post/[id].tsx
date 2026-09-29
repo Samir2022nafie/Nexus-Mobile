@@ -39,6 +39,7 @@ import { postsService } from '../../src/services/posts';
 import { commentsService } from '../../src/services/comments';
 import { Post, Comment } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
+import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
 
 export default function ThreadDetailScreen() {
   const router = useSafeRouter();
@@ -356,22 +357,23 @@ export default function ThreadDetailScreen() {
             </Text>
           )}
           {isPostAuthor ? (
-            <View style={styles.authorActionsRow}>
-              <TouchableOpacity
-                onPress={openEditPost}
-                style={styles.authorActionBtn}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="edit" size={18} color={colors.secondary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleDeletePost}
-                style={styles.authorActionBtn}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="delete-outline" size={19} color={colors.error} />
-              </TouchableOpacity>
-            </View>
+            <DropdownMenu
+              items={[
+                {
+                  label: 'Edit Post',
+                  icon: 'edit',
+                  onPress: openEditPost,
+                },
+                {
+                  label: 'Delete Post',
+                  icon: 'delete-outline',
+                  destructive: true,
+                  onPress: handleDeletePost,
+                },
+              ]}
+              iconColor={colors.onSurface}
+              triggerStyle={styles.authorActionBtn}
+            />
           ) : (
             <View style={styles.backButton} />
           )}

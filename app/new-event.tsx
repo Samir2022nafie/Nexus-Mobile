@@ -401,6 +401,12 @@ export default function NewEventScreen() {
         }
       }
 
+      const validStartsAt = new Date(form.startsAt).toISOString();
+      const validEndsAt =
+        form.endsAt && !isNaN(new Date(form.endsAt).getTime()) && new Date(form.endsAt) > new Date(form.startsAt)
+          ? new Date(form.endsAt).toISOString()
+          : undefined;
+
       const payload: any = {
         title: form.title.trim(),
         description: form.description.trim() || undefined,
@@ -408,8 +414,8 @@ export default function NewEventScreen() {
         locationName: (form.locationName || form.location).trim() || undefined,
         latitude: form.latitude ?? undefined,
         longitude: form.longitude ?? undefined,
-        startsAt: new Date(form.startsAt).toISOString(),
-        endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : undefined,
+        startsAt: validStartsAt,
+        endsAt: validEndsAt,
         maxParticipants: isEditing
           ? (form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : null)
           : (form.maxParticipants.trim() ? parseInt(form.maxParticipants.trim(), 10) : undefined),
@@ -441,9 +447,12 @@ export default function NewEventScreen() {
           ]);
         }
       }
-    } catch (err) {
-      if (err instanceof ApiRequestError) {
-        setGeneralError(err.message);
+    } catch (err: any) {
+      if (err instanceof ApiRequestError && err.details && Array.isArray(err.details) && err.details.length > 0) {
+        const issues = err.details.map((d: any) => `${d.path?.join('.') || 'field'}: ${d.message}`).join(', ');
+        setGeneralError(`Validation failed (${issues})`);
+      } else if (err instanceof ApiRequestError) {
+        setGeneralError(err.message || 'Validation failed');
       } else {
         setGeneralError(err instanceof Error ? err.message : 'Failed to save event');
       }

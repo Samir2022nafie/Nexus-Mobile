@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -231,6 +232,10 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
   };
 
   const handleConfirm = () => {
+    if (Math.abs(selectedCoords.lat) < 0.5 && Math.abs(selectedCoords.lng) < 0.5) {
+      Alert.alert('Invalid Location', 'Locations cannot be placed on the ocean. Please select a valid place on land.');
+      return;
+    }
     onSelect({
       name: selectedName || 'Selected Location',
       latitude: selectedCoords.lat,

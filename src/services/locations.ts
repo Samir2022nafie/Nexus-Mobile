@@ -28,6 +28,7 @@ export interface MapEventItem {
   endsAt?: string;
   communityName: string;
   communitySlug: string;
+  category?: string;
   location: MapLocation;
 }
 
@@ -41,6 +42,7 @@ export interface MapHangoutItem {
   joinType: string;
   maxParticipants?: number;
   participantCount: number;
+  category?: string;
   creator: {
     id: string;
     username: string;

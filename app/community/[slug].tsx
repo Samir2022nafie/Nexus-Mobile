@@ -39,6 +39,7 @@ import { formatCategoryName } from '../../src/utils/categories';
 import { categorizeItemByDate, sortItemsByDate } from '../../src/utils/dateUtils';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 import { useAuth } from '../../src/context/AuthContext';
+import { hasActualMapLocation } from '../../src/utils/distance';
 
 function formatPostDate(rawDate?: string) {
   if (!rawDate) return '';
@@ -504,7 +505,7 @@ export default function CommunityDetailScreen() {
                   <MaterialIcons
                     name={communityNotificationsEnabled ? 'notifications-active' : 'notifications-none'}
                     size={20}
-                    color={communityNotificationsEnabled ? colors.primary : colors.onSurfaceVariant}
+                    color={communityNotificationsEnabled ? '#e8a736' : colors.onSurfaceVariant}
                   />
                 </TouchableOpacity>
 
@@ -567,10 +568,14 @@ export default function CommunityDetailScreen() {
                 (typeof (community as any).location === 'string' ? (community as any).location : null);
               if (!locName) return null;
 
-              const lat = community.latitude ?? (community as any).location?.latitude;
-              const lng = community.longitude ?? (community as any).location?.longitude;
+              const rawLat = community.latitude ?? (community as any).location?.latitude;
+              const rawLng = community.longitude ?? (community as any).location?.longitude;
+              const numLat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat));
+              const numLng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng));
               const hasValidCoords =
-                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+                !isNaN(numLat) &&
+                !isNaN(numLng) &&
+                hasActualMapLocation((community as any).location || { latitude: numLat, longitude: numLng });
 
               if (!hasValidCoords) {
                 return (
@@ -592,8 +597,8 @@ export default function CommunityDetailScreen() {
                       params: {
                         focusId: String(community.id || community.slug),
                         focusType: 'communities',
-                        focusLat: String(lat),
-                        focusLng: String(lng),
+                        focusLat: String(numLat),
+                        focusLng: String(numLng),
                       },
                     } as any);
                   }}
@@ -934,6 +939,27 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: colors.success,
+  },
+  actionButtonsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  communityBellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  communityBellBtnActive: {
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.14)',
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.45)' : 'rgba(217, 119, 6, 0.45)',
+  },
+  communityBellBtnInactive: {
+    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+    borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.12)',
   },
   membershipBtn: {
     height: 36,
@@ -1394,26 +1420,5 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-  },
-  actionButtonsRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  communityBellBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  communityBellBtnActive: {
-    backgroundColor: colors.primaryContainer,
-    borderColor: colors.primary,
-  },
-  communityBellBtnInactive: {
-    backgroundColor: colors.surfaceContainerHighest,
-    borderColor: colors.surfaceVariant,
   },
 });

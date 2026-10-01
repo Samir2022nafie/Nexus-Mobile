@@ -1,10 +1,15 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
+import { View, LogBox } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+
+// Suppress known Expo SDK 53 Expo Go remote push warning (local notifications work seamlessly)
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications (remote notifications) functionality provided by expo-notifications was removed from Expo Go',
+]);
 
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { PostStateProvider } from '../src/context/PostStateContext';
@@ -13,6 +18,8 @@ import { TabBarVisibilityProvider } from '../src/context/TabBarVisibilityContext
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 
 export { ErrorBoundary } from 'expo-router';
+
+import pushNotifications from '../src/services/pushNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -23,6 +30,20 @@ function RootNavigator() {
   useEffect(() => {
     if (!isLoading) {
       SplashScreen.hideAsync();
+      // Prompt for push notification permissions on app startup after UI attaches
+      const timer = setTimeout(() => {
+        pushNotifications.init().then(() => {
+          pushNotifications.syncUnreadNotifications();
+        });
+      }, 600);
+
+      const interval = setInterval(() => {
+        pushNotifications.syncUnreadNotifications();
+      }, 30000);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
   }, [isLoading]);
 

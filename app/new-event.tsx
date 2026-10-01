@@ -49,7 +49,7 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-const MINUTES = ['00', '15', '30', '45'];
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS = ['AM', 'PM'];
 
 function getDaysInMonth(month: number, year: number): number {
@@ -76,6 +76,16 @@ function PickerColumn<T>({
     const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
     onSelect(clampedIndex);
   };
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && selectedIndex < data.length) {
+      try {
+        flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
+      } catch (e) {
+        flatListRef.current?.scrollToOffset({ offset: selectedIndex * ITEM_HEIGHT, animated: true });
+      }
+    }
+  }, [selectedIndex, data.length]);
 
   return (
     <View style={pickerStyles.column}>
@@ -137,8 +147,8 @@ export default function NewEventScreen() {
   const incomingSlug = params.communitySlug || params.slug || '';
 
   const now = new Date();
-  const defaultStartsAt = new Date(Date.now() + 3600 * 1000 * 4).toISOString();
-  const defaultEndsAt = new Date(Date.now() + 3600 * 1000 * 6).toISOString();
+  const defaultStartsAt = new Date().toISOString();
+  const defaultEndsAt = new Date().toISOString();
 
   const [communities, setCommunities] = useState<ManagedCommunity[]>([]);
   const [selectedSlug, setSelectedSlug] = useState(incomingSlug);
@@ -169,7 +179,7 @@ export default function NewEventScreen() {
   const [tempDay, setTempDay] = useState(now.getDate());
   const [tempYear, setTempYear] = useState(now.getFullYear());
   const [tempHour, setTempHour] = useState(now.getHours() % 12 || 12);
-  const [tempMinute, setTempMinute] = useState(now.getMinutes() >= 30 ? '30' : '00');
+  const [tempMinute, setTempMinute] = useState(String(now.getMinutes()).padStart(2, '0'));
   const [tempPeriod, setTempPeriod] = useState(now.getHours() >= 12 ? 'PM' : 'AM');
 
   useEffect(() => {
@@ -296,9 +306,7 @@ export default function NewEventScreen() {
     setTempDay(validD.getDate());
     setTempYear(validD.getFullYear());
     setTempHour(validD.getHours() % 12 || 12);
-    setTempMinute(
-      validD.getMinutes() >= 45 ? '45' : validD.getMinutes() >= 30 ? '30' : validD.getMinutes() >= 15 ? '15' : '00'
-    );
+    setTempMinute(String(validD.getMinutes()).padStart(2, '0'));
     setTempPeriod(validD.getHours() >= 12 ? 'PM' : 'AM');
 
     setPickerRendered(true);
@@ -757,6 +765,23 @@ export default function NewEventScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={pickerStyles.todayRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  const cur = new Date();
+                  setTempMonth(cur.getMonth() + 1);
+                  setTempDay(cur.getDate());
+                  setTempYear(cur.getFullYear());
+                  setTempHour(cur.getHours() % 12 || 12);
+                  setTempMinute(String(cur.getMinutes()).padStart(2, '0'));
+                  setTempPeriod(cur.getHours() >= 12 ? 'PM' : 'AM');
+                }}
+                style={pickerStyles.todayBtn}
+              >
+                <Text style={pickerStyles.todayText}>Today</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={pickerStyles.pickersContainer}>
               {/* Month */}
               <PickerColumn
@@ -1056,6 +1081,27 @@ const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
     paddingBottom: Spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.cardBorder,
+  },
+  todayRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  todayBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.4)' : 'rgba(217, 119, 6, 0.35)',
+  },
+  todayText: {
+    ...Typography.labelMd,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
   },
   headerBtn: {
     paddingVertical: 6,

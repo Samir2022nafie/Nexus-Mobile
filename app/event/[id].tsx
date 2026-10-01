@@ -32,6 +32,8 @@ import { eventsService } from '../../src/services/events';
 import { communitiesService } from '../../src/services/communities';
 import { formatCategoryName } from '../../src/utils/categories';
 import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
+import { notificationPreferences } from '../../src/services/notificationPreferences';
+import { hasActualMapLocation } from '../../src/utils/distance';
 
 export default function EventDetailScreen() {
   const router = useSafeRouter();
@@ -48,6 +50,7 @@ export default function EventDetailScreen() {
   const [isJoined, setIsJoined] = useState(false);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [participantsCount, setParticipantsCount] = useState(0);
+  const [notifsActive, setNotifsActive] = useState<boolean>(false);
 
   const fetchEvent = useCallback(async () => {
     if (!id) return;
@@ -131,6 +134,19 @@ export default function EventDetailScreen() {
       event?.authorId === user.id ||
       event?.author?.id === user.id)
   );
+
+  useEffect(() => {
+    if (!event?.id) return;
+    const checkNotifs = async () => {
+      const active = await notificationPreferences.isItemNotificationActive(
+        'event',
+        String(event.id),
+        isJoined || isEventOrganizer
+      );
+      setNotifsActive(active);
+    };
+    checkNotifs();
+  }, [event?.id, isJoined, isEventOrganizer]);
 
   const handleDeleteEvent = () => {
     Alert.alert(
@@ -363,9 +379,17 @@ export default function EventDetailScreen() {
             )}
           </View>
 
-          {/* Banner Notification Button (Bottom Left inside Banner Image) */}
+          {/* Banner Category Pill (Bottom Left) */}
+          <View style={styles.categoryChipBadge}>
+            <Text style={styles.categoryChipText}>{categoryLabel}</Text>
+          </View>
+
+          {/* Banner Notification Button (Bottom Right inside Banner Image) */}
           <TouchableOpacity
-            style={styles.bannerNotificationBtn}
+            style={[
+              styles.bannerNotificationBtn,
+              notifsActive ? styles.bannerNotificationBtnActive : styles.bannerNotificationBtnInactive,
+            ]}
             onPress={() =>
               router.push({
                 pathname: '/event-notifications',
@@ -374,13 +398,12 @@ export default function EventDetailScreen() {
             }
             activeOpacity={0.8}
           >
-            <MaterialIcons name="notifications-none" size={20} color="#ffffff" />
+            <MaterialIcons
+              name={notifsActive ? 'notifications-active' : 'notifications-none'}
+              size={20}
+              color={notifsActive ? '#f6c368' : 'rgba(255, 255, 255, 0.75)'}
+            />
           </TouchableOpacity>
-
-          {/* Banner Category Pill (Bottom Right) */}
-          <View style={styles.categoryChipBadge}>
-            <Text style={styles.categoryChipText}>{categoryLabel}</Text>
-          </View>
         </View>
 
         {/* Event Body */}
@@ -428,10 +451,14 @@ export default function EventDetailScreen() {
 
             {/* Card 2: Location (clickable only if valid coordinates exist) */}
             {(() => {
-              const lat = event.location?.latitude ?? event.latitude;
-              const lng = event.location?.longitude ?? event.longitude;
+              const rawLat = event.location?.latitude ?? event.latitude;
+              const rawLng = event.location?.longitude ?? event.longitude;
+              const numLat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat));
+              const numLng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng));
               const hasValidCoords =
-                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+                !isNaN(numLat) &&
+                !isNaN(numLng) &&
+                hasActualMapLocation(event.location || { latitude: numLat, longitude: numLng });
 
               if (!hasValidCoords) {
                 return (
@@ -462,8 +489,8 @@ export default function EventDetailScreen() {
                       params: {
                         focusId: String(event.id),
                         focusType: 'events',
-                        focusLat: String(lat),
-                        focusLng: String(lng),
+                        focusLat: String(numLat),
+                        focusLng: String(numLng),
                       },
                     } as any);
                   }}
@@ -689,7 +716,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   categoryChipBadge: {
     position: 'absolute',
     bottom: 12,
-    right: Spacing.md,
+    left: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1005,15 +1032,22 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   bannerNotificationBtn: {
     position: 'absolute',
     bottom: Spacing.md,
-    left: Spacing.md,
+    right: Spacing.md,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+  },
+  bannerNotificationBtnActive: {
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.25)',
+    borderWidth: 1.5,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.65)' : 'rgba(217, 119, 6, 0.65)',
+  },
+  bannerNotificationBtnInactive: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
-    zIndex: 10,
   },
 });

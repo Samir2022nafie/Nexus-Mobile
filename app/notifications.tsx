@@ -118,6 +118,7 @@ export default function NotificationsScreen() {
           onPress: async () => {
             setNotifications([]);
             try {
+              await notificationsService.markAllAsRead();
               await notificationsService.clearAll();
             } catch {}
           },

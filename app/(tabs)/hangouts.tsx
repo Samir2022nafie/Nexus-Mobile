@@ -18,7 +18,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing, Shadows } from '../../src/constants/theme';
@@ -52,31 +52,33 @@ export interface SelectedCity {
 }
 
 // Module-level cache to persist camera position across tab switches and app minimize
+const MAX_CAMERA_MEMORY_MS = 5 * 60 * 1000; // 5 minutes camera memory window
 let lastExploreCameraState: {
   center: [number, number];
   zoom: number;
   pitch: number;
   bearing: number;
+  timestamp: number;
 } | null = null;
 
 export const CATEGORY_FILTER_ITEMS: {
   id: string;
   name: string;
   label: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
+  icon: string;
+  iconLibrary?: 'MaterialIcons' | 'MaterialCommunityIcons';
 }[] = [
   { id: 'movies_tv', name: 'movies', label: 'Movies', icon: 'movie' },
   { id: 'sports', name: 'sports', label: 'Sports', icon: 'sports-soccer' },
   { id: 'music_entertainment', name: 'music', label: 'Music', icon: 'music-note' },
   { id: 'gaming', name: 'gaming', label: 'Gaming', icon: 'sports-esports' },
   { id: 'technology', name: 'tech', label: 'Tech', icon: 'computer' },
-  { id: 'food', name: 'food', label: 'Food', icon: 'restaurant' },
   { id: 'arts_creativity', name: 'art', label: 'Art', icon: 'palette' },
   { id: 'outdoor_adventure', name: 'outdoor', label: 'Outdoor', icon: 'terrain' },
   { id: 'health_fitness', name: 'fitness', label: 'Fitness', icon: 'fitness-center' },
   { id: 'education_study_groups', name: 'education', label: 'Education', icon: 'school' },
   { id: 'books_writing', name: 'books', label: 'Books', icon: 'menu-book' },
-  { id: 'anime_manga', name: 'anime', label: 'Anime', icon: 'auto-stories' },
+  { id: 'anime_manga', name: 'anime', label: 'Anime', icon: 'shuriken', iconLibrary: 'MaterialCommunityIcons' },
   { id: 'social_lifestyle', name: 'social', label: 'Social', icon: 'groups' },
   { id: 'culture_language', name: 'culture', label: 'Culture', icon: 'translate' },
   { id: 'other', name: 'other', label: 'Others', icon: 'category' },
@@ -96,16 +98,8 @@ export default function ExploreMapScreen() {
   const { userLocation, requestLocation, isLoadingLocation } = useUserLocation();
   const webViewRef = useRef<WebView>(null);
 
-  const initialEntityTypes: string[] = (() => {
-    const ft = params.focusType ? params.focusType.toLowerCase() : '';
-    if (ft === 'hangout' || ft === 'hangouts') return ['hangouts'];
-    if (ft === 'event' || ft === 'events') return ['events'];
-    if (ft === 'community' || ft === 'communities') return ['communities'];
-    if (ft === 'user' || ft === 'users') return ['users'];
-    return ['all'];
-  })();
-
-  const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>(initialEntityTypes);
+  // Tabs always default to 'all' — opening an entity does NOT force the tab filter
+  const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>(['all']);
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all']);
   const [isCategoryStackExpanded, setIsCategoryStackExpanded] = useState<boolean>(false);
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -113,21 +107,20 @@ export default function ExploreMapScreen() {
 
   const handleExpandCategories = useCallback(() => {
     setIsCategoryStackExpanded(true);
-    categoryStackAnim.setValue(0);
-    Animated.spring(categoryStackAnim, {
+    Animated.timing(categoryStackAnim, {
       toValue: 1,
-      tension: 65,
-      friction: 9,
-      useNativeDriver: true,
+      duration: 260,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      useNativeDriver: false,
     }).start();
   }, [categoryStackAnim]);
 
   const handleCollapseCategories = useCallback(() => {
     Animated.timing(categoryStackAnim, {
       toValue: 0,
-      duration: 220,
-      easing: Easing.bezier(0.25, 1, 0.5, 1),
-      useNativeDriver: true,
+      duration: 240,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      useNativeDriver: false,
     }).start(() => {
       setIsCategoryStackExpanded(false);
       categoryScrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -169,28 +162,25 @@ export default function ExploreMapScreen() {
   const targetLng = params.focusLng ? parseFloat(params.focusLng) : null;
   const hasValidTarget = targetLat !== null && targetLng !== null && !isNaN(targetLat) && !isNaN(targetLng);
 
-  // Requirement 1: Restore camera position from lastExploreCameraState if available
-  const initialCenterLng = hasValidTarget
-    ? targetLng
-    : lastExploreCameraState
-    ? lastExploreCameraState.center[0]
+  // Welcoming camera position: starts at last visit's exact camera position if within memory window (< 5 min),
+  // or user's current city/location. The map greets the user here and then smoothly flies (flyTo) to the target element!
+  const isCameraMemoryValid =
+    !!lastExploreCameraState &&
+    Date.now() - (lastExploreCameraState.timestamp || 0) < MAX_CAMERA_MEMORY_MS;
+
+  const initialCenterLng = isCameraMemoryValid
+    ? lastExploreCameraState!.center[0]
     : userLng;
-  const initialCenterLat = hasValidTarget
-    ? targetLat
-    : lastExploreCameraState
-    ? lastExploreCameraState.center[1]
+  const initialCenterLat = isCameraMemoryValid
+    ? lastExploreCameraState!.center[1]
     : userLat;
-  const initialZoom = hasValidTarget
-    ? 15.5
-    : lastExploreCameraState
-    ? lastExploreCameraState.zoom
+  const initialZoom = isCameraMemoryValid
+    ? lastExploreCameraState!.zoom
     : 12.8;
-  const initialPitch = hasValidTarget
-    ? 35
-    : lastExploreCameraState
-    ? lastExploreCameraState.pitch
+  const initialPitch = isCameraMemoryValid
+    ? lastExploreCameraState!.pitch
     : 0;
-  const initialBearing = lastExploreCameraState ? lastExploreCameraState.bearing : 0;
+  const initialBearing = isCameraMemoryValid ? lastExploreCameraState!.bearing : 0;
 
   // Track pending focus request across lifecycle
   const pendingFocusRef = useRef<{
@@ -354,35 +344,21 @@ export default function ExploreMapScreen() {
             key: focusKey,
           };
           handledCardKeyRef.current = null;
-        }
 
-        const ft = params.focusType ? params.focusType.toLowerCase() : '';
-        const mappedTypes: string[] =
-          ft === 'hangout' || ft === 'hangouts'
-            ? ['hangouts']
-            : ft === 'event' || ft === 'events'
-            ? ['events']
-            : ft === 'community' || ft === 'communities'
-            ? ['communities']
-            : ft === 'user' || ft === 'users'
-            ? ['users']
-            : ['all'];
+          if (mapReady) {
+            const js = `if (window.focusEntityOnMap) {
+              window.focusEntityOnMap(${JSON.stringify(String(params.focusId || ''))}, ${JSON.stringify(params.focusType || '')}, ${lat}, ${lng});
+            } true;`;
+            webViewRef.current?.injectJavaScript(js);
+          }
 
-        setSelectedEntityTypes(mappedTypes);
-
-        if (mapReady) {
-          const js = `if (window.focusEntityOnMap) {
-            window.focusEntityOnMap(${JSON.stringify(String(params.focusId || ''))}, ${JSON.stringify(params.focusType || '')}, ${lat}, ${lng});
-          } true;`;
-          webViewRef.current?.injectJavaScript(js);
-        }
-
-        if (mapData) {
-          tryOpenPendingCard(mapData, pendingFocusRef.current);
+          if (mapData) {
+            tryOpenPendingCard(mapData, pendingFocusRef.current);
+          }
         }
       }
     }
-  }, [params.focusLat, params.focusLng, params.focusId, params.focusType, mapReady, mapData, tryOpenPendingCard]);
+  }, [params.focusLat, params.focusLng, params.focusId, params.focusType, mapReady, mapData]);
 
   // Requirement 14: Multi-select entity tabs
   const handleToggleEntityType = (entityType: string) => {
@@ -466,6 +442,7 @@ export default function ExploreMapScreen() {
           zoom: msg.zoom,
           pitch: msg.pitch,
           bearing: msg.bearing,
+          timestamp: Date.now(),
         };
       } else if (msg.type === 'city_selected') {
         const rawName = String(msg.city || 'City Area');
@@ -579,7 +556,7 @@ export default function ExploreMapScreen() {
 
   // 3D Globe zoom out
   const handleResetGlobe = () => {
-    const js = `if (window.resetToGlobe) { window.resetToGlobe(); } else if (window.map) { window.map.flyTo({ center: [20, 20], zoom: 1.5, pitch: 0, bearing: 0, essential: true }); } true;`;
+    const js = `if (window.resetToGlobe) { window.resetToGlobe(); } else if (window.map) { window.map.flyTo({ center: [20, 20], zoom: 1.85, pitch: 0, bearing: 0, essential: true }); } true;`;
     webViewRef.current?.injectJavaScript(js);
     closeSelectedCard();
   };
@@ -600,7 +577,7 @@ export default function ExploreMapScreen() {
   };
 
   // Requirement 8f: Even if the app is on light mode, ALWAYS use dark mode version of map & globe!
-  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/dark';
+  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
   // Primary yellow accent & dark brown companion tokens
   const yellowAccent = '#e8a736';
@@ -643,38 +620,38 @@ export default function ExploreMapScreen() {
           }
           .cosmos-stars {
             position: absolute;
-            inset: -400px;
+            inset: -300px;
             background-image: 
-              radial-gradient(4.5px 4.5px at 28px 36px, #ffffff, rgba(255,255,255,0.7) 40%, rgba(0,0,0,0)),
-              radial-gradient(3.8px 3.8px at 145px 78px, #38bdf8, rgba(56,189,248,0.5) 45%, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 82px 185px, #fde047, rgba(0,0,0,0)),
-              radial-gradient(4.2px 4.2px at 278px 128px, #ffffff, rgba(255,255,255,0.6) 40%, rgba(0,0,0,0)),
-              radial-gradient(3.2px 3.2px at 218px 288px, #93c5fd, rgba(0,0,0,0)),
-              radial-gradient(2.6px 2.6px at 48px 258px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(4.5px 4.5px at 318px 42px, #e0f2fe, rgba(224,242,254,0.6) 40%, rgba(0,0,0,0)),
-              radial-gradient(3px 3px at 188px 168px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.6px 2.6px at 112px 308px, #fed7aa, rgba(0,0,0,0)),
-              radial-gradient(4.2px 4.2px at 52px 122px, #ffffff, rgba(255,255,255,0.7) 35%, rgba(0,0,0,0)),
-              radial-gradient(2.8px 2.8px at 168px 228px, #93c5fd, rgba(0,0,0,0)),
-              radial-gradient(3.5px 3.5px at 308px 248px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.6px 2.6px at 258px 318px, #fde047, rgba(0,0,0,0)),
-              radial-gradient(4px 4px at 338px 178px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
-              radial-gradient(2.6px 2.6px at 16px 208px, #bae6fd, rgba(0,0,0,0)),
-              radial-gradient(4.5px 4.5px at 128px 18px, #ffffff, rgba(255,255,255,0.7) 35%, rgba(0,0,0,0)),
-              radial-gradient(3.2px 3.2px at 238px 88px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.8px 2.8px at 298px 332px, #fef08a, rgba(0,0,0,0)),
-              radial-gradient(3.8px 3.8px at 95px 65px, #ffffff, rgba(255,255,255,0.5) 40%, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 175px 45px, #38bdf8, rgba(0,0,0,0)),
-              radial-gradient(4.5px 4.5px at 60px 290px, #ffffff, rgba(255,255,255,0.6) 45%, rgba(0,0,0,0)),
-              radial-gradient(2.8px 2.8px at 245px 195px, #fed7aa, rgba(0,0,0,0)),
-              radial-gradient(3.6px 3.6px at 15px 95px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 195px 260px, #93c5fd, rgba(0,0,0,0)),
-              radial-gradient(4.2px 4.2px at 285px 215px, #ffffff, rgba(255,255,255,0.6) 40%, rgba(0,0,0,0)),
-              radial-gradient(2.5px 2.5px at 135px 270px, #ffffff, rgba(0,0,0,0)),
-              radial-gradient(3.8px 3.8px at 215px 115px, #fde047, rgba(253,224,71,0.5) 40%, rgba(0,0,0,0)),
-              radial-gradient(2.8px 2.8px at 30px 160px, #bae6fd, rgba(0,0,0,0));
+              radial-gradient(1.0px 1.0px at 28px 36px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 145px 78px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 82px 185px, #ffffff, transparent),
+              radial-gradient(1.3px 1.3px at 278px 128px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 218px 288px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 48px 258px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 318px 42px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 188px 168px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 112px 308px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 52px 122px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 168px 228px, #ffffff, transparent),
+              radial-gradient(1.1px 1.1px at 308px 248px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 258px 318px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 338px 178px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 16px 208px, #ffffff, transparent),
+              radial-gradient(1.3px 1.3px at 128px 18px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 238px 88px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 298px 332px, #ffffff, transparent),
+              radial-gradient(1.1px 1.1px at 95px 65px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 175px 45px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 60px 290px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 245px 195px, #ffffff, transparent),
+              radial-gradient(1.0px 1.0px at 15px 95px, #ffffff, transparent),
+              radial-gradient(0.9px 0.9px at 195px 260px, #ffffff, transparent),
+              radial-gradient(1.2px 1.2px at 285px 215px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 135px 270px, #ffffff, transparent),
+              radial-gradient(1.1px 1.1px at 215px 115px, #ffffff, transparent),
+              radial-gradient(0.8px 0.8px at 30px 160px, #ffffff, transparent);
             background-repeat: repeat;
-            background-size: 320px 320px;
+            background-size: 240px 240px;
             opacity: 1;
             will-change: transform;
             transition: transform 0.05s linear;
@@ -684,23 +661,6 @@ export default function ExploreMapScreen() {
             inset: 0;
             background: radial-gradient(circle at center, transparent 38%, rgba(2, 6, 23, 0.7) 72%, #02040a 100%);
             pointer-events: none;
-          }
-
-          /* Snapchat-style Soft Globe Atmospheric Halo Glow */
-          .globe-atmosphere-glow {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 1;
-            box-shadow: 
-              0 0 35px 14px rgba(56, 189, 248, 0.65),
-              0 0 75px 32px rgba(14, 165, 233, 0.42),
-              0 0 120px 58px rgba(2, 132, 199, 0.22);
-            opacity: 0;
-            transition: opacity 0.25s ease-out;
           }
 
           .marker-container {
@@ -1087,27 +1047,44 @@ export default function ExploreMapScreen() {
       </head>
       <body>
         <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>
-        <div id="globe-glow" class="globe-atmosphere-glow"></div>
         <div id="map"></div>
 
         <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
         <script>
           // Initialize MapLibre GL v5 with 3D Globe Projection
+          // Initialize MapLibre GL with the exact free OpenFreeMap Liberty style used in MapPickerModal (Light Mode)
           var map = new maplibregl.Map({
             container: 'map',
-            style: '${mapStyleUrl}',
+            style: 'https://tiles.openfreemap.org/styles/liberty',
             center: [${initialCenterLng}, ${initialCenterLat}],
-            zoom: ${initialZoom},
-            pitch: ${initialPitch},
+            zoom: Math.max(1.8, ${initialZoom}),
+            minZoom: 1.8,
+            maxZoom: 19.0,
+            pitch: ${initialZoom < 5.0 ? 0 : initialPitch},
+            maxPitch: ${initialZoom < 5.0 ? 0 : 60},
             bearing: ${initialBearing},
-            projection: { type: 'globe' },
+            projection: { type: ${initialZoom >= 7.0 ? "'mercator'" : "'globe'"} },
             antialias: true
           });
+
+          // Adaptive projection switcher: 3D globe at low zoom (< 7.0), Mercator flat map at high zoom (>= 7.0)
+          var currentProjection = ${initialZoom >= 7.0 ? "'mercator'" : "'globe'"};
+          function updateAdaptiveProjection() {
+            var z = map.getZoom();
+            var targetProj = z >= 7.0 ? 'mercator' : 'globe';
+            if (currentProjection !== targetProj) {
+              currentProjection = targetProj;
+              try {
+                map.setProjection({ type: targetProj });
+              } catch(e) {}
+            }
+          }
+          map.on('zoom', updateAdaptiveProjection);
 
           // Decremental smooth zoom scale calculation
           function updateZoomScale() {
             var z = map.getZoom();
-            var minZ = 1.5;
+            var minZ = 1.8;
             var maxZ = 13.0;
             var clampedZ = Math.max(minZ, Math.min(maxZ, z));
             var t = (clampedZ - minZ) / (maxZ - minZ);
@@ -1120,89 +1097,150 @@ export default function ExploreMapScreen() {
             } else {
               document.body.classList.remove('hide-labels');
             }
-          }
 
+            if (z < 5.0) {
+              if (map.getMaxPitch() !== 0) map.setMaxPitch(0);
+              if (map.getPitch() !== 0) map.setPitch(0);
+            } else {
+              if (map.getMaxPitch() !== 60) map.setMaxPitch(60);
+            }
+          }
           map.on('zoom', updateZoomScale);
           updateZoomScale();
 
-          // Requirement 1a: Soft glowing cyan-blue atmospheric aura around the globe like Snapchat
-          function updateGlobeGlow() {
-            var glowEl = document.getElementById('globe-glow');
-            if (!glowEl) return;
-            var z = map.getZoom();
-            if (z >= 4.2) {
-              glowEl.style.opacity = '0';
-              return;
-            }
-            var op = Math.max(0, Math.min(1, (4.2 - z) / 2.2));
-            glowEl.style.opacity = (op * 0.95).toFixed(2);
-            var container = map.getContainer();
-            var cx = container.clientWidth / 2;
-            var cy = container.clientHeight / 2;
-            var r = (512 * Math.pow(2, z)) / (2 * Math.PI);
-            var d = Math.round(r * 2);
-            glowEl.style.width = d + 'px';
-            glowEl.style.height = d + 'px';
-            glowEl.style.left = cx + 'px';
-            glowEl.style.top = cy + 'px';
-          }
-          map.on('zoom', updateGlobeGlow);
-          map.on('move', updateGlobeGlow);
-          map.on('resize', updateGlobeGlow);
-          updateGlobeGlow();
-
-          // Requirement 1e: Starry background responsive to swiping / parallax like Snapchat
+          // Starry background responsive to swiping / parallax
           function updateCosmicParallax() {
             var starEl = document.querySelector('.cosmos-stars');
             if (!starEl) return;
             var center = map.getCenter();
             var bearing = map.getBearing() || 0;
             var pitch = map.getPitch() || 0;
-            var shiftX = (center.lng * 3.4 + bearing * 1.4) % 320;
-            var shiftY = (center.lat * 3.4 + pitch * 1.0) % 320;
+            var shiftX = (center.lng * 2.8 + bearing * 1.2) % 240;
+            var shiftY = (center.lat * 2.8 + pitch * 0.8) % 240;
             starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
           }
-          map.on('move', updateCosmicParallax);
-          map.on('rotate', updateCosmicParallax);
-          map.on('pitch', updateCosmicParallax);
 
-          // Style load: Set dark mode globe contrast and distinguish boundaries
+          var parallaxRaf = null;
+          function scheduleCosmicParallax() {
+            if (parallaxRaf) return;
+            parallaxRaf = requestAnimationFrame(function() {
+              parallaxRaf = null;
+              updateCosmicParallax();
+            });
+          }
+          map.on('move', scheduleCosmicParallax);
+          map.on('rotate', scheduleCosmicParallax);
+          map.on('pitch', scheduleCosmicParallax);
+
+          map.on('error', function(err) {
+            // Silently absorb individual tile network drops so map canvas never halts
+          });
+
+          // Style load: Plaster the exact working light mode Liberty setup from MapPickerModal,
+          // preserving all natural places, colors, vegetation, real POIs, crisp borders and English labels
           map.on('style.load', function() {
+            var z = map.getZoom();
+            var targetProj = z >= 7.0 ? 'mercator' : 'globe';
+            currentProjection = targetProj;
             try {
-              map.setProjection({ type: 'globe' });
+              map.setProjection({ type: targetProj });
             } catch(e) {}
 
-            var allStyleLayers = map.getStyle().layers || [];
-
-            // Requirement 1b: Snapchat & Google Maps dark skin (deep navy water, charcoal land, dark emerald parks)
+            // Country Borders & Boundary Presentation (from MapPickerModal):
+            // 1. Hide state, county, maritime, and sub-national clutter
+            // 2. Make country borders clearly visible, crisp, solid lines
             try {
-              if (map.getLayer('water')) {
-                map.setPaintProperty('water', 'fill-color', '#0b1426');
-              }
-              if (map.getLayer('background')) {
-                map.setPaintProperty('background', 'background-color', '#161922');
-              }
-              if (map.getLayer('landuse_park')) {
-                map.setPaintProperty('landuse_park', 'fill-color', '#11231c');
-              }
-              if (map.getLayer('landcover_wood')) {
-                map.setPaintProperty('landcover_wood', 'fill-color', '#11231c');
-              }
-              // Muted roads matching Google Maps / Snapchat UI
-              allStyleLayers.forEach(function(lay) {
-                if (lay.id && lay.id.indexOf('highway') !== -1 && lay.type === 'line') {
+              var allStyleLayers = map.getStyle().layers || [];
+              allStyleLayers.forEach(function(l) {
+                if (!l.id) return;
+                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1;
+                if (!isBoundary) return;
+
+                var isCountryBorder = l.id === 'boundary_country' || 
+                                     l.id === 'boundary_country_z0-4' || 
+                                     (l.id.indexOf('country') !== -1 && l.type === 'line');
+
+                if (isCountryBorder) {
                   try {
-                    if (lay.id.indexOf('casing') !== -1) {
-                      map.setPaintProperty(lay.id, 'line-color', '#18202e');
-                    } else {
-                      map.setPaintProperty(lay.id, 'line-color', '#232b3c');
-                    }
-                  } catch(e){}
+                    map.setLayoutProperty(l.id, 'visibility', 'visible');
+                  } catch(e) {}
+                  try {
+                    map.setPaintProperty(l.id, 'line-dasharray', null);
+                  } catch(e) {
+                    try { map.setPaintProperty(l.id, 'line-dasharray', [1, 0]); } catch(e2) {}
+                  }
+                  try {
+                    map.setPaintProperty(l.id, 'line-color', 'rgba(30, 41, 59, 0.80)');
+                  } catch(e) {}
+                  try {
+                    var w = l.id.indexOf('z0-4') !== -1 ? 1.5 : 2.0;
+                    map.setPaintProperty(l.id, 'line-width', w);
+                  } catch(e) {}
+                  try {
+                    map.setPaintProperty(l.id, 'line-opacity', 0.95);
+                  } catch(e) {}
+                } else {
+                  try {
+                    map.setLayoutProperty(l.id, 'visibility', 'none');
+                  } catch(e) {}
                 }
               });
             } catch(e) {}
 
-            // Requirement 1b: 3D extruded buildings when zoomed in
+            // Clean progressive English labels without blur/glow
+            var labelConfigs = {
+              'place_country_major': { minzoom: 0, maxzoom: 6 },
+              'place_country_minor': { minzoom: 3.8, maxzoom: 8 },
+              'place_country_other': { minzoom: 4.8, maxzoom: 9 },
+              'place_state': { minzoom: 4.8, maxzoom: 12 },
+              'place_city_large': { minzoom: 5.2, maxzoom: 12 },
+              'place_city': { minzoom: 6.8, maxzoom: 14 },
+              'place_town': { minzoom: 9.0, maxzoom: 15 },
+              'place_village': { minzoom: 11.0, maxzoom: 15 },
+              'place_suburb': { minzoom: 12.0, maxzoom: 15 },
+              'place_other': { minzoom: 12.5, maxzoom: 15 }
+            };
+
+            Object.keys(labelConfigs).forEach(function(layerId) {
+              if (map.getLayer(layerId)) {
+                var cfg = labelConfigs[layerId];
+                try {
+                  map.setLayerZoomRange(layerId, cfg.minzoom, cfg.maxzoom);
+                  map.setLayoutProperty(layerId, 'text-field', [
+                    'coalesce',
+                    ['get', 'name:en'],
+                    ['get', 'name_en'],
+                    ['get', 'name:latin'],
+                    ['get', 'name'],
+                    ''
+                  ]);
+                  map.setLayoutProperty(layerId, 'text-padding', 10);
+                  map.setLayoutProperty(layerId, 'text-optional', true);
+                  map.setPaintProperty(layerId, 'text-halo-blur', 0);
+                } catch(e) {}
+              }
+            });
+
+            // Ensure all other symbol/text layers strictly use English coalesce & zero blur
+            try {
+              var allLayers = map.getStyle().layers || [];
+              allLayers.forEach(function(l) {
+                if (!l.id || l.type !== 'symbol') return;
+                try {
+                  map.setLayoutProperty(l.id, 'text-field', [
+                    'coalesce',
+                    ['get', 'name:en'],
+                    ['get', 'name_en'],
+                    ['get', 'name:latin'],
+                    ['get', 'name'],
+                    ''
+                  ]);
+                  map.setPaintProperty(l.id, 'text-halo-blur', 0);
+                } catch(e) {}
+              });
+            } catch(e) {}
+
+            // 3D extruded buildings (at zoom >= 15.0)
             try {
               if (!map.getLayer('3d-buildings') && map.getSource('openmaptiles')) {
                 map.addLayer({
@@ -1210,277 +1248,29 @@ export default function ExploreMapScreen() {
                   source: 'openmaptiles',
                   'source-layer': 'building',
                   type: 'fill-extrusion',
-                  minzoom: 14.8,
+                  minzoom: 15.0,
+                  maxzoom: 22,
                   paint: {
-                    'fill-extrusion-color': '#1c2333',
+                    'fill-extrusion-color': '#cbd5e1',
                     'fill-extrusion-height': [
                       'interpolate', ['linear'], ['zoom'],
-                      14.8, 0,
-                      15.5, ['case', ['has', 'render_height'], ['get', 'render_height'], 12]
+                      15.0, 0,
+                      15.8, ['case', ['has', 'render_height'], ['get', 'render_height'], 14]
                     ],
-                    'fill-extrusion-opacity': 0.72
+                    'fill-extrusion-opacity': 0.75
                   }
                 });
               }
             } catch(e) {}
 
-            // Requirement 1a: Country borders fade in only when zoomed in, soft tone, not plastered on globe
-            try {
-              allStyleLayers.forEach(function(l) {
-                if (!l.id) return;
-                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1 || l.id.indexOf('admin') !== -1;
-                if (!isBoundary) return;
-
-                var isCountry = l.id === 'boundary_country' || 
-                               l.id === 'boundary_country_z0-4' || 
-                               l.id === 'boundary_country_z5-' ||
-                               (l.id.indexOf('country') !== -1 && l.type === 'line');
-
-                var isState = l.id === 'boundary_state' || 
-                             l.id === 'boundary_state_z0-4' || 
-                             l.id.indexOf('province') !== -1 ||
-                             (l.id.indexOf('state') !== -1 && l.type === 'line');
-
-                var isCity = l.id === 'boundary_city' || 
-                            l.id === 'boundary_county' || 
-                            l.id === 'boundary_district' ||
-                            l.id.indexOf('county') !== -1 ||
-                            l.id.indexOf('admin_level_6') !== -1 ||
-                            l.id.indexOf('admin_level_8') !== -1 ||
-                            (l.id.indexOf('admin') !== -1 && l.type === 'line' && !isCountry && !isState);
-
-                if (isCountry) {
-                  // Requirement 1a: Country: Soft white-blue line, visible ONLY when zoomed in enough (fade in zoom 3.2+)
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                    map.setPaintProperty(l.id, 'line-dasharray', null);
-                    map.setPaintProperty(l.id, 'line-color', 'rgba(255, 255, 255, 0.65)');
-                    map.setPaintProperty(l.id, 'line-width', 1.2);
-                    map.setPaintProperty(l.id, 'line-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      3.2, 0,
-                      4.2, 0.45,
-                      7.0, 0.75
-                    ]);
-                  } catch(e) {}
-                } else if (isState) {
-                  // State / Region: Softer golden dashed line
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                    map.setPaintProperty(l.id, 'line-dasharray', [3, 2]);
-                    map.setPaintProperty(l.id, 'line-color', '#d99726');
-                    map.setPaintProperty(l.id, 'line-width', 1.2);
-                    map.setPaintProperty(l.id, 'line-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      4.8, 0,
-                      5.6, 0.45,
-                      8.0, 0.65
-                    ]);
-                  } catch(e) {}
-                } else if (isCity) {
-                  // City / Urban: Distinct periwinkle/indigo dotted line
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                    map.setPaintProperty(l.id, 'line-dasharray', [2, 2]);
-                    map.setPaintProperty(l.id, 'line-color', '#818cf8');
-                    map.setPaintProperty(l.id, 'line-width', 1.5);
-                    map.setPaintProperty(l.id, 'line-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      8.8, 0,
-                      9.6, 0.75,
-                      13.0, 0.85
-                    ]);
-                  } catch(e) {}
-                } else {
-                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
-                }
-              });
-            } catch(e) {}
-
-            // Requirement 1c: Add Google Maps places (hospitals, buildings, cafes, schools, etc.)
-            // Rendered selectively in moderation with small circles smaller than people elements, and appropriate icons
-            try {
-              if (!map.getLayer('poi-circles') && map.getSource('openmaptiles')) {
-                // (a) Circle layer: small colored circles with 1.5px white ring
-                map.addLayer({
-                  id: 'poi-circles',
-                  source: 'openmaptiles',
-                  'source-layer': 'poi',
-                  type: 'circle',
-                  minzoom: 13.5,
-                  filter: [
-                    'step', ['zoom'],
-                    ['all', ['<=', ['get', 'rank'], 2], ['in', ['get', 'class'], ['literal', ['hospital', 'university', 'college', 'railway', 'airport']]]],
-                    14.5, ['<=', ['get', 'rank'], 4],
-                    15.8, ['all']
-                  ],
-                  paint: {
-                    'circle-radius': [
-                      'interpolate', ['linear'], ['zoom'],
-                      13.5, 7,
-                      15.0, 8.5,
-                      17.0, 10
-                    ],
-                    'circle-color': [
-                      'match', ['get', 'class'],
-                      ['hospital', 'doctors'], '#ef4444',
-                      ['pharmacy'], '#14b8a6',
-                      ['cafe', 'coffee'], '#f97316',
-                      ['restaurant', 'fast_food', 'food', 'bar'], '#ea580c',
-                      ['school', 'college', 'university', 'library'], '#3b82f6',
-                      ['bank', 'atm'], '#10b981',
-                      ['park', 'pitch'], '#22c55e',
-                      ['hotel', 'lodging'], '#8b5cf6',
-                      ['shop', 'supermarket', 'grocery', 'mall'], '#ec4899',
-                      ['cinema', 'theatre', 'museum'], '#a855f7',
-                      '#64748b'
-                    ],
-                    'circle-stroke-width': 1.5,
-                    'circle-stroke-color': '#ffffff',
-                    'circle-opacity': 0.95
-                  }
-                });
-
-                // (b) Symbol layer: Appropriate icons inside the circle
-                map.addLayer({
-                  id: 'poi-icons',
-                  source: 'openmaptiles',
-                  'source-layer': 'poi',
-                  type: 'symbol',
-                  minzoom: 13.5,
-                  filter: [
-                    'step', ['zoom'],
-                    ['all', ['<=', ['get', 'rank'], 2], ['in', ['get', 'class'], ['literal', ['hospital', 'university', 'college', 'railway', 'airport']]]],
-                    14.5, ['<=', ['get', 'rank'], 4],
-                    15.8, ['all']
-                  ],
-                  layout: {
-                    'text-field': [
-                      'match', ['get', 'class'],
-                      ['hospital', 'doctors'], '✚',
-                      ['pharmacy'], '💊',
-                      ['cafe', 'coffee'], '☕',
-                      ['restaurant', 'fast_food', 'food', 'bar'], '🍴',
-                      ['school', 'college', 'university', 'library'], '🎓',
-                      ['bank', 'atm'], '$',
-                      ['park', 'pitch'], '🌲',
-                      ['hotel', 'lodging'], '🛏',
-                      ['shop', 'supermarket', 'grocery', 'mall'], '🛍',
-                      ['cinema', 'theatre', 'museum'], '🎬',
-                      '🏢'
-                    ],
-                    'text-size': [
-                      'interpolate', ['linear'], ['zoom'],
-                      13.5, 9,
-                      16.0, 11
-                    ],
-                    'text-allow-overlap': false,
-                    'text-ignore-placement': false
-                  },
-                  paint: {
-                    'text-color': '#ffffff'
-                  }
-                });
-
-                // (c) Text labels under the circles (only when zoomed in close, non-overlapping)
-                map.addLayer({
-                  id: 'poi-labels',
-                  source: 'openmaptiles',
-                  'source-layer': 'poi',
-                  type: 'symbol',
-                  minzoom: 14.8,
-                  filter: ['<=', ['get', 'rank'], 4],
-                  layout: {
-                    'text-field': ['get', 'name'],
-                    'text-font': ['Noto Sans Regular'],
-                    'text-size': 9.5,
-                    'text-offset': [0, 1.4],
-                    'text-anchor': 'top',
-                    'text-max-width': 8,
-                    'text-optional': true,
-                    'text-allow-overlap': false
-                  },
-                  paint: {
-                    'text-color': '#e2e8f0',
-                    'text-halo-color': '#0b1426',
-                    'text-halo-width': 1.5
-                  }
-                });
-              }
-            } catch(e) {}
-
-            // Requirement 1d: Selective non-overlapping texts for countries, regions/states, cities, sub-cities
-            try {
-              // Country texts: Only zoom 0 to 4.2
-              ['place_country_major', 'place_country_minor', 'place_country_other'].forEach(function(cId) {
-                if (map.getLayer(cId)) {
-                  try {
-                    map.setPaintProperty(cId, 'text-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      1.0, 0.92,
-                      3.8, 0.92,
-                      4.4, 0
-                    ]);
-                  } catch(e){}
-                }
-              });
-
-              // Region / State texts: Only zoom 4.2 to 6.8
-              if (map.getLayer('place_state')) {
-                try {
-                  map.setPaintProperty('place_state', 'text-opacity', [
-                    'interpolate', ['linear'], ['zoom'],
-                    4.2, 0,
-                    4.8, 0.85,
-                    6.8, 0.85,
-                    7.4, 0
-                  ]);
-                } catch(e){}
-              }
-
-              // City texts: Only zoom 6.8 to 11.5
-              ['place_city_large', 'place_city'].forEach(function(cityId) {
-                if (map.getLayer(cityId)) {
-                  try {
-                    map.setPaintProperty(cityId, 'text-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      6.8, 0,
-                      7.6, 0.9,
-                      11.2, 0.9,
-                      12.0, 0
-                    ]);
-                  } catch(e){}
-                }
-              });
-
-              // Sub-cities / Towns / Districts: Only zoom 11.2 to 14.0
-              ['place_town', 'place_suburb'].forEach(function(subId) {
-                if (map.getLayer(subId)) {
-                  try {
-                    map.setPaintProperty(subId, 'text-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      11.2, 0,
-                      12.0, 0.85,
-                      14.0, 0.85,
-                      14.6, 0
-                    ]);
-                  } catch(e){}
-                }
-              });
-
-              // Villages / Neighborhoods / Local: Only zoom 13.8+
-              ['place_village', 'place_other'].forEach(function(vId) {
-                if (map.getLayer(vId)) {
-                  try {
-                    map.setPaintProperty(vId, 'text-opacity', [
-                      'interpolate', ['linear'], ['zoom'],
-                      13.8, 0,
-                      14.5, 0.85
-                    ]);
-                  } catch(e){}
-                }
-              });
-            } catch(e) {}
+            if (currentPayload) {
+              window.renderElements(currentPayload.items, currentPayload.selectedCityNames);
+            }
+            if (window.pendingFocus) {
+              var pf = window.pendingFocus;
+              window.pendingFocus = null;
+              window.focusLocation(pf.lat, pf.lng, pf.zoom, pf.targetItemId);
+            }
           });
 
           // Reset to 3D Globe
@@ -1491,7 +1281,7 @@ export default function ExploreMapScreen() {
             } catch(e) {}
             map.flyTo({
               center: [20, 20],
-              zoom: 1.5,
+              zoom: 2.3,
               pitch: 0,
               bearing: 0,
               speed: 0.8,
@@ -1506,6 +1296,7 @@ export default function ExploreMapScreen() {
           var activeItemMarkers = [];
           var expandedMarkers = [];
           var currentlyHiddenMarker = null;
+          var currentlyExpandedClusterKey = null;
           var userGpsMarker = null;
           var lastActionTime = 0;
           var isProgrammaticFlight = false;
@@ -1526,20 +1317,43 @@ export default function ExploreMapScreen() {
           };
 
           // Requirement 13: Collapse expanded cluster with smooth card slide back into deck without glitches
-          function collapseExpanded(callback) {
-            if (!expandedMarkers.length) {
-              if (currentlyHiddenMarker && currentlyHiddenMarker._element) {
-                currentlyHiddenMarker._element.style.display = 'block';
+          function collapseExpanded(callback, immediate) {
+            currentlyExpandedClusterKey = null;
+
+            function restoreParent() {
+              if (currentlyHiddenMarker) {
+                var el = (currentlyHiddenMarker.getElement && currentlyHiddenMarker.getElement()) || currentlyHiddenMarker._element;
+                if (el) {
+                  el.style.display = 'block';
+                  var inEl = el.querySelector('.marker-inner');
+                  if (inEl) {
+                    inEl.classList.remove('stacked-return');
+                    void inEl.offsetWidth;
+                    inEl.classList.add('stacked-return');
+                  }
+                }
                 currentlyHiddenMarker = null;
               }
               if (callback) callback();
+            }
+
+            if (!expandedMarkers.length) {
+              restoreParent();
+              return;
+            }
+
+            if (immediate) {
+              expandedMarkers.forEach(function(m) { m.remove(); });
+              expandedMarkers = [];
+              restoreParent();
               return;
             }
 
             // Animate expanded cards back into the deck smoothly
             expandedMarkers.forEach(function(m) {
-              if (m._element) {
-                var inEl = m._element.querySelector('.marker-inner');
+              var el = (m.getElement && m.getElement()) || m._element;
+              if (el) {
+                var inEl = el.querySelector('.marker-inner');
                 if (inEl) {
                   inEl.style.animationDelay = '0ms';
                   inEl.classList.remove('card-slide-out');
@@ -1551,17 +1365,7 @@ export default function ExploreMapScreen() {
             setTimeout(function() {
               expandedMarkers.forEach(function(m) { m.remove(); });
               expandedMarkers = [];
-              if (currentlyHiddenMarker && currentlyHiddenMarker._element) {
-                currentlyHiddenMarker._element.style.display = 'block';
-                var inEl = currentlyHiddenMarker._element.querySelector('.marker-inner');
-                if (inEl) {
-                  inEl.classList.remove('stacked-return');
-                  void inEl.offsetWidth;
-                  inEl.classList.add('stacked-return');
-                }
-                currentlyHiddenMarker = null;
-              }
-              if (callback) callback();
+              restoreParent();
             }, 320);
           }
 
@@ -1702,48 +1506,70 @@ export default function ExploreMapScreen() {
 
           // Requirement 8b: Expand overlapping elements with smooth card deck sliding
           function expandCluster(cluster, markerRef) {
-            collapseExpanded(function() {
-              if (markerRef && markerRef._element) {
-                markerRef._element.style.display = 'none';
-                currentlyHiddenMarker = markerRef;
+            var vuKey = cluster.lng.toFixed(5) + '_' + cluster.lat.toFixed(5);
+            if (currentlyExpandedClusterKey === vuKey && expandedMarkers.length > 0) {
+              return;
+            }
+
+            // Immediately clear any existing expanded markers
+            if (expandedMarkers.length > 0) {
+              expandedMarkers.forEach(function(m) { m.remove(); });
+              expandedMarkers = [];
+            }
+
+            currentlyExpandedClusterKey = vuKey;
+
+            if (markerRef) {
+              var el = (markerRef.getElement && markerRef.getElement()) || markerRef._element;
+              if (el) el.style.display = 'none';
+              currentlyHiddenMarker = markerRef;
+            } else {
+              for (var i = 0; i < activeItemMarkers.length; i++) {
+                var aim = activeItemMarkers[i];
+                if (Math.abs(aim.origLng - cluster.lng) < 0.0001 && Math.abs(aim.origLat - cluster.lat) < 0.0001) {
+                  var el2 = (aim.marker.getElement && aim.marker.getElement()) || aim.marker._element;
+                  if (el2) el2.style.display = 'none';
+                  currentlyHiddenMarker = aim.marker;
+                  break;
+                }
               }
+            }
 
-              var items = cluster.items;
-              var offsets = computeAdaptiveOffsets(items.length);
+            var items = cluster.items;
+            var offsets = computeAdaptiveOffsets(items.length);
 
-              items.forEach(function(item, idx) {
-                var off = offsets[idx] || { dx: 0, dy: 0, delay: 0, rot: 0 };
-                var itemDom = createItemDom(item, false, 1);
+            items.forEach(function(item, idx) {
+              var off = offsets[idx] || { dx: 0, dy: 0, delay: 0, rot: 0 };
+              var itemDom = createItemDom(item, false, 1);
 
-                itemDom.inner.style.setProperty('--target-x', off.dx + 'px');
-                itemDom.inner.style.setProperty('--target-y', off.dy + 'px');
-                itemDom.inner.style.setProperty('--card-deck-rot', off.rot + 'deg');
-                itemDom.inner.style.animationDelay = off.delay + 'ms';
-                itemDom.inner.classList.add('card-slide-out');
+              itemDom.inner.style.setProperty('--target-x', off.dx + 'px');
+              itemDom.inner.style.setProperty('--target-y', off.dy + 'px');
+              itemDom.inner.style.setProperty('--card-deck-rot', off.rot + 'deg');
+              itemDom.inner.style.animationDelay = off.delay + 'ms';
+              itemDom.inner.classList.add('card-slide-out');
 
-                itemDom.container.addEventListener('click', function(ev) {
-                  ev.stopPropagation();
-                  lastActionTime = Date.now();
-                  highlightPin(itemDom.pin);
-                  sendMarkerClick(item.entityType, item);
-                });
-
-                itemDom.container.addEventListener('touchend', function(ev) {
-                  ev.stopPropagation();
-                  lastActionTime = Date.now();
-                });
-
-                var expandedMarker = new maplibregl.Marker({
-                  element: itemDom.container,
-                  offset: [0, 0]
-                })
-                  .setLngLat([cluster.lng, cluster.lat])
-                  .addTo(map);
-
-                expandedMarker._item = item;
-                expandedMarker._pin = itemDom.pin;
-                expandedMarkers.push(expandedMarker);
+              itemDom.container.addEventListener('click', function(ev) {
+                ev.stopPropagation();
+                lastActionTime = Date.now();
+                highlightPin(itemDom.pin);
+                sendMarkerClick(item.entityType, item);
               });
+
+              itemDom.container.addEventListener('touchend', function(ev) {
+                ev.stopPropagation();
+                lastActionTime = Date.now();
+              });
+
+              var expandedMarker = new maplibregl.Marker({
+                element: itemDom.container,
+                offset: [0, 0]
+              })
+                .setLngLat([cluster.lng, cluster.lat])
+                .addTo(map);
+
+              expandedMarker._item = item;
+              expandedMarker._pin = itemDom.pin;
+              expandedMarkers.push(expandedMarker);
             });
           }
 
@@ -1788,8 +1614,9 @@ export default function ExploreMapScreen() {
           // Dynamic Marker Rendering with City Scoping
           function renderMarkers() {
             if (!currentPayload) return;
-            if (!isProgrammaticFlight && !window.pendingFocus) {
-              collapseExpanded();
+            if (isProgrammaticFlight) return;
+            if (!window.pendingFocus) {
+              collapseExpanded(null, true);
             }
             activeItemMarkers.forEach(function(m) { m.marker.remove(); });
             activeItemMarkers = [];
@@ -1841,8 +1668,14 @@ export default function ExploreMapScreen() {
             function pushIfSelected(item, type) {
               if (item.location && typeof item.location.latitude === 'number' && typeof item.location.longitude === 'number') {
                 var wrapped = Object.assign({}, item, { entityType: type });
-                // Requirement 8c-ii: Only render elements inside selected cities
-                if (itemMatchesSelectedCities(wrapped)) {
+                var isTargetItem = window.pendingFocus && (
+                  String(window.pendingFocus.id) === String(item.id) ||
+                  (item.slug && String(window.pendingFocus.id) === String(item.slug)) ||
+                  (window.pendingFocus.lat !== null && Math.abs(item.location.latitude - window.pendingFocus.lat) < 0.0005 &&
+                   window.pendingFocus.lng !== null && Math.abs(item.location.longitude - window.pendingFocus.lng) < 0.0005)
+                );
+                // Requirement 8c-ii: Only render elements inside selected cities, unless it is a focused target
+                if (isTargetItem || itemMatchesSelectedCities(wrapped)) {
                   allItems.push(wrapped);
                 }
               }
@@ -1981,6 +1814,13 @@ export default function ExploreMapScreen() {
                   .setLngLat([vu.lng, vu.lat])
                   .addTo(map);
 
+                var vuKey = vu.lng.toFixed(5) + '_' + vu.lat.toFixed(5);
+                if (currentlyExpandedClusterKey && currentlyExpandedClusterKey === vuKey) {
+                  var mEl = (marker.getElement && marker.getElement()) || marker._element;
+                  if (mEl) mEl.style.display = 'none';
+                  currentlyHiddenMarker = marker;
+                }
+
                 activeItemMarkers.push({
                   venueUnit: vu,
                   item: topItem,
@@ -2014,11 +1854,13 @@ export default function ExploreMapScreen() {
             if (payload.selectedCities) {
               currentSelectedCities = payload.selectedCities;
             }
+            if (isProgrammaticFlight) return;
             renderMarkers();
           };
 
           window.syncSelectedCities = function(cities) {
             currentSelectedCities = cities;
+            if (isProgrammaticFlight) return;
             renderMarkers();
           };
 
@@ -2063,8 +1905,14 @@ export default function ExploreMapScreen() {
 
             var targetVu = foundEntry.venueUnit;
             var markerRef = foundEntry.marker;
+            var flightCompleted = false;
 
             function doExpandAndHighlight() {
+              if (flightCompleted) return;
+              flightCompleted = true;
+              isProgrammaticFlight = false;
+              window.pendingFocus = null;
+
               if (targetVu.items.length > 1) {
                 expandCluster(targetVu, markerRef);
                 setTimeout(function() {
@@ -2077,14 +1925,10 @@ export default function ExploreMapScreen() {
                   if (targetPin) {
                     highlightPin(targetPin);
                   }
-                  isProgrammaticFlight = false;
-                  window.pendingFocus = null;
-                }, 120);
+                }, 80);
               } else {
-                collapseExpanded();
+                collapseExpanded(null, true);
                 highlightPin(foundEntry.dom.pin);
-                isProgrammaticFlight = false;
-                window.pendingFocus = null;
               }
             }
 
@@ -2096,11 +1940,17 @@ export default function ExploreMapScreen() {
               doExpandAndHighlight();
             } else {
               isProgrammaticFlight = true;
-              map.once('moveend', function() {
+              var moveTimeout = null;
+
+              function onMoveEnd() {
+                if (moveTimeout) clearTimeout(moveTimeout);
                 setTimeout(function() {
                   doExpandAndHighlight();
-                }, 80);
-              });
+                }, 60);
+              }
+
+              map.once('moveend', onMoveEnd);
+
               map.flyTo({
                 center: [targetVu.lng, targetVu.lat],
                 zoom: 15.5,
@@ -2109,8 +1959,10 @@ export default function ExploreMapScreen() {
                 curve: 1.4,
                 essential: true
               });
-              setTimeout(function() {
-                if (isProgrammaticFlight) {
+
+              moveTimeout = setTimeout(function() {
+                if (!flightCompleted) {
+                  map.off('moveend', onMoveEnd);
                   doExpandAndHighlight();
                 }
               }, 2200);
@@ -2245,9 +2097,7 @@ export default function ExploreMapScreen() {
             }
           }
 
-          map.on('move', function() {
-            updateContinuousClustering();
-          });
+          // Clustering only depends on zoom level; move-based clustering removed to ensure smooth 60fps dragging
           map.on('moveend', function() {
             if (isProgrammaticFlight) return;
             var c = map.getCenter();
@@ -2296,10 +2146,7 @@ export default function ExploreMapScreen() {
 
       {/* Floating Header Controls with App's Yellow Accent & Dark Brown Theme */}
       <View style={[styles.headerOverlay, { top: Math.max(insets.top, 16) }]}>
-        <View style={[styles.headerTitleWrap, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '70' }]}>
-          <MaterialIcons name="explore" size={18} color={yellowAccent} style={{ marginRight: 6 }} />
-          <Text style={[styles.appTitle, { color: yellowAccent }]}>Explore Map</Text>
-        </View>
+        <Text style={styles.nexusMapTitle}>Nexus Map</Text>
 
         {/* Action Controls (Globe, GPS Current Location, Refresh) */}
         <View style={styles.controlsRow}>
@@ -2527,124 +2374,169 @@ export default function ExploreMapScreen() {
           },
         ]}
       >
-        {/* Left: Category Icon Circles Stack */}
-        {!isCategoryStackExpanded ? (
-          // Overlapped State: Max 4 circles poking out vertically downwards
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleExpandCategories}
-            style={styles.categoryStackOverlapBox}
-          >
-            {/* 4th circle */}
-            <View style={[styles.categoryOverlapPill, styles.categoryOverlap4, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '30' }]} />
-            {/* 3rd circle */}
-            <View style={[styles.categoryOverlapPill, styles.categoryOverlap3, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '45' }]} />
-            {/* 2nd circle */}
-            <View style={[styles.categoryOverlapPill, styles.categoryOverlap2, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '65' }]} />
-            {/* Top 1st circle */}
-            <View
-              style={[
-                styles.categoryOverlapPill,
-                styles.categoryOverlap1,
-                {
-                  backgroundColor: selectedCategories.length > 0 && !selectedCategories.includes('all') ? yellowAccent : darkBrownBg,
-                  borderColor: yellowAccent,
-                },
-              ]}
-            >
-              <MaterialIcons
-                name={
-                  selectedCategories.length > 0 && !selectedCategories.includes('all')
-                    ? (CATEGORY_FILTER_ITEMS.find((c) => selectedCategories.includes(c.id) || selectedCategories.includes(c.name))?.icon || 'category')
-                    : 'category'
-                }
-                size={18}
-                color={selectedCategories.length > 0 && !selectedCategories.includes('all') ? darkBrown : yellowAccent}
-              />
-              {selectedCategories.length > 0 && !selectedCategories.includes('all') && (
-                <View style={styles.categoryStackBadge}>
-                  <Text style={styles.categoryStackBadgeText}>{selectedCategories.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        ) : (
-          // Expanded State: Smooth cluster card animation, top arrow REMOVED per requirement 1h!
+        {/* Left: Unified Smooth Sliding Category Card Deck */}
+        <Animated.View
+          style={[
+            styles.categoryDeckBox,
+            {
+              height: categoryStackAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [58, Math.min(320, (CATEGORY_FILTER_ITEMS.length - 1) * 44 + 38 + 44)],
+              }),
+            },
+          ]}
+        >
+          {/* Special capsule background for exploded state only — invisible in collapsed overlap state */}
           <Animated.View
             style={[
-              styles.categoryStackExpandedBox,
+              styles.categoryDeckBg,
               {
                 backgroundColor: isDark ? 'rgba(32, 28, 24, 0.95)' : 'rgba(255, 255, 255, 0.96)',
                 borderColor: yellowAccent + '70',
                 opacity: categoryStackAnim.interpolate({
-                  inputRange: [0, 0.4, 1],
-                  outputRange: [0.6, 0.9, 1],
+                  inputRange: [0.15, 1],
+                  outputRange: [0, 1],
                 }),
               },
             ]}
-          >
-            {/* Top arrow removed per requirement 1h */}
+            pointerEvents="none"
+          />
 
-            {/* Scrollable list of categories with smooth deck slide out animation */}
-            <ScrollView
-              ref={categoryScrollRef}
-              showsVerticalScrollIndicator={false}
-              style={styles.categoryScrollList}
-              contentContainerStyle={styles.categoryScrollContent}
-            >
-              {CATEGORY_FILTER_ITEMS.map((item, idx) => {
-                const isSelected = selectedCategories.includes(item.id) || selectedCategories.includes(item.name);
-                const itemTranslateY = categoryStackAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-(idx * 16), 0],
-                });
-                const itemScale = categoryStackAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.82, 1],
-                });
-                const itemOpacity = categoryStackAnim.interpolate({
-                  inputRange: [0, 0.4, 1],
-                  outputRange: [idx === 0 ? 0.9 : 0.25, 0.75, 1],
-                });
-                return (
-                  <Animated.View
-                    key={item.id}
-                    style={{
-                      transform: [{ translateY: itemTranslateY }, { scale: itemScale }],
-                      opacity: itemOpacity,
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.categoryItemCircle,
-                        isSelected
-                          ? [styles.categoryItemActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }]
-                          : [styles.categoryItemInactive, { backgroundColor: darkBrownBg, borderColor: isDark ? '#3d3835' : '#e5d5c3' }],
-                      ]}
-                      onPress={() => handleToggleCategory(item.id)}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialIcons
-                        name={item.icon}
-                        size={17}
-                        color={isSelected ? darkBrown : yellowAccent}
-                      />
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
-            </ScrollView>
-
-            {/* Bottom Pull Tab Arrow: Collapses stack with smooth slide back */}
+          {/* Collapsed tap overlay: when collapsed, tap to expand */}
+          {!isCategoryStackExpanded && (
             <TouchableOpacity
-              style={[styles.categoryActionCircle, styles.categoryPullTabBottom, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '60' }]}
-              onPress={handleCollapseCategories}
-              activeOpacity={0.8}
+              style={[StyleSheet.absoluteFill, { zIndex: 50 }]}
+              onPress={handleExpandCategories}
+              activeOpacity={0.85}
+            />
+          )}
+
+          <ScrollView
+            ref={categoryScrollRef}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={isCategoryStackExpanded}
+            style={styles.categoryScrollList}
+            contentContainerStyle={[
+              styles.categoryScrollContent,
+              {
+                minHeight: isCategoryStackExpanded ? (CATEGORY_FILTER_ITEMS.length - 1) * 44 + 38 + 42 : 58,
+                paddingBottom: isCategoryStackExpanded ? 42 : 0,
+              },
+            ]}
+          >
+            {CATEGORY_FILTER_ITEMS.map((item, idx) => {
+              const isSelected = selectedCategories.includes(item.id) || selectedCategories.includes(item.name);
+              const reverseIdx = Math.min(3, idx);
+              const stackedTop = reverseIdx * 4;
+              const itemTop = categoryStackAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [stackedTop, idx * 44],
+              });
+              const itemScale = categoryStackAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [idx === 0 ? 1 : Math.max(0.82, 1 - idx * 0.05), 1],
+              });
+              const itemOpacity = idx < 4
+                ? 1
+                : categoryStackAnim.interpolate({
+                    inputRange: [0, 0.3, 1],
+                    outputRange: [0, 0.4, 1],
+                  });
+              const zIndex = idx === 0 ? 25 : (15 - idx);
+
+              return (
+                <Animated.View
+                  key={item.id}
+                  style={[
+                    styles.categoryDeckItemWrap,
+                    {
+                      top: itemTop,
+                      transform: [{ scale: itemScale }],
+                      opacity: itemOpacity,
+                      zIndex,
+                    },
+                  ]}
+                  pointerEvents={isCategoryStackExpanded ? 'auto' : 'none'}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryItemCircle,
+                      isSelected
+                        ? [styles.categoryItemActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }]
+                        : [styles.categoryItemInactive, { backgroundColor: darkBrownBg, borderColor: isDark ? '#3d3835' : '#e5d5c3' }],
+                    ]}
+                    onPress={() => handleToggleCategory(item.id)}
+                    activeOpacity={0.8}
+                  >
+                    {item.iconLibrary === 'MaterialCommunityIcons' ? (
+                      <MaterialCommunityIcons
+                        name={item.icon as any}
+                        size={18}
+                        color={isSelected ? darkBrown : (isDark ? yellowAccent : '#92400e')}
+                      />
+                    ) : (
+                      <MaterialIcons
+                        name={item.icon as any}
+                        size={18}
+                        color={isSelected ? darkBrown : (isDark ? yellowAccent : '#92400e')}
+                      />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Badge count on Card 0 when collapsed */}
+                  {idx === 0 && selectedCategories.length > 0 && !selectedCategories.includes('all') && (
+                    <Animated.View
+                      style={[
+                        styles.categoryStackBadge,
+                        {
+                          opacity: categoryStackAnim.interpolate({
+                            inputRange: [0, 0.3],
+                            outputRange: [1, 0],
+                          }),
+                        },
+                      ]}
+                      pointerEvents="none"
+                    >
+                      <Text style={styles.categoryStackBadgeText}>{selectedCategories.length}</Text>
+                    </Animated.View>
+                  )}
+                </Animated.View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Bottom Pull Tab Arrow: Only visible in exploded state to collapse back to overlap state */}
+          {isCategoryStackExpanded && (
+            <Animated.View
+              style={[
+                styles.categoryPullTabBottomWrap,
+                {
+                  opacity: categoryStackAnim.interpolate({
+                    inputRange: [0.5, 1],
+                    outputRange: [0, 1],
+                  }),
+                  transform: [
+                    {
+                      scale: categoryStackAnim.interpolate({
+                        inputRange: [0.5, 1],
+                        outputRange: [0.5, 1],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+              pointerEvents="auto"
             >
-              <MaterialIcons name="keyboard-arrow-up" size={20} color={yellowAccent} />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+              <TouchableOpacity
+                style={[styles.categoryActionCircle, styles.categoryPullTabBottom, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '60' }]}
+                onPress={handleCollapseCategories}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="keyboard-arrow-up" size={20} color={yellowAccent} />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </Animated.View>
 
         {/* Right: "Categories" text pill or horizontally stacking selected categories pills */}
         <ScrollView
@@ -2654,14 +2546,21 @@ export default function ExploreMapScreen() {
           style={styles.categorySelectedPillsWrap}
         >
           {activeCategoriesList.length === 0 ? (
-            <View style={styles.categoryLabelPill}>
-              <MaterialIcons name="category" size={13} color={yellowAccent} style={{ marginRight: 4 }} />
-              <Text style={styles.categoryLabelPillText}>Categories</Text>
+            <View style={[
+              styles.categoryLabelPill,
+              !isDark && { backgroundColor: '#ffffff', borderColor: yellowAccent }
+            ]}>
+              <MaterialIcons name="category" size={13} color={isDark ? yellowAccent : '#92400e'} style={{ marginRight: 4 }} />
+              <Text style={[styles.categoryLabelPillText, !isDark && { color: '#92400e' }]}>Categories</Text>
             </View>
           ) : (
             activeCategoriesList.map((catItem) => (
               <View key={catItem.id} style={styles.categoryActivePill}>
-                <MaterialIcons name={catItem.icon} size={13} color={darkBrown} style={{ marginRight: 4 }} />
+                {catItem.iconLibrary === 'MaterialCommunityIcons' ? (
+                  <MaterialCommunityIcons name={catItem.icon as any} size={13} color={darkBrown} style={{ marginRight: 4 }} />
+                ) : (
+                  <MaterialIcons name={catItem.icon as any} size={13} color={darkBrown} style={{ marginRight: 4 }} />
+                )}
                 <Text style={styles.categoryActivePillText}>{catItem.label}</Text>
                 <TouchableOpacity
                   onPress={() => handleToggleCategory(catItem.id)}
@@ -2698,29 +2597,31 @@ export default function ExploreMapScreen() {
                 style={[
                   styles.cityPill,
                   city.isCurrent ? styles.cityPillCurrent : styles.cityPillNormal,
+                  !isDark && (city.isCurrent ? { backgroundColor: '#fffbeb', borderColor: yellowAccent } : { backgroundColor: '#ffffff', borderColor: '#cbd5e1' })
                 ]}
               >
                 <MaterialIcons
                   name={city.isCurrent ? 'my-location' : 'location-city'}
                   size={14}
-                  color={city.isCurrent ? '#feba48' : '#e2e8f0'}
+                  color={city.isCurrent ? (isDark ? '#feba48' : '#92400e') : (isDark ? '#e2e8f0' : '#475569')}
                   style={{ marginRight: 4 }}
                 />
                 <Text
                   style={[
                     styles.cityPillText,
                     city.isCurrent ? styles.cityPillTextCurrent : styles.cityPillTextNormal,
+                    !isDark && (city.isCurrent ? { color: '#92400e' } : { color: '#334155' })
                   ]}
                   numberOfLines={1}
                 >
                   {city.isCurrent ? `Current: ${city.name}` : city.name}
                 </Text>
                 <TouchableOpacity
-                  style={styles.cityPillCloseBtn}
+                  style={[styles.cityPillCloseBtn, !isDark && { backgroundColor: 'rgba(0, 0, 0, 0.08)' }]}
                   onPress={() => handleRemoveCity(city.id)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <MaterialIcons name="close" size={13} color={city.isCurrent ? '#feba48' : '#94a3b8'} />
+                  <MaterialIcons name="close" size={13} color={city.isCurrent ? (isDark ? '#feba48' : '#92400e') : (isDark ? '#94a3b8' : '#64748b')} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -2737,7 +2638,7 @@ export default function ExploreMapScreen() {
               backgroundColor: isDark ? '#1a1816' : '#ffffff',
               borderColor: yellowAccent + '70',
               transform: [{ translateY: cardSlideAnim }],
-              bottom: 16,
+              bottom: Math.max(insets.bottom, 12) + 66,
             },
           ]}
         >
@@ -2938,6 +2839,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     ...Shadows.md,
   },
+  nexusMapTitle: {
+    fontSize: 27,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 4,
+  },
   appTitle: {
     fontSize: 15,
     fontWeight: '800',
@@ -2991,6 +2901,44 @@ const styles = StyleSheet.create({
   categoryStackWrapper: {
     position: 'absolute',
     zIndex: 96,
+  },
+  categoryDeckBox: {
+    width: 48,
+    borderRadius: 24,
+    borderWidth: 0,
+    alignItems: 'center',
+    paddingTop: 5,
+    paddingBottom: 0,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: 'transparent',
+  },
+  categoryDeckBg: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    ...Shadows.lg,
+  },
+  categoryDeckItemWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    width: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryPullTabBottomWrap: {
+    position: 'absolute',
+    bottom: 6,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 60,
   },
   categoryStackOverlapBox: {
     width: 44,
@@ -3052,30 +3000,34 @@ const styles = StyleSheet.create({
     ...Shadows.lg,
   },
   categoryActionCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 0,
   },
   categoryPullTabBottom: {
-    marginTop: 4,
+    marginTop: 0,
     marginBottom: 0,
   },
   categoryScrollList: {
-    maxHeight: 280,
+    width: '100%',
+    alignSelf: 'stretch',
+    flex: 1,
   },
   categoryScrollContent: {
+    width: '100%',
+    alignSelf: 'stretch',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 2,
+    paddingVertical: 0,
   },
   categoryItemCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',

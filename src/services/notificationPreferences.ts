@@ -1,7 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
+import api from './api';
 
 export interface GlobalNotificationSettings {
   // Hangout triggers
+  hangout_reminder_enabled: boolean;
+  hangout_remind_days: number;
+  hangout_remind_hours: number;
   hangout_start_6h: boolean;
   hangout_details_changed: boolean;
   hangout_user_joined: boolean;
@@ -10,6 +14,9 @@ export interface GlobalNotificationSettings {
   hangout_ended: boolean;
 
   // Event triggers
+  event_reminder_enabled: boolean;
+  event_remind_days: number;
+  event_remind_hours: number;
   event_start_6h: boolean;
   event_details_changed: boolean;
   event_user_joined: boolean;
@@ -22,7 +29,11 @@ export interface GlobalNotificationSettings {
 }
 
 export interface SpecificEntitySettings {
-  muted: boolean; // Master mute toggle for this specific hangout/event
+  muted: boolean;
+  receive_notifications?: boolean;
+  remind_days?: number;
+  remind_hours?: number;
+  reminder_enabled?: boolean;
   triggers: Partial<GlobalNotificationSettings>;
 }
 
@@ -31,6 +42,9 @@ const SPECIFIC_PREFS_KEY = 'nexus_notification_specific_prefs_v1';
 const COMMUNITY_PREFS_KEY = 'nexus_notification_community_prefs_v1';
 
 export const DEFAULT_GLOBAL_SETTINGS: GlobalNotificationSettings = {
+  hangout_reminder_enabled: true,
+  hangout_remind_days: 0,
+  hangout_remind_hours: 6,
   hangout_start_6h: true,
   hangout_details_changed: true,
   hangout_user_joined: true,
@@ -38,6 +52,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalNotificationSettings = {
   hangout_deleted: true,
   hangout_ended: true,
 
+  event_reminder_enabled: true,
+  event_remind_days: 0,
+  event_remind_hours: 6,
   event_start_6h: true,
   event_details_changed: true,
   event_user_joined: true,
@@ -68,9 +85,9 @@ class NotificationPreferencesService {
     return this.globalCache!;
   }
 
-  async updateGlobalSetting(
-    key: keyof GlobalNotificationSettings,
-    value: boolean,
+  async updateGlobalSetting<K extends keyof GlobalNotificationSettings>(
+    key: K,
+    value: GlobalNotificationSettings[K],
   ): Promise<GlobalNotificationSettings> {
     const current = await this.getGlobalSettings();
     const updated = { ...current, [key]: value };
@@ -80,6 +97,10 @@ class NotificationPreferencesService {
     } catch (e) {
       console.warn('Failed to save global notification settings', e);
     }
+    // Sync with backend
+    try {
+      api.patch('/notifications/preferences', { global: { [key]: value } }).catch(() => null);
+    } catch {}
     return updated;
   }
 
@@ -96,6 +117,18 @@ class NotificationPreferencesService {
     const current = all[entityId] || { muted: false, triggers: {} };
     const merged: SpecificEntitySettings = {
       muted: update.muted !== undefined ? update.muted : current.muted,
+      receive_notifications:
+        update.receive_notifications !== undefined
+          ? update.receive_notifications
+          : current.receive_notifications,
+      remind_days:
+        update.remind_days !== undefined ? update.remind_days : current.remind_days,
+      remind_hours:
+        update.remind_hours !== undefined ? update.remind_hours : current.remind_hours,
+      reminder_enabled:
+        update.reminder_enabled !== undefined
+          ? update.reminder_enabled
+          : current.reminder_enabled,
       triggers: {
         ...current.triggers,
         ...(update.triggers || {}),
@@ -108,6 +141,10 @@ class NotificationPreferencesService {
     } catch (e) {
       console.warn('Failed to save specific notification settings', e);
     }
+    // Sync with backend
+    try {
+      api.patch('/notifications/preferences', { entityId, settings: merged }).catch(() => null);
+    } catch {}
     return merged;
   }
 
@@ -185,7 +222,7 @@ class NotificationPreferencesService {
 
     if (entityId) {
       const specific = await this.getSpecificSettings(entityId);
-      if (specific.muted) {
+      if (specific.muted || specific.receive_notifications === false) {
         return false;
       }
       if (specific.triggers && specific.triggers[trigger] !== undefined) {
@@ -194,7 +231,22 @@ class NotificationPreferencesService {
     }
 
     const globalSettings = await this.getGlobalSettings();
-    return globalSettings[trigger] !== undefined ? globalSettings[trigger] : true;
+    return globalSettings[trigger] !== undefined ? Boolean(globalSettings[trigger]) : true;
+  }
+
+  async isItemNotificationActive(type: 'hangout' | 'event', id: string, isJoined: boolean): Promise<boolean> {
+    if (!isJoined) return false;
+    const all = await this.getAllSpecificSettings();
+    const specific = all[id];
+    if (specific && specific.receive_notifications !== undefined) {
+      return Boolean(specific.receive_notifications && !specific.muted);
+    }
+    const globalSettings = await this.getGlobalSettings();
+    if (type === 'hangout') {
+      return (globalSettings as any).hangouts_enabled !== false && Boolean(globalSettings.hangout_reminder_enabled || globalSettings.hangout_start_6h);
+    } else {
+      return (globalSettings as any).events_enabled !== false && Boolean(globalSettings.event_reminder_enabled || globalSettings.event_start_6h);
+    }
   }
 }
 

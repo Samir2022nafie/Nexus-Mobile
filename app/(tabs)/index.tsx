@@ -160,21 +160,20 @@ export default function HomeScreen() {
 
   const handleExpandLeadership = () => {
     setIsLeadershipStackExpanded(true);
-    leadershipAnim.setValue(0);
     Animated.spring(leadershipAnim, {
       toValue: 1,
-      tension: 70,
-      friction: 9,
-      useNativeDriver: true,
+      tension: 65,
+      friction: 10,
+      useNativeDriver: false,
     }).start();
   };
 
   const handleCollapseLeadership = () => {
     Animated.timing(leadershipAnim, {
       toValue: 0,
-      duration: 220,
+      duration: 260,
       easing: Easing.bezier(0.25, 1, 0.5, 1),
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(() => {
       setIsLeadershipStackExpanded(false);
       storiesScrollRef.current?.scrollTo({ x: 0, animated: true });
@@ -618,122 +617,141 @@ export default function HomeScreen() {
               contentContainerStyle={styles.storiesCarousel}
             >
               {/* If user manages communities (owner/admin/mod) */}
+              {/* If user manages communities (owner/admin/mod) — Unified continuous sliding card deck */}
               {leadershipCommunities.length > 0 && (
-                <>
-                  {!isLeadershipStackExpanded ? (
-                    /* Overlapped State: 1 stacked circle with up to 4 circles poking out */
-                    <TouchableOpacity
-                      style={styles.communityStackWrap}
-                      onPress={handleExpandLeadership}
-                      activeOpacity={0.85}
-                    >
-                      <View style={styles.communityStackContainer}>
-                        {leadershipCommunities.slice(0, 4).map((comm, idx) => {
-                          const reverseIdx = Math.min(3, leadershipCommunities.length - 1) - idx;
-                          return (
-                            <View
-                              key={comm.id}
-                              style={[
-                                styles.communityStackCircle,
-                                {
-                                  right: reverseIdx * 6,
-                                  zIndex: idx + 1,
-                                },
-                              ]}
-                            >
+                <Animated.View
+                  style={[
+                    styles.leadershipDeckContainer,
+                    {
+                      width: leadershipAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [96, Math.max(96, (leadershipCommunities.length - 1) * 102 + 150)],
+                      }),
+                    },
+                  ]}
+                >
+                  {/* Special capsule background for exploded state */}
+                  <Animated.View
+                    style={[
+                      styles.leadershipDeckBg,
+                      {
+                        opacity: leadershipAnim.interpolate({
+                          inputRange: [0.15, 1],
+                          outputRange: [0, 1],
+                        }),
+                      },
+                    ]}
+                    pointerEvents="none"
+                  />
+
+                  <View style={styles.leadershipDeckRow}>
+                    {leadershipCommunities.map((comm, idx) => {
+                      const isOwner = comm.role === 'owner';
+                      const N = leadershipCommunities.length;
+                      const STEP = 102; // 94px circle + 8px gap matching storiesCarousel gap
+                      // Stacked in collapsed state: card idx 0 is top/front at left: 0
+                      const stackedLeft = Math.min(3, idx) * 3;
+                      // In exploded state: each circle spaced by exactly 102px (8px gap between circles)
+                      const targetExplodedLeft = 6 + (N - 1 - idx) * STEP;
+                      const itemLeft = leadershipAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [stackedLeft, targetExplodedLeft],
+                      });
+                      const itemScale = leadershipAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [idx === 0 ? 1 : Math.max(0.88, 1 - idx * 0.03), 1],
+                      });
+                      const itemOpacity = idx < 4
+                        ? 1
+                        : leadershipAnim.interpolate({
+                            inputRange: [0, 0.3, 1],
+                            outputRange: [0, 0.4, 1],
+                          });
+                      const zIndex = 30 - idx;
+
+                      return (
+                        <Animated.View
+                          key={comm.id}
+                          style={[
+                            styles.leadershipDeckCard,
+                            {
+                              left: itemLeft,
+                              transform: [{ scale: itemScale }],
+                              opacity: itemOpacity,
+                              zIndex,
+                            },
+                          ]}
+                        >
+                          <TouchableOpacity
+                            style={styles.storyItem}
+                            onPress={() => {
+                              if (!isLeadershipStackExpanded) {
+                                handleExpandLeadership();
+                              } else {
+                                router.push(`/community/${comm.slug}`);
+                              }
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <View style={styles.storyRing}>
                               {comm.profile_picture_url ? (
                                 <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
                               ) : (
                                 <View style={styles.storyAvatarFallback}>
-                                  <MaterialIcons name="groups" size={30} color={colors.primary} />
+                                  <MaterialIcons name="groups" size={38} color={colors.primary} />
+                                </View>
+                              )}
+                              {isOwner ? (
+                                <View style={styles.stackCrownBadge}>
+                                  <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
+                                </View>
+                              ) : (
+                                <View style={styles.stackVerifiedBadge}>
+                                  <MaterialIcons name="verified" size={13} color="#ffffff" />
                                 </View>
                               )}
                             </View>
-                          );
-                        })}
-                        {/* Top-Right Badge: Crown for owner, verified tick for admin/mod */}
-                        {leadershipCommunities[0]?.role === 'owner' ? (
-                          <View style={styles.stackCrownBadge}>
-                            <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
-                          </View>
-                        ) : (
-                          <View style={styles.stackVerifiedBadge}>
-                            <MaterialIcons name="verified" size={13} color="#ffffff" />
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.storyName} numberOfLines={1}>
-                        Managed ({leadershipCommunities.length})
-                      </Text>
-                    </TouchableOpacity>
-                  ) : (
-                    /* Expanded State: Smooth cluster card exploded animation without layout push */
+                            <Animated.Text
+                              style={[
+                                styles.storyName,
+                                {
+                                  opacity: leadershipAnim.interpolate({
+                                    inputRange: [0.35, 1],
+                                    outputRange: [0, 1],
+                                  }),
+                                },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {comm.name}
+                            </Animated.Text>
+                          </TouchableOpacity>
+                        </Animated.View>
+                      );
+                    })}
+
+                    {/* Right-most Chevron button: vertically centered with equal top and bottom distance */}
                     <Animated.View
                       style={[
-                        styles.leadershipExpandedContainer,
+                        styles.deckCollapseWrap,
                         {
+                          left: (leadershipCommunities.length - 1) * 102 + 108,
                           opacity: leadershipAnim.interpolate({
-                            inputRange: [0, 0.3, 1],
-                            outputRange: [0.5, 0.85, 1],
+                            inputRange: [0.5, 1],
+                            outputRange: [0, 1],
                           }),
+                          transform: [
+                            {
+                              scale: leadershipAnim.interpolate({
+                                inputRange: [0.5, 1],
+                                outputRange: [0.5, 1],
+                              }),
+                            },
+                          ],
                         },
                       ]}
+                      pointerEvents={isLeadershipStackExpanded ? 'auto' : 'none'}
                     >
-                      {/* Leadership Communities with badges — animate out from stack position */}
-                      {leadershipCommunities.map((comm, idx) => {
-                        const isOwner = comm.role === 'owner';
-                        const itemTranslateX = leadershipAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-(idx * 32), 0],
-                        });
-                        const itemScale = leadershipAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [idx === 0 ? 1 : 0.82, 1],
-                        });
-                        const itemOpacity = leadershipAnim.interpolate({
-                          inputRange: [0, 0.4, 1],
-                          outputRange: [idx === 0 ? 0.9 : 0.3, 0.8, 1],
-                        });
-                        return (
-                          <Animated.View
-                            key={comm.id}
-                            style={{
-                              transform: [{ translateX: itemTranslateX }, { scale: itemScale }],
-                              opacity: itemOpacity,
-                            }}
-                          >
-                            <TouchableOpacity
-                              style={styles.storyItem}
-                              onPress={() => router.push(`/community/${comm.slug}`)}
-                              activeOpacity={0.8}
-                            >
-                              <View style={styles.storyRing}>
-                                {comm.profile_picture_url ? (
-                                  <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
-                                ) : (
-                                  <View style={styles.storyAvatarFallback}>
-                                    <MaterialIcons name="groups" size={34} color={colors.primary} />
-                                  </View>
-                                )}
-                                {isOwner ? (
-                                  <View style={styles.stackCrownBadge}>
-                                    <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
-                                  </View>
-                                ) : (
-                                  <View style={styles.stackVerifiedBadge}>
-                                    <MaterialIcons name="verified" size={13} color="#ffffff" />
-                                  </View>
-                                )}
-                              </View>
-                              <Text style={styles.storyName} numberOfLines={1}>
-                                {comm.name}
-                              </Text>
-                            </TouchableOpacity>
-                          </Animated.View>
-                        );
-                      })}
-
-                      {/* Right-most Chevron button: only head, no stem, no text, compact circle */}
                       <TouchableOpacity
                         style={styles.stackCollapseChevronBtn}
                         onPress={handleCollapseLeadership}
@@ -742,8 +760,26 @@ export default function HomeScreen() {
                         <MaterialIcons name="chevron-left" size={20} color={colors.primary} />
                       </TouchableOpacity>
                     </Animated.View>
-                  )}
-                </>
+                  </View>
+
+                  {/* "Managed (N)" label when deck is collapsed */}
+                  <Animated.Text
+                    style={[
+                      styles.storyName,
+                      styles.managedLabelCollapsed,
+                      {
+                        opacity: leadershipAnim.interpolate({
+                          inputRange: [0, 0.3],
+                          outputRange: [1, 0],
+                        }),
+                      },
+                    ]}
+                    numberOfLines={1}
+                    pointerEvents="none"
+                  >
+                    Managed ({leadershipCommunities.length})
+                  </Animated.Text>
+                </Animated.View>
               )}
 
               {/* Member communities */}
@@ -759,7 +795,7 @@ export default function HomeScreen() {
                       <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
                     ) : (
                       <View style={styles.storyAvatarFallback}>
-                        <MaterialIcons name="groups" size={34} color={colors.primary} />
+                        <MaterialIcons name="groups" size={38} color={colors.primary} />
                       </View>
                     )}
                   </View>
@@ -773,7 +809,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Section 2: Upcoming Events (strictly joined communities, white card, category pill, community name) */}
-        <View style={styles.section}>
+        <View style={[styles.section, { marginTop: Spacing.sm }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming Events</Text>
             <TouchableOpacity
@@ -1038,8 +1074,30 @@ export default function HomeScreen() {
                             const txt = formatDistance(d);
                             if (txt) {
                               return (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6, alignSelf: 'flex-start' }}>
-                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    backgroundColor: isDark ? colors.surfaceContainerHigh : '#ffffff',
+                                    borderWidth: isDark ? 0 : 1,
+                                    borderColor: isDark ? 'transparent' : colors.cardBorder,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 6,
+                                    alignSelf: 'flex-start',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 1 },
+                                    shadowOpacity: isDark ? 0 : 0.08,
+                                    shadowRadius: 2,
+                                    elevation: isDark ? 0 : 1,
+                                  }}
+                                >
+                                  <MaterialIcons
+                                    name="near-me"
+                                    size={10}
+                                    color={isDark ? colors.tertiary : colors.primary}
+                                    style={{ marginRight: 3 }}
+                                  />
                                   <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
                                 </View>
                               );
@@ -1181,61 +1239,62 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: 12,
     },
 
-    // Section 1: Communities (Stories) — Enlarged 76x76, no yellow ring
+    // Section 1: Communities (Stories) — Enlarged 94x94 circles, tighter 8px spacing, zero excess vertical padding
     storiesSection: {
-      paddingTop: 8,
+      paddingTop: 4,
       paddingBottom: 4,
-      height: 124,
       overflow: 'visible',
     },
     storiesCarousel: {
-      paddingHorizontal: Spacing.md,
-      gap: 16,
+      paddingLeft: 10,
+      paddingRight: Spacing.md,
+      gap: 8,
       alignItems: 'flex-start',
-      paddingTop: 8,
-      height: 124,
+      paddingTop: 4,
+      paddingBottom: 4,
     },
     storyItem: {
       alignItems: 'center',
-      width: 82,
+      width: 96,
     },
     storyRing: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
+      width: 94,
+      height: 94,
+      borderRadius: 47,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.surfaceContainerLow,
     },
     storyAvatar: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
     },
     storyAvatarFallback: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
       backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.16)',
       alignItems: 'center',
       justifyContent: 'center',
     },
     storyName: {
-      ...Typography.captionSm,
+      fontSize: 10.5,
+      lineHeight: 14,
       color: colors.onSurface,
       fontWeight: '600',
       textAlign: 'center',
-      marginTop: 6,
-      width: 82,
+      marginTop: 4,
+      width: 96,
     },
     emptyStoryWrap: {
       paddingHorizontal: Spacing.md,
       alignItems: 'flex-start',
     },
     singleExploreCircle: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
+      width: 94,
+      height: 94,
+      borderRadius: 47,
       borderWidth: 1.5,
       borderStyle: 'dashed',
       borderColor: colors.primary,
@@ -1314,25 +1373,69 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '600',
     },
 
-    // Leadership Community Stack & Expanded Container
+    // Leadership Community Continuous Sliding Deck — Symmetrical envelope & vertically centered toggle
+    leadershipDeckContainer: {
+      position: 'relative',
+      height: 120,
+      overflow: 'visible',
+    },
+    leadershipDeckBg: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: -4,
+      right: -4,
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.12)' : 'rgba(232, 167, 54, 0.16)',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.35)',
+      borderRadius: 24,
+    },
+    leadershipDeckRow: {
+      height: 120,
+      position: 'relative',
+    },
+    leadershipDeckCard: {
+      position: 'absolute',
+      top: 4,
+      width: 96,
+      alignItems: 'center',
+    },
+    deckCollapseWrap: {
+      position: 'absolute',
+      top: 44,
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50,
+    },
+    managedLabelCollapsed: {
+      position: 'absolute',
+      bottom: 4,
+      left: 0,
+      width: 96,
+      textAlign: 'center',
+      fontWeight: '600',
+      fontSize: 10.5,
+    },
     communityStackWrap: {
       alignItems: 'center',
-      width: 86,
+      width: 92,
       marginRight: Spacing.sm,
       paddingTop: 3,
     },
     communityStackContainer: {
-      width: 76,
-      height: 76,
+      width: 88,
+      height: 88,
       position: 'relative',
       alignItems: 'center',
       justifyContent: 'center',
     },
     communityStackCircle: {
       position: 'absolute',
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+      width: 84,
+      height: 84,
+      borderRadius: 42,
       borderWidth: 2,
       borderColor: colors.surface,
       backgroundColor: colors.surfaceContainerHigh,
@@ -1343,8 +1446,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     stackCrownBadge: {
       position: 'absolute',
-      top: -3,
-      right: -3,
+      top: 0,
+      right: 2,
       width: 22,
       height: 22,
       borderRadius: 11,
@@ -1357,8 +1460,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     stackVerifiedBadge: {
       position: 'absolute',
-      top: -3,
-      right: -3,
+      top: 0,
+      right: 2,
       width: 22,
       height: 22,
       borderRadius: 11,
@@ -1375,10 +1478,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       backgroundColor: isDark ? 'rgba(232, 167, 54, 0.12)' : 'rgba(232, 167, 54, 0.16)',
       borderWidth: 1.5,
       borderColor: isDark ? 'rgba(232, 167, 54, 0.35)' : 'rgba(217, 119, 6, 0.35)',
-      borderRadius: 44,
+      borderRadius: 48,
       paddingHorizontal: 8,
-      paddingTop: 3,
-      paddingBottom: 2,
+      paddingTop: 6,
+      paddingBottom: 6,
+      marginBottom: 6,
       gap: 12,
       marginRight: 14,
       alignSelf: 'flex-start',

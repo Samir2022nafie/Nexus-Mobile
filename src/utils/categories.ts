@@ -8,12 +8,13 @@ export interface CategoryDef {
   label: string;      // Shortened name for tight spaces (carousels, cards, pills)
   fullLabel: string;  // Full display name
   icon: string;
+  iconFamily?: 'MaterialIcons' | 'MaterialCommunityIcons';
 }
 
 export const BACKEND_CATEGORIES: CategoryDef[] = [
   { id: 'ccec8541-95da-4bb4-aadb-199e5fe633d8', name: 'technology', label: 'Tech', fullLabel: 'Technology', icon: 'computer' },
   { id: 'acc7a2e3-c005-4bd9-9258-0926b9842d75', name: 'gaming', label: 'Gaming', fullLabel: 'Gaming', icon: 'sports-esports' },
-  { id: 'dea55590-5148-4723-9063-008edbe3adf7', name: 'anime_manga', label: 'Anime', fullLabel: 'Anime & Manga', icon: 'auto-stories' },
+  { id: 'dea55590-5148-4723-9063-008edbe3adf7', name: 'anime_manga', label: 'Anime', fullLabel: 'Anime & Manga', icon: 'shuriken', iconFamily: 'MaterialCommunityIcons' },
   { id: '13615218-a8d8-4f55-89ee-093048b61ee2', name: 'movies_tv', label: 'Movies', fullLabel: 'Movies & TV', icon: 'movie' },
   { id: '78373e34-693b-4c7b-8feb-f90bca7bf0cf', name: 'arts_creativity', label: 'Art', fullLabel: 'Arts & Creativity', icon: 'palette' },
   { id: 'f144d4ed-837e-4697-bd18-4d6bed5c1658', name: 'education_study_groups', label: 'Education', fullLabel: 'Education & Study', icon: 'school' },

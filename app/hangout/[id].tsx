@@ -29,6 +29,8 @@ import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
 import { formatCategoryName } from '../../src/utils/categories';
 import { useAuth } from '../../src/context/AuthContext';
+import { notificationPreferences } from '../../src/services/notificationPreferences';
+import { hasActualMapLocation } from '../../src/utils/distance';
 
 export default function HangoutDetailScreen() {
   const router = useSafeRouter();
@@ -47,6 +49,7 @@ export default function HangoutDetailScreen() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [respondingUserId, setRespondingUserId] = useState<string | null>(null);
   const [participantsCount, setParticipantsCount] = useState<number>(0);
+  const [notifsActive, setNotifsActive] = useState<boolean>(false);
 
   const fetchHangout = useCallback(async () => {
     if (!id) return;
@@ -88,6 +91,19 @@ export default function HangoutDetailScreen() {
   useEffect(() => {
     fetchHangout();
   }, [fetchHangout]);
+
+  useEffect(() => {
+    if (!hangout?.id) return;
+    const checkNotifs = async () => {
+      const active = await notificationPreferences.isItemNotificationActive(
+        'hangout',
+        String(hangout.id),
+        isJoined || Boolean(user?.id && (hangout.creator_id === user.id || hangout.creatorId === user.id))
+      );
+      setNotifsActive(active);
+    };
+    checkNotifs();
+  }, [hangout?.id, isJoined, user?.id, hangout?.creator_id, hangout?.creatorId]);
 
   const isHangoutHost = Boolean(
     user?.id && (
@@ -395,21 +411,7 @@ export default function HangoutDetailScreen() {
             )}
           </View>
 
-          {/* Banner Notification Button (Bottom Left inside Banner Image) */}
-          <TouchableOpacity
-            style={styles.bannerNotificationBtn}
-            onPress={() =>
-              router.push({
-                pathname: '/hangout-notifications',
-                params: { id: hangout.id, title: hangout.title },
-              } as any)
-            }
-            activeOpacity={0.8}
-          >
-            <MaterialIcons name="notifications-none" size={20} color="#ffffff" />
-          </TouchableOpacity>
-
-          {/* Banner Category Pill (Bottom Right) with Distinct Colors */}
+          {/* Banner Category Pill (Bottom Left) */}
           <View style={styles.bannerCategoryPill}>
             <Text style={styles.bannerCategoryPillText}>
               {formatCategoryName(
@@ -421,6 +423,27 @@ export default function HangoutDetailScreen() {
               )}
             </Text>
           </View>
+
+          {/* Banner Notification Button (Bottom Right inside Banner Image) */}
+          <TouchableOpacity
+            style={[
+              styles.bannerNotificationBtn,
+              notifsActive ? styles.bannerNotificationBtnActive : styles.bannerNotificationBtnInactive,
+            ]}
+            onPress={() =>
+              router.push({
+                pathname: '/hangout-notifications',
+                params: { id: hangout.id, title: hangout.title },
+              } as any)
+            }
+            activeOpacity={0.8}
+          >
+            <MaterialIcons
+              name={notifsActive ? 'notifications-active' : 'notifications-none'}
+              size={20}
+              color={notifsActive ? '#f6c368' : 'rgba(255, 255, 255, 0.75)'}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Content Body */}
@@ -513,10 +536,14 @@ export default function HangoutDetailScreen() {
 
             {/* Where: clickable only if valid coordinates were chosen on map */}
             {(() => {
-              const lat = hangout.location?.latitude ?? hangout.latitude;
-              const lng = hangout.location?.longitude ?? hangout.longitude;
+              const rawLat = hangout.location?.latitude ?? hangout.latitude;
+              const rawLng = hangout.location?.longitude ?? hangout.longitude;
+              const numLat = typeof rawLat === 'number' ? rawLat : parseFloat(String(rawLat));
+              const numLng = typeof rawLng === 'number' ? rawLng : parseFloat(String(rawLng));
               const hasValidCoords =
-                typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
+                !isNaN(numLat) &&
+                !isNaN(numLng) &&
+                hasActualMapLocation(hangout.location || { latitude: numLat, longitude: numLng });
 
               if (!hasValidCoords) {
                 return (
@@ -547,8 +574,8 @@ export default function HangoutDetailScreen() {
                       params: {
                         focusId: String(hangout.id),
                         focusType: 'hangouts',
-                        focusLat: String(lat),
-                        focusLng: String(lng),
+                        focusLat: String(numLat),
+                        focusLng: String(numLng),
                       },
                     } as any);
                   }}
@@ -1408,21 +1435,28 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     bannerNotificationBtn: {
       position: 'absolute',
       bottom: Spacing.md,
-      left: Spacing.md,
+      right: Spacing.md,
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: 'rgba(0, 0, 0, 0.55)',
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 10,
+    },
+    bannerNotificationBtnActive: {
+      backgroundColor: isDark ? 'rgba(232, 167, 54, 0.22)' : 'rgba(232, 167, 54, 0.25)',
+      borderWidth: 1.5,
+      borderColor: isDark ? 'rgba(232, 167, 54, 0.65)' : 'rgba(217, 119, 6, 0.65)',
+    },
+    bannerNotificationBtnInactive: {
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.25)',
-      zIndex: 10,
     },
     bannerCategoryPill: {
       position: 'absolute',
       bottom: 12,
-      right: Spacing.md,
+      left: Spacing.md,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 12,

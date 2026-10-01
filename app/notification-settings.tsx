@@ -18,6 +18,10 @@ import notificationPreferences, {
   DEFAULT_GLOBAL_SETTINGS,
 } from '../src/services/notificationPreferences';
 import pushNotifications from '../src/services/pushNotifications';
+import {
+  ReminderTimePickerModal,
+  formatReminderText,
+} from '../src/components/ui/ReminderTimePickerModal';
 
 export default function NotificationSettingsScreen() {
   const router = useSafeRouter();
@@ -27,6 +31,8 @@ export default function NotificationSettingsScreen() {
 
   const [settings, setSettings] = useState<GlobalNotificationSettings>(DEFAULT_GLOBAL_SETTINGS);
   const [loading, setLoading] = useState(true);
+  const [hangoutPickerVisible, setHangoutPickerVisible] = useState(false);
+  const [eventPickerVisible, setEventPickerVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -38,9 +44,95 @@ export default function NotificationSettingsScreen() {
     })();
   }, []);
 
-  const handleToggle = async (key: keyof GlobalNotificationSettings, val: boolean) => {
+  const handleToggle = async (key: keyof GlobalNotificationSettings, val: any) => {
     setSettings((prev) => ({ ...prev, [key]: val }));
     await notificationPreferences.updateGlobalSetting(key, val);
+  };
+
+  const handleHangoutReminderConfirm = async (days: number, hours: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      hangout_remind_days: days,
+      hangout_remind_hours: hours,
+    }));
+    await notificationPreferences.updateGlobalSetting('hangout_remind_days', days);
+    await notificationPreferences.updateGlobalSetting('hangout_remind_hours', hours);
+  };
+
+  const handleEventReminderConfirm = async (days: number, hours: number) => {
+    setSettings((prev) => ({
+      ...prev,
+      event_remind_days: days,
+      event_remind_hours: hours,
+    }));
+    await notificationPreferences.updateGlobalSetting('event_remind_days', days);
+    await notificationPreferences.updateGlobalSetting('event_remind_hours', hours);
+  };
+
+  const isHangoutsActive = Boolean(
+    settings.hangout_reminder_enabled ||
+    settings.hangout_start_6h ||
+    settings.hangout_details_changed ||
+    settings.hangout_user_joined ||
+    settings.hangout_user_left ||
+    settings.hangout_deleted ||
+    settings.hangout_ended
+  );
+
+  const isEventsActive = Boolean(
+    settings.event_reminder_enabled ||
+    settings.event_start_6h ||
+    settings.event_details_changed ||
+    settings.event_user_joined ||
+    settings.event_user_left ||
+    settings.event_deleted ||
+    settings.event_ended
+  );
+
+  const isCommunitiesActive = Boolean(settings.community_new_event);
+
+  const handleToggleAllHangouts = async (val: boolean) => {
+    const keys: (keyof GlobalNotificationSettings)[] = [
+      'hangout_reminder_enabled',
+      'hangout_start_6h',
+      'hangout_details_changed',
+      'hangout_user_joined',
+      'hangout_user_left',
+      'hangout_deleted',
+      'hangout_ended',
+    ];
+    setSettings((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => ((next as any)[k] = val));
+      return next;
+    });
+    for (const k of keys) {
+      await notificationPreferences.updateGlobalSetting(k, val);
+    }
+  };
+
+  const handleToggleAllEvents = async (val: boolean) => {
+    const keys: (keyof GlobalNotificationSettings)[] = [
+      'event_reminder_enabled',
+      'event_start_6h',
+      'event_details_changed',
+      'event_user_joined',
+      'event_user_left',
+      'event_deleted',
+      'event_ended',
+    ];
+    setSettings((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => ((next as any)[k] = val));
+      return next;
+    });
+    for (const k of keys) {
+      await notificationPreferences.updateGlobalSetting(k, val);
+    }
+  };
+
+  const handleToggleAllCommunities = async (val: boolean) => {
+    await handleToggle('community_new_event', val);
   };
 
   return (
@@ -76,19 +168,49 @@ export default function NotificationSettingsScreen() {
           {/* HANGOUTS SECTION */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <MaterialIcons name="groups" size={20} color={colors.primary} />
-              <Text style={styles.sectionHeading}>Hangouts</Text>
+              <View style={styles.sectionTitleLeft}>
+                <MaterialIcons name="local-cafe" size={20} color={colors.primary} />
+                <Text style={styles.sectionHeading}>Hangouts</Text>
+              </View>
+              <View style={styles.sectionMasterToggle}>
+                <Text style={styles.masterToggleLabel}>General</Text>
+                <Switch
+                  value={isHangoutsActive}
+                  onValueChange={handleToggleAllHangouts}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                  thumbColor={colors.white}
+                />
+              </View>
             </View>
             <Text style={styles.sectionSubheading}>For hangouts where you are a participant</Text>
 
             <View style={styles.sectionCard}>
-              <ToggleRow
-                title="Starting in 6 Hours"
-                subtitle="Alert when start date is today and start time is in 6 hours"
-                value={settings.hangout_start_6h}
-                onValueChange={(val) => handleToggle('hangout_start_6h', val)}
-                colors={colors}
-              />
+              <View style={styles.remindCard}>
+                <View style={styles.remindHeaderRow}>
+                  <View style={styles.remindTitleCol}>
+                    <Text style={styles.remindTitle}>Remind me in:</Text>
+                    <Text style={styles.remindSubtitle}>Alert when start time matches your reminder window</Text>
+                  </View>
+                  <Switch
+                    value={settings.hangout_reminder_enabled}
+                    onValueChange={(val) => handleToggle('hangout_reminder_enabled', val)}
+                    trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+                {settings.hangout_reminder_enabled && (
+                  <TouchableOpacity
+                    style={styles.remindInputBox}
+                    onPress={() => setHangoutPickerVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.remindInputText}>
+                      {formatReminderText(settings.hangout_remind_days ?? 0, settings.hangout_remind_hours ?? 6)}
+                    </Text>
+                    <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.divider} />
 
               <ToggleRow
@@ -140,19 +262,49 @@ export default function NotificationSettingsScreen() {
           {/* EVENTS SECTION */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <MaterialIcons name="event" size={20} color={colors.primary} />
-              <Text style={styles.sectionHeading}>Events</Text>
+              <View style={styles.sectionTitleLeft}>
+                <MaterialIcons name="event" size={20} color={colors.primary} />
+                <Text style={styles.sectionHeading}>Events</Text>
+              </View>
+              <View style={styles.sectionMasterToggle}>
+                <Text style={styles.masterToggleLabel}>General</Text>
+                <Switch
+                  value={isEventsActive}
+                  onValueChange={handleToggleAllEvents}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                  thumbColor={colors.white}
+                />
+              </View>
             </View>
             <Text style={styles.sectionSubheading}>For events where you are an attendee</Text>
 
             <View style={styles.sectionCard}>
-              <ToggleRow
-                title="Starting in 6 Hours"
-                subtitle="Alert when start date is today and start time is in 6 hours"
-                value={settings.event_start_6h}
-                onValueChange={(val) => handleToggle('event_start_6h', val)}
-                colors={colors}
-              />
+              <View style={styles.remindCard}>
+                <View style={styles.remindHeaderRow}>
+                  <View style={styles.remindTitleCol}>
+                    <Text style={styles.remindTitle}>Remind me in:</Text>
+                    <Text style={styles.remindSubtitle}>Alert when start time matches your reminder window</Text>
+                  </View>
+                  <Switch
+                    value={settings.event_reminder_enabled}
+                    onValueChange={(val) => handleToggle('event_reminder_enabled', val)}
+                    trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+                {settings.event_reminder_enabled && (
+                  <TouchableOpacity
+                    style={styles.remindInputBox}
+                    onPress={() => setEventPickerVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.remindInputText}>
+                      {formatReminderText(settings.event_remind_days ?? 0, settings.event_remind_hours ?? 6)}
+                    </Text>
+                    <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.divider} />
 
               <ToggleRow
@@ -204,8 +356,19 @@ export default function NotificationSettingsScreen() {
           {/* COMMUNITIES SECTION */}
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <MaterialIcons name="public" size={20} color={colors.primary} />
-              <Text style={styles.sectionHeading}>Communities</Text>
+              <View style={styles.sectionTitleLeft}>
+                <MaterialIcons name="groups" size={20} color={colors.primary} />
+                <Text style={styles.sectionHeading}>Communities</Text>
+              </View>
+              <View style={styles.sectionMasterToggle}>
+                <Text style={styles.masterToggleLabel}>General</Text>
+                <Switch
+                  value={isCommunitiesActive}
+                  onValueChange={handleToggleAllCommunities}
+                  trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                  thumbColor={colors.white}
+                />
+              </View>
             </View>
             <Text style={styles.sectionSubheading}>For communities where you are a member</Text>
 
@@ -223,6 +386,25 @@ export default function NotificationSettingsScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+      {/* Reminder Pickers */}
+      <ReminderTimePickerModal
+        visible={hangoutPickerVisible}
+        days={settings.hangout_remind_days ?? 0}
+        hours={settings.hangout_remind_hours ?? 6}
+        title="Remind me for Hangouts"
+        onConfirm={handleHangoutReminderConfirm}
+        onClose={() => setHangoutPickerVisible(false)}
+      />
+
+      <ReminderTimePickerModal
+        visible={eventPickerVisible}
+        days={settings.event_remind_days ?? 0}
+        hours={settings.event_remind_hours ?? 6}
+        title="Remind me for Events"
+        onConfirm={handleEventReminderConfirm}
+        onClose={() => setEventPickerVisible(false)}
+      />
     </View>
   );
 }
@@ -331,7 +513,22 @@ function getStyles(colors: ThemeColors) {
     sectionHeaderRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sectionTitleLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: Spacing.xs,
+    },
+    sectionMasterToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    masterToggleLabel: {
+      fontSize: Typography.labelSmall.fontSize,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
     },
     sectionHeading: {
       fontSize: Typography.titleSmall.fontSize,
@@ -356,6 +553,47 @@ function getStyles(colors: ThemeColors) {
       height: 1,
       backgroundColor: colors.surfaceVariant,
       marginHorizontal: Spacing.md,
+    },
+    remindCard: {
+      paddingVertical: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+    },
+    remindHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    remindTitleCol: {
+      flex: 1,
+      marginRight: Spacing.md,
+    },
+    remindTitle: {
+      fontSize: Typography.bodyLarge.fontSize,
+      fontWeight: '600',
+      color: colors.onSurface,
+    },
+    remindSubtitle: {
+      fontSize: Typography.bodySmall.fontSize,
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    remindInputBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surfaceVariant + '40',
+      borderWidth: 1,
+      borderColor: colors.outlineVariant || colors.surfaceVariant,
+      borderRadius: BorderRadius.md,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 10,
+      marginTop: Spacing.sm,
+    },
+    remindInputText: {
+      fontSize: Typography.bodyMedium.fontSize,
+      color: colors.onSurface,
+      fontWeight: '600',
     },
   });
 }

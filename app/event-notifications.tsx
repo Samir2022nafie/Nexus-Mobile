@@ -18,6 +18,10 @@ import notificationPreferences, {
   GlobalNotificationSettings,
   SpecificEntitySettings,
 } from '../src/services/notificationPreferences';
+import {
+  ReminderTimePickerModal,
+  formatReminderText,
+} from '../src/components/ui/ReminderTimePickerModal';
 
 export default function EventNotificationsScreen() {
   const router = useSafeRouter();
@@ -27,7 +31,11 @@ export default function EventNotificationsScreen() {
   const styles = useThemedStyles(getStyles);
 
   const [loading, setLoading] = useState(true);
-  const [muted, setMuted] = useState(false);
+  const [receiveNotifications, setReceiveNotifications] = useState(false);
+  const [remindDays, setRemindDays] = useState(0);
+  const [remindHours, setRemindHours] = useState(6);
+  const [reminderEnabled, setReminderEnabled] = useState(true);
+  const [reminderPickerVisible, setReminderPickerVisible] = useState(false);
   const [triggers, setTriggers] = useState<Partial<GlobalNotificationSettings>>({});
 
   useEffect(() => {
@@ -35,7 +43,12 @@ export default function EventNotificationsScreen() {
     (async () => {
       const global = await notificationPreferences.getGlobalSettings();
       const specific = await notificationPreferences.getSpecificSettings(id);
-      setMuted(specific.muted);
+      const isCustomized = specific.receive_notifications !== undefined || specific.muted !== undefined;
+      const initialReceive = isCustomized ? (specific.receive_notifications ?? !specific.muted) : true;
+      setReceiveNotifications(initialReceive);
+      setRemindDays(specific.remind_days ?? global.event_remind_days ?? 0);
+      setRemindHours(specific.remind_hours ?? global.event_remind_hours ?? 6);
+      setReminderEnabled(specific.reminder_enabled ?? global.event_reminder_enabled ?? true);
       setTriggers({
         event_start_6h: specific.triggers.event_start_6h ?? global.event_start_6h,
         event_details_changed: specific.triggers.event_details_changed ?? global.event_details_changed,
@@ -48,10 +61,33 @@ export default function EventNotificationsScreen() {
     })();
   }, [id]);
 
-  const handleToggleMute = async (val: boolean) => {
-    setMuted(val);
+  const handleToggleReceive = async (val: boolean) => {
+    setReceiveNotifications(val);
     if (id) {
-      await notificationPreferences.updateSpecificSettings(id, { muted: val });
+      await notificationPreferences.updateSpecificSettings(id, {
+        receive_notifications: val,
+        muted: !val,
+      });
+    }
+  };
+
+  const handleReminderConfirm = async (days: number, hours: number) => {
+    setRemindDays(days);
+    setRemindHours(hours);
+    if (id) {
+      await notificationPreferences.updateSpecificSettings(id, {
+        remind_days: days,
+        remind_hours: hours,
+      });
+    }
+  };
+
+  const handleToggleReminderEnabled = async (val: boolean) => {
+    setReminderEnabled(val);
+    if (id) {
+      await notificationPreferences.updateSpecificSettings(id, {
+        reminder_enabled: val,
+      });
     }
   };
 
@@ -104,44 +140,63 @@ export default function EventNotificationsScreen() {
             this event.
           </Text>
 
-          {/* MASTER MUTE TOGGLE */}
+          {/* MASTER RECEIVE TOGGLE */}
           <View style={styles.sectionCard}>
             <View style={styles.muteRow}>
-              <View style={styles.muteIconCircle}>
+              <View style={[styles.muteIconCircle, { backgroundColor: receiveNotifications ? colors.primaryContainer + '20' : colors.surfaceVariant }]}>
                 <MaterialIcons
-                  name={muted ? 'notifications-off' : 'notifications-active'}
+                  name={receiveNotifications ? 'notifications-active' : 'notifications-off'}
                   size={20}
-                  color={muted ? colors.error : colors.primary}
+                  color={receiveNotifications ? colors.primary : colors.outline}
                 />
               </View>
               <View style={styles.muteTextCol}>
-                <Text style={styles.muteTitle}>Mute This Event</Text>
+                <Text style={styles.muteTitle}>Receive notifications from this Event</Text>
                 <Text style={styles.muteSubtitle}>
-                  {muted
-                    ? 'All push alerts for this event are muted'
-                    : 'Receive notifications according to triggers below'}
+                  {receiveNotifications
+                    ? 'Receive notifications according to triggers below'
+                    : 'Push alerts for this event are turned off'}
                 </Text>
               </View>
               <Switch
-                value={muted}
-                onValueChange={handleToggleMute}
-                trackColor={{ false: colors.surfaceVariant, true: colors.errorContainer }}
+                value={receiveNotifications}
+                onValueChange={handleToggleReceive}
+                trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
                 thumbColor={colors.white}
               />
             </View>
           </View>
 
           {/* TRIGGERS LIST */}
-          <View style={[styles.section, muted && { opacity: 0.4 }]} pointerEvents={muted ? 'none' : 'auto'}>
+          <View style={[styles.section, !receiveNotifications && { opacity: 0.4 }]} pointerEvents={!receiveNotifications ? 'none' : 'auto'}>
             <Text style={styles.sectionHeading}>Notification Triggers</Text>
             <View style={styles.sectionCard}>
-              <TriggerItem
-                title="Starting in 6 Hours"
-                subtitle="Alert when start date is today and start time is in 6 hours"
-                value={Boolean(triggers.event_start_6h)}
-                onValueChange={(val) => handleToggleTrigger('event_start_6h', val)}
-                colors={colors}
-              />
+              <View style={styles.remindCard}>
+                <View style={styles.remindHeaderRow}>
+                  <View style={styles.remindTitleCol}>
+                    <Text style={styles.remindTitle}>Remind me in:</Text>
+                    <Text style={styles.remindSubtitle}>Alert when start time matches your reminder window</Text>
+                  </View>
+                  <Switch
+                    value={reminderEnabled}
+                    onValueChange={handleToggleReminderEnabled}
+                    trackColor={{ false: colors.surfaceVariant, true: colors.primaryContainer }}
+                    thumbColor={colors.white}
+                  />
+                </View>
+                {reminderEnabled && (
+                  <TouchableOpacity
+                    style={styles.remindInputBox}
+                    onPress={() => setReminderPickerVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.remindInputText}>
+                      {formatReminderText(remindDays, remindHours)}
+                    </Text>
+                    <MaterialIcons name="schedule" size={18} color={colors.primaryContainer} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.divider} />
 
               <TriggerItem
@@ -191,6 +246,16 @@ export default function EventNotificationsScreen() {
           </View>
         </ScrollView>
       )}
+
+      {/* Reminder Picker Modal */}
+      <ReminderTimePickerModal
+        visible={reminderPickerVisible}
+        days={remindDays}
+        hours={remindHours}
+        title="Remind me for this Event"
+        onConfirm={handleReminderConfirm}
+        onClose={() => setReminderPickerVisible(false)}
+      />
     </View>
   );
 }
@@ -353,6 +418,47 @@ function getStyles(colors: ThemeColors) {
       height: 1,
       backgroundColor: colors.surfaceVariant,
       marginHorizontal: Spacing.md,
+    },
+    remindCard: {
+      paddingVertical: Spacing.sm,
+      paddingHorizontal: Spacing.md,
+    },
+    remindHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    remindTitleCol: {
+      flex: 1,
+      marginRight: Spacing.md,
+    },
+    remindTitle: {
+      fontSize: Typography.bodyLarge.fontSize,
+      fontWeight: '600',
+      color: colors.onSurface,
+    },
+    remindSubtitle: {
+      fontSize: Typography.bodySmall.fontSize,
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+      lineHeight: 18,
+    },
+    remindInputBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surfaceVariant + '40',
+      borderWidth: 1,
+      borderColor: colors.surfaceVariant,
+      borderRadius: BorderRadius.md,
+      paddingHorizontal: Spacing.md,
+      paddingVertical: 10,
+      marginTop: Spacing.sm,
+    },
+    remindInputText: {
+      fontSize: Typography.bodyMedium.fontSize,
+      color: colors.onSurface,
+      fontWeight: '600',
     },
   });
 }

@@ -28,6 +28,7 @@ import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/
 import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { Button } from '../src/components/ui/Button';
 import { hangoutsService } from '../src/services/hangouts';
+import { pushNotifications } from '../src/services/pushNotifications';
 import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
@@ -41,7 +42,7 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
-const MINUTES = ['00', '15', '30', '45'];
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const PERIODS = ['AM', 'PM'];
 
 function getDaysInMonth(month: number, year: number): number {
@@ -69,6 +70,16 @@ function PickerColumn<T>({
     const clampedIndex = Math.max(0, Math.min(index, data.length - 1));
     onSelect(clampedIndex);
   };
+
+  useEffect(() => {
+    if (selectedIndex >= 0 && selectedIndex < data.length) {
+      try {
+        flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
+      } catch (e) {
+        flatListRef.current?.scrollToOffset({ offset: selectedIndex * ITEM_HEIGHT, animated: true });
+      }
+    }
+  }, [selectedIndex, data.length]);
 
   return (
     <View style={pickerStyles.column}>
@@ -123,7 +134,7 @@ export default function NewHangoutScreen() {
   const isEditing = Boolean(params.hangoutId);
 
   const now = new Date();
-  const defaultStartsAt = new Date(Date.now() + 3600 * 1000 * 3).toISOString();
+  const defaultStartsAt = new Date().toISOString();
 
   const [form, setForm] = useState({
     title: '',
@@ -191,7 +202,7 @@ export default function NewHangoutScreen() {
   const [tempDay, setTempDay] = useState(now.getDate());
   const [tempYear, setTempYear] = useState(now.getFullYear());
   const [tempHour, setTempHour] = useState(now.getHours() % 12 || 12);
-  const [tempMinute, setTempMinute] = useState(now.getMinutes() >= 30 ? '30' : '00');
+  const [tempMinute, setTempMinute] = useState(String(now.getMinutes()).padStart(2, '0'));
   const [tempPeriod, setTempPeriod] = useState(now.getHours() >= 12 ? 'PM' : 'AM');
 
   const updateField = (field: string, value: any) => {
@@ -206,7 +217,7 @@ export default function NewHangoutScreen() {
     setTempDay(validD.getDate());
     setTempYear(validD.getFullYear());
     setTempHour(validD.getHours() % 12 || 12);
-    setTempMinute(validD.getMinutes() >= 45 ? '45' : validD.getMinutes() >= 30 ? '30' : validD.getMinutes() >= 15 ? '15' : '00');
+    setTempMinute(String(validD.getMinutes()).padStart(2, '0'));
     setTempPeriod(validD.getHours() >= 12 ? 'PM' : 'AM');
 
     setDatePickerRendered(true);
@@ -310,7 +321,7 @@ export default function NewHangoutScreen() {
           : undefined;
 
       if (isEditing && params.hangoutId) {
-        await hangoutsService.update(params.hangoutId, {
+        const updated = await hangoutsService.update(params.hangoutId, {
           title: form.title.trim(),
           description: form.description.trim() || undefined,
           location: (form.locationName || form.location).trim() || undefined,
@@ -325,8 +336,17 @@ export default function NewHangoutScreen() {
           categoryId: form.categoryId || undefined,
           category_id: form.categoryId || undefined,
         } as any);
+
+        if (updated && (updated.id || params.hangoutId)) {
+          pushNotifications.scheduleCustomReminder({
+            id: updated.id || params.hangoutId,
+            title: updated.title || form.title.trim(),
+            startsAt: validStartsAt,
+            entityType: 'hangout',
+          });
+        }
       } else {
-        await hangoutsService.create({
+        const created = await hangoutsService.create({
           title: form.title.trim(),
           description: form.description.trim() || undefined,
           location: (form.locationName || form.location).trim() || undefined,
@@ -342,7 +362,17 @@ export default function NewHangoutScreen() {
           categoryId: form.categoryId || undefined,
           category_id: form.categoryId || undefined,
         } as any);
+
+        if (created && created.id) {
+          pushNotifications.scheduleCustomReminder({
+            id: created.id,
+            title: created.title || form.title.trim(),
+            startsAt: validStartsAt,
+            entityType: 'hangout',
+          });
+        }
       }
+      pushNotifications.syncUnreadNotifications();
       router.back();
     } catch (err: any) {
       if (err instanceof ApiRequestError && err.details && Array.isArray(err.details) && err.details.length > 0) {
@@ -645,6 +675,23 @@ export default function NewHangoutScreen() {
               </TouchableOpacity>
             </View>
 
+            <View style={pickerStyles.todayRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  const cur = new Date();
+                  setTempMonth(cur.getMonth() + 1);
+                  setTempDay(cur.getDate());
+                  setTempYear(cur.getFullYear());
+                  setTempHour(cur.getHours() % 12 || 12);
+                  setTempMinute(String(cur.getMinutes()).padStart(2, '0'));
+                  setTempPeriod(cur.getHours() >= 12 ? 'PM' : 'AM');
+                }}
+                style={pickerStyles.todayBtn}
+              >
+                <Text style={pickerStyles.todayText}>Today</Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={pickerStyles.preview}>
               {MONTHS[tempMonth - 1]} {Math.min(tempDay, daysInMonth)}, {tempYear} · {tempHour}:{tempMinute} {tempPeriod}
             </Text>
@@ -917,6 +964,27 @@ const getPickerStyles = (colors: ThemeColors, isDark: boolean) =>
     paddingHorizontal: Spacing.sm,
     paddingTop: Spacing.xs,
     paddingBottom: Spacing.sm,
+  },
+  todayRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  todayBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    backgroundColor: isDark ? 'rgba(232, 167, 54, 0.16)' : 'rgba(232, 167, 54, 0.12)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(232, 167, 54, 0.4)' : 'rgba(217, 119, 6, 0.35)',
+  },
+  todayText: {
+    ...Typography.labelMd,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 12,
   },
   headerBtn: {
     padding: Spacing.xs,

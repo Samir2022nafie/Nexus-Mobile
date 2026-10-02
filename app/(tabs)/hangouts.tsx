@@ -107,10 +107,10 @@ export default function ExploreMapScreen() {
 
   const handleExpandCategories = useCallback(() => {
     setIsCategoryStackExpanded(true);
-    Animated.timing(categoryStackAnim, {
+    Animated.spring(categoryStackAnim, {
       toValue: 1,
-      duration: 260,
-      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      tension: 65,
+      friction: 10,
       useNativeDriver: false,
     }).start();
   }, [categoryStackAnim]);
@@ -118,8 +118,8 @@ export default function ExploreMapScreen() {
   const handleCollapseCategories = useCallback(() => {
     Animated.timing(categoryStackAnim, {
       toValue: 0,
-      duration: 240,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      duration: 260,
+      easing: Easing.bezier(0.25, 1, 0.5, 1),
       useNativeDriver: false,
     }).start(() => {
       setIsCategoryStackExpanded(false);
@@ -579,11 +579,11 @@ export default function ExploreMapScreen() {
   // Requirement 8f: Even if the app is on light mode, ALWAYS use dark mode version of map & globe!
   const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
-  // Primary yellow accent & dark brown companion tokens
+  // Primary yellow accent & dark brown companion tokens (dark mode map is default whether app is in dark or light mode)
   const yellowAccent = '#e8a736';
   const darkBrown = '#281800';
-  const darkBrownBg = isDark ? '#201e1c' : '#ffffff';
-  const darkBrownBorder = isDark ? '#38332d' : '#e5d5c3';
+  const darkBrownBg = '#201e1c';
+  const darkBrownBorder = '#38332d';
 
   const mapHtml = useMemo(() => {
     return `
@@ -607,6 +607,11 @@ export default function ExploreMapScreen() {
             top: 0;
             left: 0;
             z-index: 1;
+          }
+
+          /* High-Contrast Crisp Dark Mode for MapLibre Canvas - Preserves All Real Places, POIs & Layers */
+          .maplibregl-canvas {
+            filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(92%);
           }
 
           /* Cosmic Deep Space Background */
@@ -2382,6 +2387,7 @@ export default function ExploreMapScreen() {
               height: categoryStackAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [58, Math.min(320, (CATEGORY_FILTER_ITEMS.length - 1) * 44 + 38 + 44)],
+                extrapolate: 'clamp',
               }),
             },
           ]}
@@ -2391,11 +2397,12 @@ export default function ExploreMapScreen() {
             style={[
               styles.categoryDeckBg,
               {
-                backgroundColor: isDark ? 'rgba(32, 28, 24, 0.95)' : 'rgba(255, 255, 255, 0.96)',
+                backgroundColor: 'rgba(32, 28, 24, 0.95)',
                 borderColor: yellowAccent + '70',
                 opacity: categoryStackAnim.interpolate({
                   inputRange: [0.15, 1],
                   outputRange: [0, 1],
+                  extrapolate: 'clamp',
                 }),
               },
             ]}
@@ -2431,16 +2438,19 @@ export default function ExploreMapScreen() {
               const itemTop = categoryStackAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [stackedTop, idx * 44],
+                extrapolate: 'clamp',
               });
               const itemScale = categoryStackAnim.interpolate({
                 inputRange: [0, 1],
                 outputRange: [idx === 0 ? 1 : Math.max(0.82, 1 - idx * 0.05), 1],
+                extrapolate: 'clamp',
               });
               const itemOpacity = idx < 4
                 ? 1
                 : categoryStackAnim.interpolate({
                     inputRange: [0, 0.3, 1],
                     outputRange: [0, 0.4, 1],
+                    extrapolate: 'clamp',
                   });
               const zIndex = idx === 0 ? 25 : (15 - idx);
 
@@ -2514,12 +2524,14 @@ export default function ExploreMapScreen() {
                   opacity: categoryStackAnim.interpolate({
                     inputRange: [0.5, 1],
                     outputRange: [0, 1],
+                    extrapolate: 'clamp',
                   }),
                   transform: [
                     {
                       scale: categoryStackAnim.interpolate({
                         inputRange: [0.5, 1],
                         outputRange: [0.5, 1],
+                        extrapolate: 'clamp',
                       }),
                     },
                   ],
@@ -2840,13 +2852,14 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   nexusMapTitle: {
-    fontSize: 27,
+    fontFamily: 'DINNextRoundedLTW01',
+    fontSize: 34,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.85)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
   },
   appTitle: {
     fontSize: 15,

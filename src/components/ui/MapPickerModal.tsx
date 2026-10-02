@@ -246,10 +246,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
 
   const initialLat = initialLocation?.latitude ?? 40.7128;
   const initialLng = initialLocation?.longitude ?? -74.006;
-  // Free OpenFreeMap vector styles: Dark mode style for dark theme, Liberty style for light theme
-  const mapStyleUrl = isDark
-    ? 'https://tiles.openfreemap.org/styles/dark'
-    : 'https://tiles.openfreemap.org/styles/liberty';
+  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
   const mapHtml = `
     <!DOCTYPE html>
@@ -275,6 +272,12 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             background: transparent !important;
           }
           .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { display: none !important; }
+
+          ${isDark ? `
+          .maplibregl-canvas {
+            filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(92%);
+          }
+          ` : ''}
 
           /* Cosmic Starry Atmosphere for Dark Mode */
           .cosmos-bg {
@@ -381,16 +384,6 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             } catch(e) {}
 
             var isDark = ${isDark ? 'true' : 'false'};
-            if (isDark) {
-              try {
-                if (map.getLayer('water')) {
-                  map.setPaintProperty('water', 'fill-color', '#0e1d44');
-                }
-                if (map.getLayer('background')) {
-                  map.setPaintProperty('background', 'background-color', '#131826');
-                }
-              } catch(e) {}
-            }
 
             // Country Borders & Boundary Presentation:
             // 1. Hide state, county, maritime, and sub-national clutter

@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, LogBox } from 'react-native';
+import { View, LogBox, Platform, StatusBar as RNStatusBar } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
 import 'react-native-reanimated';
 
 // Suppress known Expo SDK 53 Expo Go remote push warning (local notifications work seamlessly)
@@ -27,8 +28,20 @@ function RootNavigator() {
   const { isLoading } = useAuth();
   const { colors, isDark } = useTheme();
 
+  const [fontsLoaded] = useFonts({
+    DINNextRoundedLTW01: require('../assets/fonts/DINNextRoundedLTW01-Bold.ttf'),
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  });
+
   useEffect(() => {
-    if (!isLoading) {
+    if (Platform.OS === 'android') {
+      RNStatusBar.setTranslucent(true);
+      RNStatusBar.setBackgroundColor('transparent');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && fontsLoaded) {
       SplashScreen.hideAsync();
       // Prompt for push notification permissions on app startup after UI attaches
       const timer = setTimeout(() => {
@@ -45,14 +58,19 @@ function RootNavigator() {
         clearInterval(interval);
       };
     }
-  }, [isLoading]);
+  }, [isLoading, fontsLoaded]);
 
-  if (isLoading) {
+  if (isLoading || !fontsLoaded) {
     return <LoadingSpinner fullScreen message="Loading Nexus..." />;
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <RNStatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        translucent
+        backgroundColor="transparent"
+      />
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{

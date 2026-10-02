@@ -58,14 +58,32 @@ export const LocationInput: React.FC<LocationInputProps> = ({
   privacyLabel = 'Keep my location private',
   privacyHint = 'Your city will not be shown on your profile or explore map',
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  // When user edits the text directly (plain text without map picker)
+  // When user edits the text directly
   const handleTextChange = (text: string) => {
+    if (!text.trim()) {
+      onChangeLocation?.({
+        name: '',
+        latitude: null,
+        longitude: null,
+      });
+      return;
+    }
+    // If coordinates were selected via the map modal, PRESERVE them!
+    // The user is customizing/typing a custom place name for this valid map location.
     onChangeLocation?.({
       name: text,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+    });
+  };
+
+  const handleClearPin = () => {
+    onChangeLocation?.({
+      name: value,
       latitude: null,
       longitude: null,
     });
@@ -79,6 +97,8 @@ export const LocationInput: React.FC<LocationInputProps> = ({
       longitude: result.longitude,
     });
   };
+
+  const hasPin = latitude !== null && latitude !== undefined && longitude !== null && longitude !== undefined;
 
   return (
     <View style={styles.container}>
@@ -124,12 +144,53 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         </TouchableOpacity>
       </View>
 
+      {/* Pin status badge and option to detach pin for pure text-only */}
+      {hasPin && (
+        <View style={styles.pinnedStatusRow}>
+          <View
+            style={[
+              styles.pinnedPill,
+              {
+                backgroundColor: isDark ? 'rgba(232, 167, 54, 0.15)' : 'rgba(232, 167, 54, 0.12)',
+                borderColor: isDark ? 'rgba(232, 167, 54, 0.4)' : colors.primaryContainer,
+              },
+            ]}
+          >
+            <MaterialIcons name="pin-drop" size={13} color={colors.primaryContainer} />
+            <Text style={[styles.pinnedPillText, { color: isDark ? '#ffddaf' : colors.primaryContainer }]}>
+              Map pin attached
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={handleClearPin}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.removePinBtn}
+          >
+            <MaterialIcons name="close" size={13} color={colors.outline} />
+            <Text style={[styles.removePinText, { color: colors.outline }]}>Remove pin (text-only)</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {error && <Text style={styles.errorText}>{error}</Text>}
       {hint && !error && <Text style={[styles.hintText, { color: colors.outline }]}>{hint}</Text>}
 
-      {/* Optional Privacy Toggle */}
+      {/* Optional Privacy Toggle with High-Contrast Dark Mode Styling */}
       {showPrivacyToggle && (
-        <View style={[styles.privacyContainer, { backgroundColor: colors.surfaceContainerLow }]}>
+        <View
+          style={[
+            styles.privacyContainer,
+            {
+              backgroundColor: isDark
+                ? (isPrivate ? 'rgba(232, 167, 54, 0.12)' : colors.surfaceContainer)
+                : (isPrivate ? '#fef7ea' : colors.surfaceContainerLow),
+              borderWidth: 1,
+              borderColor: isPrivate
+                ? (isDark ? 'rgba(232, 167, 54, 0.55)' : colors.primaryContainer)
+                : (isDark ? 'rgba(255, 255, 255, 0.08)' : colors.outlineVariant),
+            },
+          ]}
+        >
           <View style={styles.privacyTextContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <MaterialIcons
@@ -138,15 +199,41 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                 color={isPrivate ? colors.primaryContainer : colors.outline}
                 style={{ marginRight: 6 }}
               />
-              <Text style={[styles.privacyLabel, { color: colors.onSurface }]}>{privacyLabel}</Text>
+              <Text
+                style={[
+                  styles.privacyLabel,
+                  {
+                    color: isDark
+                      ? (isPrivate ? '#fef3c7' : colors.onSurface)
+                      : (isPrivate ? '#78350f' : colors.onSurface),
+                  },
+                ]}
+              >
+                {privacyLabel}
+              </Text>
             </View>
-            <Text style={[styles.privacySubtext, { color: colors.outline }]}>{privacyHint}</Text>
+            <Text
+              style={[
+                styles.privacySubtext,
+                {
+                  color: isDark
+                    ? (isPrivate ? '#d5c4af' : colors.outline)
+                    : (isPrivate ? '#92400e' : colors.outline),
+                },
+              ]}
+            >
+              {privacyHint}
+            </Text>
           </View>
           <Switch
             value={isPrivate}
             onValueChange={onPrivacyChange}
-            trackColor={{ false: colors.surfaceContainerHigh, true: colors.primaryContainer }}
-            thumbColor={Platform.OS === 'ios' ? '#ffffff' : isPrivate ? colors.onPrimary : '#f4f3f4'}
+            trackColor={{
+              false: isDark ? '#38332d' : colors.surfaceContainerHigh,
+              true: colors.primaryContainer,
+            }}
+            thumbColor={isDark ? (isPrivate ? '#ffffff' : '#b0a498') : (Platform.OS === 'ios' ? '#ffffff' : isPrivate ? '#ffffff' : '#f4f3f4')}
+            ios_backgroundColor={isDark ? '#38332d' : colors.surfaceContainerHigh}
           />
         </View>
       )}
@@ -214,6 +301,36 @@ const styles = StyleSheet.create({
     ...Typography.captionSm,
     marginTop: Spacing.xs,
     marginLeft: Spacing.xs,
+  },
+  pinnedStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.xs,
+  },
+  pinnedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  pinnedPillText: {
+    ...Typography.captionSm,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  removePinBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  removePinText: {
+    ...Typography.captionSm,
+    fontSize: 11,
   },
   privacyContainer: {
     flexDirection: 'row',

@@ -304,7 +304,6 @@ export default function NotificationsScreen() {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.sectionSub}>Real-time alerts</Text>
             </View>
 
             <View style={styles.itemsList}>

@@ -30,6 +30,8 @@ function RootNavigator() {
 
   const [fontsLoaded] = useFonts({
     DINNextRoundedLTW01: require('../assets/fonts/DINNextRoundedLTW01-Bold.ttf'),
+    'DIN Next Rounded': require('../assets/fonts/DINNextRoundedLTW01-Bold.ttf'),
+    'DINNextRounded-Bold': require('../assets/fonts/DINNextRoundedLTW01-Bold.ttf'),
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 

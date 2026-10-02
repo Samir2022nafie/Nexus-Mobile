@@ -459,9 +459,8 @@ export default function AccountSettingsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Danger Zone */}
+        {/* Delete Account */}
         <View style={[styles.card, styles.dangerCard]}>
-          <Text style={[styles.sectionHeader, { color: colors.error }]}>DANGER ZONE</Text>
           <TouchableOpacity
             style={styles.settingRow}
             onPress={openDeleteModal}

@@ -107,15 +107,15 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
     }
   };
 
-  // Reverse geocode coords to place name
-  const reverseGeocode = async (lat: number, lng: number) => {
+  // Reverse geocode coords to place name (including real place name detection)
+  const reverseGeocode = async (lat: number, lng: number, clickedPlaceName?: string) => {
     setIsReverseGeocoding(true);
     try {
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
           headers: {
-            'User-Agent': 'HobbyHubMobile/1.0',
+            'User-Agent': 'NexusMobile/1.0',
             'Accept-Language': 'en',
           },
         },
@@ -124,29 +124,50 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
         const data = await res.json();
         const addr = data.address || {};
         const venue =
+          clickedPlaceName ||
           addr.amenity ||
           addr.leisure ||
           addr.building ||
           addr.tourism ||
           addr.shop ||
           addr.office ||
-          data.name;
+          addr.commercial ||
+          addr.historic ||
+          addr.club ||
+          addr.craft ||
+          (data.name && data.name !== addr.road && data.name !== addr.city && data.name !== addr.country ? data.name : '');
 
-        const street = addr.road || addr.pedestrian || addr.suburb || '';
+        const street = addr.road || addr.pedestrian || '';
+        const suburb = addr.suburb || addr.neighbourhood || addr.city_district || '';
         const city = addr.city || addr.town || addr.village || addr.county || '';
         const country = addr.country || '';
 
+        // Address parts preserving street, suburb, and city
+        const addressParts: string[] = [];
+        if (street) addressParts.push(street);
+        else if (suburb) addressParts.push(suburb);
+        if (city) addressParts.push(city);
+
+        let baseAddress = addressParts.join(', ');
+        if (!baseAddress) {
+          if (data.display_name) {
+            const parts = data.display_name.split(',').map((p: string) => p.trim());
+            baseAddress = parts.slice(0, 2).join(', ');
+          } else {
+            baseAddress = country || 'Pinned Location';
+          }
+        }
+
         let formattedName = '';
         if (venue) {
-          formattedName = city ? `${venue}, ${city}` : venue;
-        } else if (street && city) {
-          formattedName = `${street}, ${city}`;
-        } else if (data.display_name) {
-          // Take first two parts of display name
-          const parts = data.display_name.split(',').map((p: string) => p.trim());
-          formattedName = parts.slice(0, 2).join(', ');
+          // If venue is not already included in baseAddress, prepend it
+          if (!baseAddress.toLowerCase().includes(venue.toLowerCase())) {
+            formattedName = `${venue}, ${baseAddress}`;
+          } else {
+            formattedName = baseAddress;
+          }
         } else {
-          formattedName = city || country || 'Pinned Location';
+          formattedName = baseAddress;
         }
 
         setSelectedName(formattedName);
@@ -158,7 +179,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
     }
   };
 
-  // Handle message from WebView Leaflet map
+  // Handle message from WebView Leaflet/MapLibre map
   const onWebViewMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -166,7 +187,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
         const lat = Number(data.lat.toFixed(6));
         const lng = Number(data.lng.toFixed(6));
         setSelectedCoords({ lat, lng });
-        reverseGeocode(lat, lng);
+        reverseGeocode(lat, lng, data.placeName);
       }
     } catch (e) {
       console.error('WebView message parse error:', e);
@@ -226,7 +247,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
 
   const handleResetGlobe = () => {
     const js = `if (window.map) {
-      window.map.flyTo({ center: [20, 20], zoom: 1.5, pitch: 0, bearing: 0, essential: true });
+      window.map.flyTo({ center: [20, 20], zoom: 1.45, pitch: 0, bearing: 0, essential: true });
     } true;`;
     webViewRef.current?.injectJavaScript(js);
   };
@@ -260,7 +281,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: ${isDark ? '#02040a' : '#f8f9fa'};
+            background: #02040a;
           }
           #map {
             width: 100%;
@@ -273,57 +294,48 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
           }
           .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { display: none !important; }
 
-          ${isDark ? `
-          .maplibregl-canvas {
-            filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(92%);
-          }
-          ` : ''}
-
-          /* Cosmic Starry Atmosphere for Dark Mode */
+          /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(ellipse at 50% 50%, #0d1538 0%, #070c20 60%, #02040a 100%);
+            inset: 0;
             z-index: 0;
+            background: #02040a;
+            overflow: hidden;
             pointer-events: none;
           }
           .cosmos-stars {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image:
-              radial-gradient(1.2px 1.2px at 30px 40px, #ffffff, transparent),
-              radial-gradient(1.5px 1.5px at 100px 140px, #38bdf8, transparent),
-              radial-gradient(1px 1px at 170px 80px, #ffffff, transparent),
-              radial-gradient(2px 2px at 230px 210px, #fde047, transparent),
-              radial-gradient(1.2px 1.2px at 340px 90px, #ffffff, transparent),
-              radial-gradient(1.8px 1.8px at 290px 260px, #38bdf8, transparent),
-              radial-gradient(1px 1px at 110px 310px, #ffffff, transparent),
-              radial-gradient(2px 2px at 200px 360px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 360px 330px, #fde047, transparent);
+            inset: -300px;
+            background-image: 
+              radial-gradient(1.8px 1.8px at 28px 36px, #ffffff, transparent),
+              radial-gradient(2.2px 2.2px at 145px 78px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 82px 185px, #ffffff, transparent),
+              radial-gradient(2.4px 2.4px at 278px 128px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 218px 288px, #ffffff, transparent),
+              radial-gradient(1.4px 1.4px at 48px 258px, #ffffff, transparent),
+              radial-gradient(2.1px 2.1px at 328px 218px, #ffffff, transparent),
+              radial-gradient(1.7px 1.7px at 188px 348px, #ffffff, transparent),
+              radial-gradient(2.3px 2.3px at 388px 308px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 98px 418px, #ffffff, transparent);
             background-repeat: repeat;
-            background-size: 380px 380px;
-            opacity: 0.85;
+            background-size: 420px 420px;
+            opacity: 0.9;
             pointer-events: none;
             z-index: 0;
           }
-          .cosmos-atmosphere {
+          .globe-atmosphere-halo {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 360px;
-            height: 360px;
+            width: 92vmin;
+            height: 92vmin;
             transform: translate(-50%, -50%);
             border-radius: 50%;
-            background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(99, 102, 241, 0.14) 50%, transparent 72%);
-            filter: blur(28px);
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.40) 58%, rgba(14, 165, 233, 0.20) 72%, rgba(2, 132, 199, 0.05) 86%, transparent 100%);
+            filter: blur(12px);
             pointer-events: none;
             z-index: 0;
+            transition: opacity 0.4s ease;
           }
 
           /* Interactive Location Pin (Explore/Nexus Gold Pin) - Anchored at tip via MapLibre anchor: bottom */
@@ -365,7 +377,10 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
         </style>
       </head>
       <body>
-        ${isDark ? '<div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>' : ''}
+        <div class="cosmos-bg">
+          <div class="globe-atmosphere-halo"></div>
+          <div class="cosmos-stars"></div>
+        </div>
         <div id="map"></div>
         <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
         <script>
@@ -374,91 +389,239 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             style: '${mapStyleUrl}',
             center: [${initialLng}, ${initialLat}],
             zoom: 14,
+            minZoom: 1.45,
+            maxZoom: 20,
             projection: { type: 'globe' },
             antialias: true
           });
+
+          function createOceanWavePattern() {
+            var canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 32;
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#070b11'; // deep black ocean background
+            ctx.fillRect(0, 0, 64, 32);
+            ctx.lineWidth = 3.2;
+            ctx.strokeStyle = '#18283e'; // dark navy wave
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            [8, 24].forEach(function(baseY) {
+              ctx.beginPath();
+              for (var x = 0; x <= 64; x += 2) {
+                var y = baseY + Math.sin((x / 64) * Math.PI * 2) * 4.2;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+            });
+            return ctx.getImageData(0, 0, 64, 32);
+          }
 
           map.on('style.load', function() {
             try {
               map.setProjection({ type: 'globe' });
             } catch(e) {}
 
-            var isDark = ${isDark ? 'true' : 'false'};
-
-            // Country Borders & Boundary Presentation:
-            // 1. Hide state, county, maritime, and sub-national clutter
-            // 2. Make country borders clearly visible, crisp, solid lines (removes blue dotted effect)
+            // Add seamless ocean wave pattern to MapLibre
             try {
-              var allStyleLayers = map.getStyle().layers || [];
-              allStyleLayers.forEach(function(l) {
-                if (!l.id) return;
-                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1;
-                if (!isBoundary) return;
+              if (!map.hasImage('snap-ocean-waves')) {
+                map.addImage('snap-ocean-waves', createOceanWavePattern());
+              }
+            } catch(e) {}
 
-                var isCountryBorder = l.id === 'boundary_country' || 
-                                     l.id === 'boundary_country_z0-4' || 
-                                     (l.id.indexOf('country') !== -1 && l.type === 'line');
+            // Continents: Dark slate grey (#28323c)
+            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
+            try {
+              map.getStyle().layers.forEach(function(l) {
+                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
+                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
+                }
+              });
+            } catch(e) {}
 
-                if (isCountryBorder) {
+            // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
+            [
+              'park', 'park_outline', 'park_national', 'park_nature_reserve', 'landcover_wood', 'landcover_grass',
+              'landcover_wetland', 'landcover_scrub', 'landcover_cemetery', 'landcover_glacier',
+              'landuse_pitch', 'landuse_track', 'landuse_grass', 'landuse_residential',
+              'landcover_sand', 'landcover_ice', 'landuse_hospital', 'landuse_school',
+              'landuse_industrial', 'landuse_commercial'
+            ].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+              }
+            });
+
+            if (map.getLayer('background')) {
+              try { map.setPaintProperty('background', 'background-color', '#28323c'); } catch(e) {}
+            }
+            ['land', 'landuse'].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setPaintProperty(id, 'fill-color', '#28323c'); } catch(e) {}
+              }
+            });
+            if (map.getLayer('water')) {
+              try {
+                map.setPaintProperty('water', 'fill-pattern', 'snap-ocean-waves');
+              } catch(e) {
+                try { map.setPaintProperty('water', 'fill-color', '#070b11'); } catch(e2) {}
+              }
+            }
+
+            // Waterways
+            ['waterway_river', 'waterway_tunnel', 'waterway_other'].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setPaintProperty(id, 'line-color', '#18283e'); } catch(e) {}
+              }
+            });
+
+            // Tone down bright yellow and white road lines to dark charcoal / slate
+            try {
+              map.getStyle().layers.forEach(function(l) {
+                if (l.type === 'line' && (l.id.indexOf('road') !== -1 || l.id.indexOf('highway') !== -1 || l.id.indexOf('bridge') !== -1 || l.id.indexOf('tunnel') !== -1)) {
                   try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                  } catch(e) {}
-                  try {
-                    // Remove dotted / dashed pattern so lines are solid and clean
-                    map.setPaintProperty(l.id, 'line-dasharray', null);
-                  } catch(e) {
-                    try { map.setPaintProperty(l.id, 'line-dasharray', [1, 0]); } catch(e2) {}
-                  }
-                  try {
-                    // High-contrast visible borders: luminous white in dark mode, crisp slate in light mode
-                    map.setPaintProperty(l.id, 'line-color', isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(30, 41, 59, 0.80)');
-                  } catch(e) {}
-                  try {
-                    var w = l.id.indexOf('z0-4') !== -1 ? 1.5 : 2.0;
-                    map.setPaintProperty(l.id, 'line-width', w);
-                  } catch(e) {}
-                  try {
-                    map.setPaintProperty(l.id, 'line-opacity', 0.95);
-                  } catch(e) {}
-                } else {
-                  // Hide county, state, maritime, and sub-national clutter
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'none');
+                    if (l.id.indexOf('case') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#12171e');
+                    } else if (l.id.indexOf('motorway') !== -1 || l.id.indexOf('trunk') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#2c3545');
+                    } else if (l.id.indexOf('primary') !== -1 || l.id.indexOf('secondary') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#222b37');
+                    } else {
+                      map.setPaintProperty(l.id, 'line-color', '#1a222b');
+                    }
+                    map.setPaintProperty(l.id, 'line-opacity', 0.85);
                   } catch(e) {}
                 }
               });
             } catch(e) {}
 
-            // Clean progressive labels
-            var labelConfigs = {
-              'place_country_major': { minzoom: 0, maxzoom: 6 },
-              'place_country_minor': { minzoom: 3.8, maxzoom: 8 },
-              'place_country_other': { minzoom: 4.8, maxzoom: 9 },
-              'place_state': { minzoom: 4.8, maxzoom: 12 },
-              'place_city_large': { minzoom: 5.2, maxzoom: 12 },
-              'place_city': { minzoom: 6.8, maxzoom: 14 },
-              'place_town': { minzoom: 9.0, maxzoom: 15 },
-              'place_village': { minzoom: 11.0, maxzoom: 15 },
-              'place_suburb': { minzoom: 12.0, maxzoom: 15 },
-              'place_other': { minzoom: 12.5, maxzoom: 15 }
-            };
+            if (map.getLayer('building')) {
+              try { map.setPaintProperty('building', 'fill-color', '#1e242c'); } catch(e) {}
+            }
+            if (map.getLayer('building-3d')) {
+              try { map.setPaintProperty('building-3d', 'fill-extrusion-color', '#232b35'); } catch(e) {}
+            }
 
-            Object.keys(labelConfigs).forEach(function(layerId) {
-              if (map.getLayer(layerId)) {
-                var cfg = labelConfigs[layerId];
+            // Country & Region Boundaries:
+            // Crisp, solid, thin borders between countries (removes dotted clutter)
+            if (map.getLayer('boundary_2')) {
+              try {
+                map.setLayoutProperty('boundary_2', 'visibility', 'visible');
+                map.setPaintProperty('boundary_2', 'line-color', 'rgba(120, 140, 160, 0.65)');
+                map.setPaintProperty('boundary_2', 'line-width', 1.1);
+                map.setPaintProperty('boundary_2', 'line-dasharray', null);
+              } catch(e) {}
+            }
+            if (map.getLayer('boundary_3')) {
+              try {
+                map.setLayoutProperty('boundary_3', 'visibility', 'visible');
+                map.setPaintProperty('boundary_3', 'line-color', 'rgba(80, 95, 115, 0.35)');
+                map.setPaintProperty('boundary_3', 'line-width', 0.8);
+                map.setPaintProperty('boundary_3', 'line-dasharray', null);
+              } catch(e) {}
+            }
+            if (map.getLayer('boundary_disputed')) {
+              try { map.setLayoutProperty('boundary_disputed', 'visibility', 'none'); } catch(e) {}
+            }
+
+            // High-Contrast English Text Labels with Dark Halo
+            var textLayers = [
+              'label_country_1', 'label_country_2', 'label_country_3',
+              'label_city_capital', 'label_city', 'label_state',
+              'label_town', 'label_village', 'label_other',
+              'waterway_line_label', 'water_name_point_label', 'water_name_line_label',
+              'poi_r20', 'poi_r7', 'poi_r1', 'poi_transit'
+            ];
+            textLayers.forEach(function(id) {
+              if (map.getLayer(id)) {
                 try {
-                  map.setLayerZoomRange(layerId, cfg.minzoom, cfg.maxzoom);
-                  map.setLayoutProperty(layerId, 'text-field', [
+                  map.setPaintProperty(id, 'text-color', '#e2e8f0');
+                  map.setPaintProperty(id, 'text-halo-color', '#090d13');
+                  map.setPaintProperty(id, 'text-halo-width', 1.6);
+                  map.setPaintProperty(id, 'text-halo-blur', 0);
+                  map.setLayoutProperty(id, 'text-field', [
                     'coalesce',
                     ['get', 'name:en'],
+                    ['get', 'name_en'],
                     ['get', 'name:latin'],
-                    ['get', 'name']
+                    ['get', 'name'],
+                    ''
                   ]);
-                  map.setLayoutProperty(layerId, 'text-padding', 10);
-                  map.setLayoutProperty(layerId, 'text-optional', true);
                 } catch(e) {}
               }
             });
+
+            // Native WebGL Selective Label Zoom Ranges (60 FPS on GPU, zero JS overhead!)
+            var labelRanges = {
+              'label_country_1': [2.1, 24],
+              'label_country_2': [3.0, 24],
+              'label_country_3': [4.2, 24],
+              'label_city_capital': [4.5, 24],
+              'label_city': [4.8, 24],
+              'label_state': [5.5, 24],
+              'label_town': [8.5, 24],
+              'label_village': [10.0, 24],
+              'label_other': [11.0, 24],
+              'water_name_point_label': [4.0, 24],
+              'water_name_line_label': [4.0, 24],
+              'waterway_line_label': [6.0, 24]
+            };
+            Object.keys(labelRanges).forEach(function(id) {
+              if (map.getLayer(id)) {
+                try {
+                  map.setLayerZoomRange(id, labelRanges[id][0], labelRanges[id][1]);
+                } catch(e) {}
+              }
+            });
+
+            // Atmosphere Halo: Fades as user zooms into street level
+            var haloRaf = null;
+            function updateAtmosphereHalo() {
+              var halo = document.querySelector('.globe-atmosphere-halo');
+              if (!halo) return;
+              var currentZ = map.getZoom();
+              if (currentZ > 5.5) {
+                halo.style.opacity = '0';
+              } else if (currentZ > 3.5) {
+                halo.style.opacity = String(Math.max(0, 1 - (currentZ - 3.5) / 2.0));
+              } else {
+                halo.style.opacity = '1';
+              }
+            }
+            map.on('zoom', function() {
+              if (!haloRaf) {
+                haloRaf = requestAnimationFrame(function() {
+                  haloRaf = null;
+                  updateAtmosphereHalo();
+                });
+              }
+            });
+            map.on('zoomend', updateAtmosphereHalo);
+            updateAtmosphereHalo();
+
+            // 3D extruded buildings (at zoom >= 15.0)
+            try {
+              if (!map.getLayer('building-3d') && map.getSource('openmaptiles')) {
+                map.addLayer({
+                  id: 'building-3d',
+                  source: 'openmaptiles',
+                  'source-layer': 'building',
+                  type: 'fill-extrusion',
+                  minzoom: 15.0,
+                  maxzoom: 22,
+                  paint: {
+                    'fill-extrusion-color': '#232b35',
+                    'fill-extrusion-height': [
+                      'interpolate', ['linear'], ['zoom'],
+                      15.0, 0,
+                      15.8, ['case', ['has', 'render_height'], ['get', 'render_height'], 14]
+                    ],
+                    'fill-extrusion-opacity': 0.75
+                  }
+                });
+              }
+            } catch(e) {}
           });
 
           var pinEl = document.createElement('div');
@@ -476,24 +639,42 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
           window.map = map;
           window.marker = marker;
 
-          function sendLocation(lat, lng) {
+          function sendLocation(lat, lng, placeName) {
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({
                 type: 'location_selected',
                 lat: lat,
-                lng: lng
+                lng: lng,
+                placeName: placeName || ''
               }));
             }
           }
 
           map.on('click', function(e) {
             marker.setLngLat(e.lngLat);
-            sendLocation(e.lngLat.lat, e.lngLat.lng);
+            var clickedPlaceName = '';
+            try {
+              var bbox = [[e.point.x - 12, e.point.y - 12], [e.point.x + 12, e.point.y + 12]];
+              var features = map.queryRenderedFeatures(bbox);
+              if (features && features.length > 0) {
+                for (var i = 0; i < features.length; i++) {
+                  var f = features[i];
+                  var p = f.properties || {};
+                  var fn = p['name:en'] || p['name_en'] || p['name:latin'] || p['name'];
+                  if (fn && f.layer && (f.layer.id.indexOf('poi') !== -1 || f.layer.id.indexOf('label') !== -1 || f.layer.id.indexOf('place') !== -1 || f.layer.type === 'symbol')) {
+                    clickedPlaceName = fn;
+                    break;
+                  }
+                }
+              }
+            } catch(err) {}
+
+            sendLocation(e.lngLat.lat, e.lngLat.lng, clickedPlaceName);
           });
 
           marker.on('dragend', function() {
             var lngLat = marker.getLngLat();
-            sendLocation(lngLat.lat, lngLat.lng);
+            sendLocation(lngLat.lat, lngLat.lng, '');
           });
         </script>
       </body>
@@ -577,27 +758,27 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             <TouchableOpacity
               style={[
                 styles.floatingControlBtn,
-                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: '#e8a73680' },
+                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: isDark ? '#e8a73680' : '#e2e8f0' },
               ]}
               onPress={handleResetGlobe}
               activeOpacity={0.8}
             >
-              <MaterialIcons name="public" size={20} color="#e8a736" />
+              <MaterialIcons name="public" size={20} color={isDark ? '#e8a736' : '#92400e'} />
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.floatingControlBtn,
-                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: '#e8a73680' },
+                { backgroundColor: isDark ? '#201e1c' : '#ffffff', borderColor: isDark ? '#e8a73680' : '#e2e8f0' },
               ]}
               onPress={handleFlyToGpsLocation}
               disabled={locatingGps || isLoadingLocation}
               activeOpacity={0.8}
             >
               {locatingGps || isLoadingLocation ? (
-                <ActivityIndicator size="small" color="#e8a736" />
+                <ActivityIndicator size="small" color={isDark ? '#e8a736' : '#92400e'} />
               ) : (
-                <MaterialIcons name="my-location" size={20} color="#e8a736" />
+                <MaterialIcons name="my-location" size={20} color={isDark ? '#e8a736' : '#92400e'} />
               )}
             </TouchableOpacity>
           </View>

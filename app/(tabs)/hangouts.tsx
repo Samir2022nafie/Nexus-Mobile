@@ -8,6 +8,9 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
   StyleSheet,
   TouchableOpacity,
   Image,
@@ -17,6 +20,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
@@ -34,6 +38,7 @@ import {
   MapUserItem,
 } from '../../src/services/locations';
 import { BACKEND_CATEGORIES } from '../../src/utils/categories';
+import { hasActualMapLocation } from '../../src/utils/distance';
 
 // Ordered tabs: All -> Hangouts -> Events -> Communities -> People (Users)
 type FilterType = 'all' | 'hangouts' | 'events' | 'communities' | 'users';
@@ -107,10 +112,10 @@ export default function ExploreMapScreen() {
 
   const handleExpandCategories = useCallback(() => {
     setIsCategoryStackExpanded(true);
-    Animated.spring(categoryStackAnim, {
+    Animated.timing(categoryStackAnim, {
       toValue: 1,
-      tension: 65,
-      friction: 10,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
     }).start();
   }, [categoryStackAnim]);
@@ -118,8 +123,8 @@ export default function ExploreMapScreen() {
   const handleCollapseCategories = useCallback(() => {
     Animated.timing(categoryStackAnim, {
       toValue: 0,
-      duration: 260,
-      easing: Easing.bezier(0.25, 1, 0.5, 1),
+      duration: 200,
+      easing: Easing.inOut(Easing.cubic),
       useNativeDriver: false,
     }).start(() => {
       setIsCategoryStackExpanded(false);
@@ -138,6 +143,126 @@ export default function ExploreMapScreen() {
   const [locatingGps, setLocatingGps] = useState<boolean>(false);
   const [selectedEntity, setSelectedEntity] = useState<SelectedMapEntity | null>(null);
   const [mapReady, setMapReady] = useState<boolean>(false);
+
+  // Requirement 1c: Search pop-up modal state
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const searchDebounceRef = useRef<any>(null);
+
+  const handleSearchQueryChange = (query: string) => {
+    setSearchQuery(query);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!query.trim() || query.trim().length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`,
+          { headers: { 'User-Agent': 'NexusMobile/1.0', 'Accept-Language': 'en' } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data || []);
+        }
+      } catch (err) {
+        console.warn('Place search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 280);
+  };
+
+  const handleSelectSearchResult = (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    let zoom = 14.5;
+    const type = (item.type || '').toLowerCase();
+    if (type === 'country') zoom = 5.0;
+    else if (type === 'state' || type === 'county') zoom = 8.5;
+    else if (type === 'city' || type === 'town' || type === 'administrative') zoom = 13.0;
+    else zoom = 16.0;
+
+    const js = `if (window.map) {
+      window.map.flyTo({ center: [${lng}, ${lat}], zoom: ${zoom}, speed: 1.2, essential: true });
+    } true;`;
+    webViewRef.current?.injectJavaScript(js);
+
+    const addr = item.address || {};
+    const cityName =
+      addr.city ||
+      addr.town ||
+      addr.village ||
+      addr.municipality ||
+      addr.city_district ||
+      addr.county ||
+      addr.state ||
+      item.name;
+
+    if (cityName) {
+      const cId = cityName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      setSelectedCities((prev) => {
+        if (prev.some((c) => c.id === cId || (Math.abs(c.lat - lat) < 0.25 && Math.abs(c.lng - lng) < 0.25))) {
+          return prev;
+        }
+        const newCityObj: SelectedCity = {
+          id: cId,
+          name: cityName,
+          isCurrent: false,
+          lat,
+          lng,
+        };
+        let next = [...prev, newCityObj];
+        if (next.length > 5) {
+          const currentItem = next.find((c) => c.isCurrent);
+          const nonCurrent = next.filter((c) => !c.isCurrent);
+          const trimmed = nonCurrent.slice(nonCurrent.length - (5 - (currentItem ? 1 : 0)));
+          next = currentItem ? [currentItem, ...trimmed] : trimmed;
+        }
+        const syncJs = `if (window.syncSelectedCities) { window.syncSelectedCities(${JSON.stringify(next)}); } true;`;
+        webViewRef.current?.injectJavaScript(syncJs);
+        return next;
+      });
+    }
+
+    setIsSearchModalVisible(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const handleExecuteSearch = async () => {
+    if (searchResults.length > 0) {
+      handleSelectSearchResult(searchResults[0]);
+      return;
+    }
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1&addressdetails=1`,
+        { headers: { 'User-Agent': 'NexusMobile/1.0', 'Accept-Language': 'en' } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          handleSelectSearchResult(data[0]);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Execute search failed:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   // User's default or current coordinates
   const userLat = userLocation?.latitude ?? user?.location?.latitude ?? 9.0222;
@@ -295,10 +420,10 @@ export default function ExploreMapScreen() {
         type: 'set_items',
         selectedEntityTypes: entityTypes,
         selectedCategories: categories,
-        communities: data.communities,
-        events: data.events,
-        hangouts: data.hangouts,
-        users: data.users,
+        communities: (data.communities || []).filter((c) => hasActualMapLocation(c)),
+        events: (data.events || []).filter((e) => hasActualMapLocation(e)),
+        hangouts: (data.hangouts || []).filter((h) => hasActualMapLocation(h)),
+        users: (data.users || []).filter((u) => hasActualMapLocation(u)),
         selectedCities: cities,
       };
       const js = `if (window.updateMapMarkers) { window.updateMapMarkers(${JSON.stringify(payload)}); } true;`;
@@ -311,7 +436,13 @@ export default function ExploreMapScreen() {
   const loadMapData = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await locationsService.getExploreMap();
+      const rawData = await locationsService.getExploreMap();
+      const data: ExploreMapResponse = {
+        communities: (rawData.communities || []).filter((c) => hasActualMapLocation(c)),
+        events: (rawData.events || []).filter((e) => hasActualMapLocation(e)),
+        hangouts: (rawData.hangouts || []).filter((h) => hasActualMapLocation(h)),
+        users: (rawData.users || []).filter((u) => hasActualMapLocation(u)),
+      };
       setMapData(data);
       sendDataToWebView(data, selectedEntityTypes, selectedCategories, selectedCities);
       tryOpenPendingCard(data, pendingFocusRef.current);
@@ -445,12 +576,13 @@ export default function ExploreMapScreen() {
           timestamp: Date.now(),
         };
       } else if (msg.type === 'city_selected') {
-        const rawName = String(msg.city || 'City Area');
+        const rawName = String(msg.city || 'Selected City');
         const cId = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
         const isCurrent = cId === currentCityId || (Math.abs(msg.lat - userLat) < 0.35 && Math.abs(msg.lng - userLng) < 0.35);
 
+        // Requirement 1b: Support up to 5 cities rendered simultaneously
         setSelectedCities((prev) => {
-          if (prev.some((c) => c.id === cId)) return prev;
+          if (prev.some((c) => c.id === cId || (Math.abs(c.lat - msg.lat) < 0.25 && Math.abs(c.lng - msg.lng) < 0.25))) return prev;
           const newCityObj: SelectedCity = {
             id: cId,
             name: rawName,
@@ -458,9 +590,17 @@ export default function ExploreMapScreen() {
             lat: msg.lat,
             lng: msg.lng,
           };
-          const next = isCurrent
+          let next = isCurrent
             ? [newCityObj, ...prev.filter((c) => c.id !== cId)]
             : [...prev, newCityObj];
+
+          if (next.length > 5) {
+            const currentItem = next.find((c) => c.isCurrent);
+            const nonCurrent = next.filter((c) => !c.isCurrent);
+            const trimmed = nonCurrent.slice(nonCurrent.length - (5 - (currentItem ? 1 : 0)));
+            next = currentItem ? [currentItem, ...trimmed] : trimmed;
+          }
+
           const js = `if (window.syncSelectedCities) { window.syncSelectedCities(${JSON.stringify(next)}); } true;`;
           webViewRef.current?.injectJavaScript(js);
           return next;
@@ -540,8 +680,14 @@ export default function ExploreMapScreen() {
         requestLocation(false, true).catch(() => null),
       ]);
       if (freshData) {
-        setMapData(freshData);
-        sendDataToWebView(freshData, selectedEntityTypes, selectedCategories, selectedCities);
+        const filteredData: ExploreMapResponse = {
+          communities: (freshData.communities || []).filter((c) => hasActualMapLocation(c)),
+          events: (freshData.events || []).filter((e) => hasActualMapLocation(e)),
+          hangouts: (freshData.hangouts || []).filter((h) => hasActualMapLocation(h)),
+          users: (freshData.users || []).filter((u) => hasActualMapLocation(u)),
+        };
+        setMapData(filteredData);
+        sendDataToWebView(filteredData, selectedEntityTypes, selectedCategories, selectedCities);
       }
       if (loc?.latitude && loc?.longitude) {
         const js = `if (window.setUserGpsMarker) { window.setUserGpsMarker(${loc.latitude}, ${loc.longitude}); } true;`;
@@ -579,11 +725,11 @@ export default function ExploreMapScreen() {
   // Requirement 8f: Even if the app is on light mode, ALWAYS use dark mode version of map & globe!
   const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
-  // Primary yellow accent & dark brown companion tokens (dark mode map is default whether app is in dark or light mode)
+  // Primary yellow accent & dark brown companion tokens (light mode equivalent for category icons & controls)
   const yellowAccent = '#e8a736';
   const darkBrown = '#281800';
-  const darkBrownBg = '#201e1c';
-  const darkBrownBorder = '#38332d';
+  const darkBrownBg = isDark ? '#201e1c' : '#ffffff';
+  const darkBrownBorder = isDark ? '#38332d' : '#e2e8f0';
 
   const mapHtml = useMemo(() => {
     return `
@@ -609,17 +755,12 @@ export default function ExploreMapScreen() {
             z-index: 1;
           }
 
-          /* High-Contrast Crisp Dark Mode for MapLibre Canvas - Preserves All Real Places, POIs & Layers */
-          .maplibregl-canvas {
-            filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(92%);
-          }
-
           /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
             inset: 0;
             z-index: 0;
-            background: radial-gradient(ellipse at 50% 50%, #0a1128 0%, #02040a 100%);
+            background: #02040a;
             overflow: hidden;
             pointer-events: none;
           }
@@ -627,45 +768,54 @@ export default function ExploreMapScreen() {
             position: absolute;
             inset: -300px;
             background-image: 
-              radial-gradient(1.0px 1.0px at 28px 36px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 145px 78px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 82px 185px, #ffffff, transparent),
-              radial-gradient(1.3px 1.3px at 278px 128px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 218px 288px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 48px 258px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 318px 42px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 188px 168px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 112px 308px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 52px 122px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 168px 228px, #ffffff, transparent),
-              radial-gradient(1.1px 1.1px at 308px 248px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 258px 318px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 338px 178px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 16px 208px, #ffffff, transparent),
-              radial-gradient(1.3px 1.3px at 128px 18px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 238px 88px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 298px 332px, #ffffff, transparent),
-              radial-gradient(1.1px 1.1px at 95px 65px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 175px 45px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 60px 290px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 245px 195px, #ffffff, transparent),
-              radial-gradient(1.0px 1.0px at 15px 95px, #ffffff, transparent),
-              radial-gradient(0.9px 0.9px at 195px 260px, #ffffff, transparent),
-              radial-gradient(1.2px 1.2px at 285px 215px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 135px 270px, #ffffff, transparent),
-              radial-gradient(1.1px 1.1px at 215px 115px, #ffffff, transparent),
-              radial-gradient(0.8px 0.8px at 30px 160px, #ffffff, transparent);
+              radial-gradient(1.8px 1.8px at 28px 36px, #ffffff, transparent),
+              radial-gradient(2.2px 2.2px at 145px 78px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 82px 185px, #ffffff, transparent),
+              radial-gradient(2.4px 2.4px at 278px 128px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 218px 288px, #ffffff, transparent),
+              radial-gradient(1.4px 1.4px at 48px 258px, #ffffff, transparent),
+              radial-gradient(2.0px 2.0px at 318px 42px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 188px 168px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 112px 308px, #ffffff, transparent),
+              radial-gradient(2.1px 2.1px at 52px 122px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 168px 228px, #ffffff, transparent),
+              radial-gradient(1.9px 1.9px at 308px 248px, #ffffff, transparent),
+              radial-gradient(1.4px 1.4px at 258px 318px, #ffffff, transparent),
+              radial-gradient(2.2px 2.2px at 338px 178px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 16px 208px, #ffffff, transparent),
+              radial-gradient(2.3px 2.3px at 128px 18px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 238px 88px, #ffffff, transparent),
+              radial-gradient(1.4px 1.4px at 298px 332px, #ffffff, transparent),
+              radial-gradient(2.0px 2.0px at 95px 65px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 175px 45px, #ffffff, transparent),
+              radial-gradient(2.1px 2.1px at 60px 290px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 245px 195px, #ffffff, transparent),
+              radial-gradient(1.8px 1.8px at 15px 95px, #ffffff, transparent),
+              radial-gradient(1.6px 1.6px at 195px 260px, #ffffff, transparent),
+              radial-gradient(2.2px 2.2px at 285px 215px, #ffffff, transparent),
+              radial-gradient(1.5px 1.5px at 135px 270px, #ffffff, transparent),
+              radial-gradient(2.0px 2.0px at 215px 115px, #ffffff, transparent),
+              radial-gradient(1.4px 1.4px at 30px 160px, #ffffff, transparent);
             background-repeat: repeat;
-            background-size: 240px 240px;
+            background-size: 260px 260px;
             opacity: 1;
             will-change: transform;
-            transition: transform 0.05s linear;
           }
-          .cosmos-atmosphere {
+          /* Snapchat Soft Spherical Atmospheric Glow */
+          .globe-atmosphere-halo {
             position: absolute;
-            inset: 0;
-            background: radial-gradient(circle at center, transparent 38%, rgba(2, 6, 23, 0.7) 72%, #02040a 100%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 380px;
+            height: 380px;
+            max-width: 96vw;
+            max-height: 96vw;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.40) 0%, rgba(56, 189, 248, 0.28) 40%, rgba(14, 116, 144, 0.15) 60%, rgba(8, 47, 73, 0.05) 75%, transparent 88%);
             pointer-events: none;
+            z-index: 0;
+            transition: opacity 0.3s ease;
           }
 
           .marker-container {
@@ -680,7 +830,6 @@ export default function ExploreMapScreen() {
             position: relative;
             transform: scale(var(--map-zoom-scale, 1));
             transform-origin: center bottom;
-            transition: transform 0.05s linear;
             will-change: transform;
           }
 
@@ -943,14 +1092,16 @@ export default function ExploreMapScreen() {
 
           /* Requirement 8c-i: Grayed out element styling for events and hangouts whose end dates/times passed */
           .item-passed {
-            filter: grayscale(100%) opacity(0.48) !important;
-            border-color: #64748b !important;
-            box-shadow: none !important;
+            filter: grayscale(100%) brightness(0.88) !important;
+            opacity: 0.78 !important;
+            border: 2.5px solid #94a3b8 !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.7) !important;
           }
           .item-passed-label {
-            filter: grayscale(100%) opacity(0.65) !important;
-            color: #94a3b8 !important;
-            border-color: rgba(148, 163, 184, 0.4) !important;
+            opacity: 0.88 !important;
+            background: rgba(18, 22, 30, 0.95) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(148, 163, 184, 0.6) !important;
           }
 
           /* Active selection glow in expanded state */
@@ -1051,78 +1202,84 @@ export default function ExploreMapScreen() {
         </style>
       </head>
       <body>
-        <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="cosmos-atmosphere"></div></div>
+        <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="globe-atmosphere-halo"></div></div>
         <div id="map"></div>
 
         <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
         <script>
           // Initialize MapLibre GL v5 with 3D Globe Projection
-          // Initialize MapLibre GL with the exact free OpenFreeMap Liberty style used in MapPickerModal (Light Mode)
+          // minZoom lowered to 1.45 so the entire globe sphere fits comfortably on screen without clipping
           var map = new maplibregl.Map({
             container: 'map',
             style: 'https://tiles.openfreemap.org/styles/liberty',
             center: [${initialCenterLng}, ${initialCenterLat}],
-            zoom: Math.max(1.8, ${initialZoom}),
-            minZoom: 1.8,
+            zoom: Math.max(1.45, ${initialZoom}),
+            minZoom: 1.45,
             maxZoom: 19.0,
             pitch: ${initialZoom < 5.0 ? 0 : initialPitch},
-            maxPitch: ${initialZoom < 5.0 ? 0 : 60},
+            maxPitch: 60,
             bearing: ${initialBearing},
-            projection: { type: ${initialZoom >= 7.0 ? "'mercator'" : "'globe'"} },
-            antialias: true
+            projection: { type: 'globe' },
+            antialias: false,
+            fadeDuration: 0,
+            trackResize: false,
+            cooperativeGestures: false,
+            renderWorldCopies: true
           });
 
-          // Adaptive projection switcher: 3D globe at low zoom (< 7.0), Mercator flat map at high zoom (>= 7.0)
-          var currentProjection = ${initialZoom >= 7.0 ? "'mercator'" : "'globe'"};
-          function updateAdaptiveProjection() {
-            var z = map.getZoom();
-            var targetProj = z >= 7.0 ? 'mercator' : 'globe';
-            if (currentProjection !== targetProj) {
-              currentProjection = targetProj;
-              try {
-                map.setProjection({ type: targetProj });
-              } catch(e) {}
-            }
-          }
-          map.on('zoom', updateAdaptiveProjection);
-
-          // Decremental smooth zoom scale calculation
+          // Decremental smooth zoom scale calculation (throttled for 60fps performance)
+          var lastZoomScale = -1;
+          var zoomScaleRaf = null;
           function updateZoomScale() {
             var z = map.getZoom();
-            var minZ = 1.8;
+            var minZ = 1.45;
             var maxZ = 13.0;
             var clampedZ = Math.max(minZ, Math.min(maxZ, z));
             var t = (clampedZ - minZ) / (maxZ - minZ);
             var smoothT = t * t * (3 - 2 * t);
             var scale = 0.44 + (1.0 - 0.44) * smoothT;
-            document.documentElement.style.setProperty('--map-zoom-scale', scale.toFixed(3));
 
-            if (z < 10.5) {
-              document.body.classList.add('hide-labels');
-            } else {
-              document.body.classList.remove('hide-labels');
+            if (Math.abs(scale - lastZoomScale) >= 0.02) {
+              lastZoomScale = scale;
+              document.documentElement.style.setProperty('--map-zoom-scale', scale.toFixed(2));
             }
 
-            if (z < 5.0) {
-              if (map.getMaxPitch() !== 0) map.setMaxPitch(0);
-              if (map.getPitch() !== 0) map.setPitch(0);
-            } else {
-              if (map.getMaxPitch() !== 60) map.setMaxPitch(60);
+            var shouldHide = z < 10.5;
+            if (shouldHide !== document.body.classList.contains('hide-labels')) {
+              if (shouldHide) {
+                document.body.classList.add('hide-labels');
+              } else {
+                document.body.classList.remove('hide-labels');
+              }
             }
           }
-          map.on('zoom', updateZoomScale);
+          function scheduleZoomScale() {
+            if (zoomScaleRaf) return;
+            zoomScaleRaf = requestAnimationFrame(function() {
+              zoomScaleRaf = null;
+              updateZoomScale();
+            });
+          }
+          map.on('zoom', scheduleZoomScale);
+          map.on('zoomend', updateZoomScale);
           updateZoomScale();
 
-          // Starry background responsive to swiping / parallax
+          // Starry background responsive to swiping / parallax (throttled)
+          var lastParallaxX = -999;
+          var lastParallaxY = -999;
           function updateCosmicParallax() {
             var starEl = document.querySelector('.cosmos-stars');
             if (!starEl) return;
             var center = map.getCenter();
             var bearing = map.getBearing() || 0;
             var pitch = map.getPitch() || 0;
-            var shiftX = (center.lng * 2.8 + bearing * 1.2) % 240;
-            var shiftY = (center.lat * 2.8 + pitch * 0.8) % 240;
-            starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
+            var shiftX = Math.round((center.lng * 2.8 + bearing * 1.2) % 240);
+            var shiftY = Math.round((center.lat * 2.8 + pitch * 0.8) % 240);
+            if (Math.abs(shiftX - lastParallaxX) >= 4 || Math.abs(shiftY - lastParallaxY) >= 4) {
+              lastParallaxX = shiftX;
+              lastParallaxY = shiftY;
+              starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
+            }
           }
 
           var parallaxRaf = null;
@@ -1138,11 +1295,10 @@ export default function ExploreMapScreen() {
           map.on('pitch', scheduleCosmicParallax);
 
           map.on('error', function(err) {
-            // Silently absorb individual tile network drops so map canvas never halts
+            // Silently absorb individual tile network drops
           });
 
-          // Style load: Plaster the exact working light mode Liberty setup from MapPickerModal,
-          // preserving all natural places, colors, vegetation, real POIs, crisp borders and English labels
+          // Style load: Snapchat Dark Globe Aesthetics + Selective Labels
           map.on('style.load', function() {
             var z = map.getZoom();
             var targetProj = z >= 7.0 ? 'mercator' : 'globe';
@@ -1151,67 +1307,161 @@ export default function ExploreMapScreen() {
               map.setProjection({ type: targetProj });
             } catch(e) {}
 
-            // Country Borders & Boundary Presentation (from MapPickerModal):
-            // 1. Hide state, county, maritime, and sub-national clutter
-            // 2. Make country borders clearly visible, crisp, solid lines
+            // 1. Generate & register the Snapchat dark navy sinusoidal wave pattern for water
+            function createOceanWavePattern() {
+              var c = document.createElement('canvas');
+              c.width = 64;
+              c.height = 32;
+              var ctx = c.getContext('2d');
+              // Obsidian black ocean base
+              ctx.fillStyle = '#070b11';
+              ctx.fillRect(0, 0, 64, 32);
+
+              // Snapchat dark navy sinusoidal wave lines
+              ctx.strokeStyle = '#18283e';
+              ctx.lineWidth = 2.2;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+
+              [8, 24].forEach(function(baseY) {
+                ctx.beginPath();
+                for (var x = 0; x <= 64; x++) {
+                  var y = baseY + Math.sin((x / 64) * Math.PI * 2) * 4.2;
+                  if (x === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+              });
+              return ctx.getImageData(0, 0, 64, 32);
+            }
+
             try {
-              var allStyleLayers = map.getStyle().layers || [];
-              allStyleLayers.forEach(function(l) {
-                if (!l.id) return;
-                var isBoundary = l.id.indexOf('boundary') !== -1 || l.id.indexOf('border') !== -1;
-                if (!isBoundary) return;
+              if (!map.hasImage('snap-ocean-waves')) {
+                map.addImage('snap-ocean-waves', createOceanWavePattern());
+              }
+            } catch(e) {}
 
-                var isCountryBorder = l.id === 'boundary_country' || 
-                                     l.id === 'boundary_country_z0-4' || 
-                                     (l.id.indexOf('country') !== -1 && l.type === 'line');
+            // 2. Snapchat Continent & Landscape Dark Mode Styling
+            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
+            try {
+              map.getStyle().layers.forEach(function(l) {
+                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
+                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
+                }
+              });
+            } catch(e) {}
 
-                if (isCountryBorder) {
+            // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
+            [
+              'park', 'park_outline', 'park_national', 'park_nature_reserve', 'landcover_wood', 'landcover_grass',
+              'landcover_wetland', 'landcover_scrub', 'landcover_cemetery', 'landcover_glacier',
+              'landuse_pitch', 'landuse_track', 'landuse_grass', 'landuse_residential',
+              'landcover_sand', 'landcover_ice', 'landuse_hospital', 'landuse_school',
+              'landuse_industrial', 'landuse_commercial'
+            ].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+              }
+            });
+
+            // Sweep and remove any remaining park / garden line or fill layers
+            try {
+              map.getStyle().layers.forEach(function(l) {
+                if (l.id.indexOf('park') !== -1 || l.id.indexOf('garden') !== -1 || l.id.indexOf('grass') !== -1) {
+                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
+                }
+              });
+            } catch(e) {}
+
+            // Continents: Dark slate grey (#28323c) matching Snapchat
+            if (map.getLayer('background')) {
+              try { map.setPaintProperty('background', 'background-color', '#28323c'); } catch(e) {}
+            }
+            ['land', 'landuse'].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setPaintProperty(id, 'fill-color', '#28323c'); } catch(e) {}
+              }
+            });
+            if (map.getLayer('water')) {
+              try {
+                map.setPaintProperty('water', 'fill-pattern', 'snap-ocean-waves');
+              } catch(e) {
+                try { map.setPaintProperty('water', 'fill-color', '#070b11'); } catch(e2) {}
+              }
+            }
+
+            // Waterways
+            ['waterway_river', 'waterway_tunnel', 'waterway_other'].forEach(function(id) {
+              if (map.getLayer(id)) {
+                try { map.setPaintProperty(id, 'line-color', '#18283e'); } catch(e) {}
+              }
+            });
+
+            // Tone down bright yellow and white road lines to dark charcoal / slate
+            try {
+              map.getStyle().layers.forEach(function(l) {
+                if (l.type === 'line' && (l.id.indexOf('road') !== -1 || l.id.indexOf('highway') !== -1 || l.id.indexOf('bridge') !== -1 || l.id.indexOf('tunnel') !== -1)) {
                   try {
-                    map.setLayoutProperty(l.id, 'visibility', 'visible');
-                  } catch(e) {}
-                  try {
-                    map.setPaintProperty(l.id, 'line-dasharray', null);
-                  } catch(e) {
-                    try { map.setPaintProperty(l.id, 'line-dasharray', [1, 0]); } catch(e2) {}
-                  }
-                  try {
-                    map.setPaintProperty(l.id, 'line-color', 'rgba(30, 41, 59, 0.80)');
-                  } catch(e) {}
-                  try {
-                    var w = l.id.indexOf('z0-4') !== -1 ? 1.5 : 2.0;
-                    map.setPaintProperty(l.id, 'line-width', w);
-                  } catch(e) {}
-                  try {
-                    map.setPaintProperty(l.id, 'line-opacity', 0.95);
-                  } catch(e) {}
-                } else {
-                  try {
-                    map.setLayoutProperty(l.id, 'visibility', 'none');
+                    if (l.id.indexOf('case') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#12171e');
+                    } else if (l.id.indexOf('motorway') !== -1 || l.id.indexOf('trunk') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#2c3545');
+                    } else if (l.id.indexOf('primary') !== -1 || l.id.indexOf('secondary') !== -1) {
+                      map.setPaintProperty(l.id, 'line-color', '#222b37');
+                    } else {
+                      map.setPaintProperty(l.id, 'line-color', '#1a222b');
+                    }
+                    map.setPaintProperty(l.id, 'line-opacity', 0.85);
                   } catch(e) {}
                 }
               });
             } catch(e) {}
 
-            // Clean progressive English labels without blur/glow
-            var labelConfigs = {
-              'place_country_major': { minzoom: 0, maxzoom: 6 },
-              'place_country_minor': { minzoom: 3.8, maxzoom: 8 },
-              'place_country_other': { minzoom: 4.8, maxzoom: 9 },
-              'place_state': { minzoom: 4.8, maxzoom: 12 },
-              'place_city_large': { minzoom: 5.2, maxzoom: 12 },
-              'place_city': { minzoom: 6.8, maxzoom: 14 },
-              'place_town': { minzoom: 9.0, maxzoom: 15 },
-              'place_village': { minzoom: 11.0, maxzoom: 15 },
-              'place_suburb': { minzoom: 12.0, maxzoom: 15 },
-              'place_other': { minzoom: 12.5, maxzoom: 15 }
-            };
+            if (map.getLayer('building')) {
+              try { map.setPaintProperty('building', 'fill-color', '#1e242c'); } catch(e) {}
+            }
+            if (map.getLayer('building-3d')) {
+              try { map.setPaintProperty('building-3d', 'fill-extrusion-color', '#232b35'); } catch(e) {}
+            }
 
-            Object.keys(labelConfigs).forEach(function(layerId) {
-              if (map.getLayer(layerId)) {
-                var cfg = labelConfigs[layerId];
+            // Country & Region Boundaries:
+            // Crisp, solid, thin borders between countries (removes dotted clutter)
+            if (map.getLayer('boundary_2')) {
+              try {
+                map.setLayoutProperty('boundary_2', 'visibility', 'visible');
+                map.setPaintProperty('boundary_2', 'line-color', 'rgba(120, 140, 160, 0.65)');
+                map.setPaintProperty('boundary_2', 'line-width', 1.1);
+                map.setPaintProperty('boundary_2', 'line-dasharray', null);
+              } catch(e) {}
+            }
+            if (map.getLayer('boundary_3')) {
+              try {
+                map.setLayoutProperty('boundary_3', 'visibility', 'visible');
+                map.setPaintProperty('boundary_3', 'line-color', 'rgba(80, 95, 115, 0.35)');
+                map.setPaintProperty('boundary_3', 'line-width', 0.8);
+                map.setPaintProperty('boundary_3', 'line-dasharray', null);
+              } catch(e) {}
+            }
+            if (map.getLayer('boundary_disputed')) {
+              try { map.setLayoutProperty('boundary_disputed', 'visibility', 'none'); } catch(e) {}
+            }
+
+            // 3. High-Contrast English Text Labels with Dark Halo
+            var textLayers = [
+              'label_country_1', 'label_country_2', 'label_country_3',
+              'label_city_capital', 'label_city', 'label_state',
+              'label_town', 'label_village', 'label_other',
+              'waterway_line_label', 'water_name_point_label', 'water_name_line_label',
+              'poi_r20', 'poi_r7', 'poi_r1', 'poi_transit'
+            ];
+            textLayers.forEach(function(id) {
+              if (map.getLayer(id)) {
                 try {
-                  map.setLayerZoomRange(layerId, cfg.minzoom, cfg.maxzoom);
-                  map.setLayoutProperty(layerId, 'text-field', [
+                  map.setPaintProperty(id, 'text-color', '#e2e8f0');
+                  map.setPaintProperty(id, 'text-halo-color', '#090d13');
+                  map.setPaintProperty(id, 'text-halo-width', 1.6);
+                  map.setPaintProperty(id, 'text-halo-blur', 0);
+                  map.setLayoutProperty(id, 'text-field', [
                     'coalesce',
                     ['get', 'name:en'],
                     ['get', 'name_en'],
@@ -1219,31 +1469,57 @@ export default function ExploreMapScreen() {
                     ['get', 'name'],
                     ''
                   ]);
-                  map.setLayoutProperty(layerId, 'text-padding', 10);
-                  map.setLayoutProperty(layerId, 'text-optional', true);
-                  map.setPaintProperty(layerId, 'text-halo-blur', 0);
                 } catch(e) {}
               }
             });
 
-            // Ensure all other symbol/text layers strictly use English coalesce & zero blur
-            try {
-              var allLayers = map.getStyle().layers || [];
-              allLayers.forEach(function(l) {
-                if (!l.id || l.type !== 'symbol') return;
+            // 4. Native WebGL Selective Label Zoom Ranges (60 FPS on GPU, zero JS overhead!)
+            var labelRanges = {
+              'label_country_1': [2.1, 24],
+              'label_country_2': [3.0, 24],
+              'label_country_3': [4.2, 24],
+              'label_city_capital': [4.5, 24],
+              'label_city': [4.8, 24],
+              'label_state': [5.5, 24],
+              'label_town': [8.5, 24],
+              'label_village': [10.0, 24],
+              'label_other': [11.0, 24],
+              'water_name_point_label': [4.0, 24],
+              'water_name_line_label': [4.0, 24],
+              'waterway_line_label': [6.0, 24]
+            };
+            Object.keys(labelRanges).forEach(function(id) {
+              if (map.getLayer(id)) {
                 try {
-                  map.setLayoutProperty(l.id, 'text-field', [
-                    'coalesce',
-                    ['get', 'name:en'],
-                    ['get', 'name_en'],
-                    ['get', 'name:latin'],
-                    ['get', 'name'],
-                    ''
-                  ]);
-                  map.setPaintProperty(l.id, 'text-halo-blur', 0);
+                  map.setLayerZoomRange(id, labelRanges[id][0], labelRanges[id][1]);
                 } catch(e) {}
-              });
-            } catch(e) {}
+              }
+            });
+
+            // Atmosphere Halo: Fades smoothly as user zooms into street level
+            var haloRaf = null;
+            function updateAtmosphereHalo() {
+              var halo = document.querySelector('.globe-atmosphere-halo');
+              if (!halo) return;
+              var currentZ = map.getZoom();
+              if (currentZ > 5.5) {
+                halo.style.opacity = '0';
+              } else if (currentZ > 3.5) {
+                halo.style.opacity = String(Math.max(0, 1 - (currentZ - 3.5) / 2.0));
+              } else {
+                halo.style.opacity = '1';
+              }
+            }
+            map.on('zoom', function() {
+              if (!haloRaf) {
+                haloRaf = requestAnimationFrame(function() {
+                  haloRaf = null;
+                  updateAtmosphereHalo();
+                });
+              }
+            });
+            map.on('zoomend', updateAtmosphereHalo);
+            updateAtmosphereHalo();
 
             // 3D extruded buildings (at zoom >= 15.0)
             try {
@@ -1256,7 +1532,7 @@ export default function ExploreMapScreen() {
                   minzoom: 15.0,
                   maxzoom: 22,
                   paint: {
-                    'fill-extrusion-color': '#cbd5e1',
+                    'fill-extrusion-color': '#232b35',
                     'fill-extrusion-height': [
                       'interpolate', ['linear'], ['zoom'],
                       15.0, 0,
@@ -1671,7 +1947,21 @@ export default function ExploreMapScreen() {
             }
 
             function pushIfSelected(item, type) {
-              if (item.location && typeof item.location.latitude === 'number' && typeof item.location.longitude === 'number') {
+              if (
+                item.location &&
+                typeof item.location.latitude === 'number' &&
+                typeof item.location.longitude === 'number' &&
+                item.location.placeId !== 'plain_text' &&
+                item.location.place_id !== 'plain_text' &&
+                item.place_id !== 'plain_text' &&
+                item.placeId !== 'plain_text'
+              ) {
+                var lat = item.location.latitude;
+                var lng = item.location.longitude;
+                if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) return;
+                var locName = (item.location.name || item.location.placeName || '').toLowerCase().trim();
+                if ((locName === 'online' || locName === 'virtual') && Math.abs(lat - 40.7128) < 0.5 && Math.abs(lng - (-74.0060)) < 0.5) return;
+
                 var wrapped = Object.assign({}, item, { entityType: type });
                 var isTargetItem = window.pendingFocus && (
                   String(window.pendingFocus.id) === String(item.id) ||
@@ -2025,52 +2315,34 @@ export default function ExploreMapScreen() {
               // Region / State level -> Zoom to City level
               map.flyTo({ center: [e.lngLat.lng, e.lngLat.lat], zoom: 12.8, essential: true });
             } else {
-              // City level (z >= 10.5): Check city empty space tap
-              var cityName = '';
-              var cityFeature = features.find(function(f) {
-                return f.layer && f.layer.id && (
-                  f.layer.id.indexOf('place_city') !== -1 ||
-                  f.layer.id.indexOf('place_town') !== -1 ||
-                  f.layer.id.indexOf('place_suburb') !== -1
-                );
+              // City level (z >= 10.5): Check city empty space tap with real city name resolution
+              var nearbyLabels = map.queryRenderedFeatures([
+                [e.point.x - 140, e.point.y - 140],
+                [e.point.x + 140, e.point.y + 140]
+              ], {
+                layers: ['label_city_capital', 'label_city', 'label_town', 'label_village', 'label_state']
               });
-              if (cityFeature && cityFeature.properties) {
-                cityName = cityFeature.properties['name:en'] || cityFeature.properties.name || '';
-              }
-              if (!cityName) {
-                var nearbyPlaces = map.queryRenderedFeatures([
-                  [e.point.x - 120, e.point.y - 120],
-                  [e.point.x + 120, e.point.y + 120]
-                ], {
-                  layers: ['place_city_large', 'place_city', 'place_town', 'place_suburb']
-                });
-                if (nearbyPlaces.length && nearbyPlaces[0].properties) {
-                  cityName = nearbyPlaces[0].properties['name:en'] || nearbyPlaces[0].properties.name || '';
-                }
-              }
-              if (!cityName) {
-                cityName = 'Selected Area';
+              var quickCity = '';
+              if (nearbyLabels.length && nearbyLabels[0].properties) {
+                quickCity = nearbyLabels[0].properties['name:en'] || nearbyLabels[0].properties.name_en || nearbyLabels[0].properties['name:latin'] || nearbyLabels[0].properties.name || '';
               }
 
-              // Check if already selected:
               var isAlreadySelected = (currentSelectedCities || []).some(function(c) {
-                var cName = (c.name || '').toLowerCase();
-                var hitName = cityName.toLowerCase();
-                if (cName === hitName) return true;
+                if (quickCity && (c.name || '').toLowerCase() === quickCity.toLowerCase()) return true;
                 var dLat = Math.abs(c.lat - e.lngLat.lat);
                 var dLng = Math.abs(c.lng - e.lngLat.lng);
-                return dLat < 0.35 && dLng < 0.35;
+                return dLat < 0.28 && dLng < 0.28;
               });
 
               if (isAlreadySelected) {
-                // Tapping in empty space inside already selected city should do nothing
                 return;
               }
 
               // Trigger special UI: Radar Scanner Animation at tap coordinate!
               var radarEl = document.createElement('div');
               radarEl.className = 'city-radar-container';
-              radarEl.innerHTML = '<div class="city-radar-ring"></div><div class="city-radar-core"></div><div class="city-radar-label">Scanning & Rendering ' + cityName + '...</div>';
+              var radarLabelText = quickCity ? ('Scanning ' + quickCity + '...') : 'Scanning Location...';
+              radarEl.innerHTML = '<div class="city-radar-ring"></div><div class="city-radar-core"></div><div class="city-radar-label">' + radarLabelText + '</div>';
 
               var radarMarker = new maplibregl.Marker({ element: radarEl })
                 .setLngLat([e.lngLat.lng, e.lngLat.lat])
@@ -2078,17 +2350,40 @@ export default function ExploreMapScreen() {
 
               setTimeout(function() {
                 radarMarker.remove();
-              }, 1800);
+              }, 2000);
 
-              // Notify React Native that this city was selected
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'city_selected',
-                  city: cityName,
-                  lat: e.lngLat.lat,
-                  lng: e.lngLat.lng
-                }));
-              }
+              // Perform reverse geocoding to resolve exact city / town / region name
+              var tapLat = e.lngLat.lat;
+              var tapLng = e.lngLat.lng;
+              fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + tapLat + '&lon=' + tapLng + '&zoom=12&addressdetails=1', {
+                headers: { 'Accept-Language': 'en' }
+              })
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                var addr = data.address || {};
+                var realCity = addr.city || addr.town || addr.village || addr.municipality || addr.city_district || addr.suburb || addr.county || addr.state || data.name || quickCity || 'Selected City';
+                var lab = radarEl.querySelector('.city-radar-label');
+                if (lab) lab.innerText = 'Rendering ' + realCity + '...';
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'city_selected',
+                    city: realCity,
+                    lat: tapLat,
+                    lng: tapLng
+                  }));
+                }
+              })
+              .catch(function() {
+                var fallbackCity = quickCity || 'Selected City';
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'city_selected',
+                    city: fallbackCity,
+                    lat: tapLat,
+                    lng: tapLng
+                  }));
+                }
+              });
             }
           });
 
@@ -2116,8 +2411,8 @@ export default function ExploreMapScreen() {
               }));
             }
           });
-          map.on('zoom', function() {
-            updateZoomScale();
+          // Clustering update on zoomend prevents tearing down markers 60x/sec during pinch
+          map.on('zoomend', function() {
             updateContinuousClustering();
           });
           map.on('zoomstart', function() {
@@ -2146,8 +2441,37 @@ export default function ExploreMapScreen() {
         onMessage={onWebViewMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        renderToHardwareTextureAndroid={true}
+        overScrollMode="never"
+        scrollEnabled={false}
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
         onLoadEnd={() => sendDataToWebView(mapData, selectedEntityTypes, selectedCategories, selectedCities)}
       />
+
+      {/* Full-width gradient fade background behind Header & Status Bar */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.topHeaderGradient,
+          {
+            height: Math.max(insets.top, 16) + 64,
+          },
+        ]}
+      >
+        <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+          <Defs>
+            <SvgLinearGradient id="headerFade" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#04070c" stopOpacity="0.52" />
+              <Stop offset="55%" stopColor="#04070c" stopOpacity="0.38" />
+              <Stop offset="82%" stopColor="#04070c" stopOpacity="0.16" />
+              <Stop offset="100%" stopColor="#04070c" stopOpacity="0" />
+            </SvgLinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#headerFade)" />
+        </Svg>
+      </View>
 
       {/* Floating Header Controls with App's Yellow Accent & Dark Brown Theme */}
       <View style={[styles.headerOverlay, { top: Math.max(insets.top, 16) }]}>
@@ -2157,37 +2481,37 @@ export default function ExploreMapScreen() {
         <View style={styles.controlsRow}>
           {/* Globe Zoom-Out Button */}
           <TouchableOpacity
-            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '50' }]}
+            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: isDark ? yellowAccent + '50' : '#e2e8f0' }]}
             onPress={handleResetGlobe}
             activeOpacity={0.8}
           >
-            <MaterialIcons name="public" size={20} color={yellowAccent} />
+            <MaterialIcons name="public" size={20} color={isDark ? yellowAccent : '#92400e'} />
           </TouchableOpacity>
 
           {/* Current Location GPS Button */}
           <TouchableOpacity
-            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '50' }]}
+            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: isDark ? yellowAccent + '50' : '#e2e8f0' }]}
             onPress={handleFlyToGpsLocation}
             activeOpacity={0.8}
             disabled={locatingGps || isLoadingLocation}
           >
             {locatingGps || isLoadingLocation ? (
-              <ActivityIndicator size="small" color={yellowAccent} />
+              <ActivityIndicator size="small" color={isDark ? yellowAccent : '#92400e'} />
             ) : (
-              <MaterialIcons name="my-location" size={20} color={yellowAccent} />
+              <MaterialIcons name="my-location" size={20} color={isDark ? yellowAccent : '#92400e'} />
             )}
           </TouchableOpacity>
 
           {/* Refresh Map Data Button: updates locations in place without moving camera */}
           <TouchableOpacity
-            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '50' }]}
+            style={[styles.controlBtn, { backgroundColor: darkBrownBg, borderColor: isDark ? yellowAccent + '50' : '#e2e8f0' }]}
             onPress={handleRefreshDataInPlace}
             activeOpacity={0.8}
           >
             {loading ? (
-              <ActivityIndicator size="small" color={yellowAccent} />
+              <ActivityIndicator size="small" color={isDark ? yellowAccent : '#92400e'} />
             ) : (
-              <MaterialIcons name="refresh" size={20} color={yellowAccent} />
+              <MaterialIcons name="refresh" size={20} color={isDark ? yellowAccent : '#92400e'} />
             )}
           </TouchableOpacity>
         </View>
@@ -2243,7 +2567,7 @@ export default function ExploreMapScreen() {
               <MaterialIcons
                 name="local-cafe"
                 size={14}
-                color={isActive ? darkBrown : yellowAccent}
+                color={isActive ? darkBrown : (isDark ? yellowAccent : '#92400e')}
                 style={{ marginRight: 4 }}
               />
               <Text
@@ -2275,7 +2599,7 @@ export default function ExploreMapScreen() {
               <MaterialIcons
                 name="event"
                 size={14}
-                color={isActive ? darkBrown : yellowAccent}
+                color={isActive ? darkBrown : (isDark ? yellowAccent : '#92400e')}
                 style={{ marginRight: 4 }}
               />
               <Text
@@ -2307,7 +2631,7 @@ export default function ExploreMapScreen() {
               <MaterialIcons
                 name="groups"
                 size={14}
-                color={isActive ? darkBrown : yellowAccent}
+                color={isActive ? darkBrown : (isDark ? yellowAccent : '#92400e')}
                 style={{ marginRight: 4 }}
               />
               <Text
@@ -2348,7 +2672,7 @@ export default function ExploreMapScreen() {
               <MaterialIcons
                 name="person"
                 size={14}
-                color={isActive && !hasSpecificCategory ? darkBrown : yellowAccent}
+                color={isActive && !hasSpecificCategory ? darkBrown : (isDark ? yellowAccent : '#92400e')}
                 style={{ marginRight: 4 }}
               />
               <Text
@@ -2397,8 +2721,8 @@ export default function ExploreMapScreen() {
             style={[
               styles.categoryDeckBg,
               {
-                backgroundColor: 'rgba(32, 28, 24, 0.95)',
-                borderColor: yellowAccent + '70',
+                backgroundColor: isDark ? 'rgba(32, 28, 24, 0.95)' : 'rgba(255, 255, 255, 0.96)',
+                borderColor: isDark ? yellowAccent + '70' : '#e2e8f0',
                 opacity: categoryStackAnim.interpolate({
                   inputRange: [0.15, 1],
                   outputRange: [0, 1],
@@ -2426,8 +2750,8 @@ export default function ExploreMapScreen() {
             contentContainerStyle={[
               styles.categoryScrollContent,
               {
-                minHeight: isCategoryStackExpanded ? (CATEGORY_FILTER_ITEMS.length - 1) * 44 + 38 + 42 : 58,
-                paddingBottom: isCategoryStackExpanded ? 42 : 0,
+                minHeight: (CATEGORY_FILTER_ITEMS.length - 1) * 44 + 38 + 44,
+                paddingBottom: 42,
               },
             ]}
           >
@@ -2473,7 +2797,7 @@ export default function ExploreMapScreen() {
                       styles.categoryItemCircle,
                       isSelected
                         ? [styles.categoryItemActive, { backgroundColor: yellowAccent, borderColor: '#feba48' }]
-                        : [styles.categoryItemInactive, { backgroundColor: darkBrownBg, borderColor: isDark ? '#3d3835' : '#e5d5c3' }],
+                        : [styles.categoryItemInactive, { backgroundColor: darkBrownBg, borderColor: isDark ? '#3d3835' : '#e2e8f0' }],
                     ]}
                     onPress={() => handleToggleCategory(item.id)}
                     activeOpacity={0.8}
@@ -2540,11 +2864,11 @@ export default function ExploreMapScreen() {
               pointerEvents="auto"
             >
               <TouchableOpacity
-                style={[styles.categoryActionCircle, styles.categoryPullTabBottom, { backgroundColor: darkBrownBg, borderColor: yellowAccent + '60' }]}
+                style={[styles.categoryActionCircle, styles.categoryPullTabBottom, { backgroundColor: darkBrownBg, borderColor: isDark ? yellowAccent + '60' : '#e2e8f0' }]}
                 onPress={handleCollapseCategories}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="keyboard-arrow-up" size={20} color={yellowAccent} />
+                <MaterialIcons name="keyboard-arrow-up" size={20} color={isDark ? yellowAccent : '#92400e'} />
               </TouchableOpacity>
             </Animated.View>
           )}
@@ -2586,6 +2910,31 @@ export default function ExploreMapScreen() {
           )}
         </ScrollView>
       </View>
+
+      {/* Requirement 1c: Circular Search Button positioned on the right side just above the location pills */}
+      <Animated.View
+        style={[
+          styles.searchFloatingBtnWrap,
+          {
+            bottom: Math.max(insets.bottom, 12) + (selectedCities.length > 0 ? 116 : 68),
+            transform: [{ translateY: cityPillsSlideAnim }],
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.searchFloatingBtn,
+            {
+              backgroundColor: darkBrownBg,
+              borderColor: isDark ? yellowAccent + '70' : '#cbd5e1',
+            },
+          ]}
+          onPress={() => setIsSearchModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="search" size={22} color={isDark ? yellowAccent : '#92400e'} />
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Requirement 14 & 1g: Horizontally Scrollable City Pills Bar positioned a teeny tiny amount higher above navigation bar and teeny tiny amount to the left */}
       {selectedCities.length > 0 && (
@@ -2640,6 +2989,184 @@ export default function ExploreMapScreen() {
           </ScrollView>
         </Animated.View>
       )}
+
+      {/* Place Search Pop-Up Modal */}
+      <Modal
+        visible={isSearchModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setIsSearchModalVisible(false);
+          setSearchQuery('');
+          setSearchResults([]);
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.searchModalBackdrop}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              setIsSearchModalVisible(false);
+              setSearchQuery('');
+              setSearchResults([]);
+            }}
+          />
+          <View
+            style={[
+              styles.searchModalCard,
+              {
+                backgroundColor: isDark ? '#1a1816' : '#ffffff',
+                borderColor: isDark ? '#38332d' : '#e2e8f0',
+              },
+            ]}
+          >
+            <View style={styles.searchModalHeader}>
+              <MaterialIcons name="travel-explore" size={22} color={isDark ? yellowAccent : '#92400e'} />
+              <Text
+                style={[
+                  styles.searchModalTitle,
+                  { color: colors.onSurface },
+                ]}
+              >
+                Search Map & Places
+              </Text>
+            </View>
+
+            {/* Input Row */}
+            <View
+              style={[
+                styles.searchInputRow,
+                {
+                  backgroundColor: isDark ? '#262320' : '#f8fafc',
+                  borderColor: isDark ? '#3f3a36' : '#cbd5e1',
+                },
+              ]}
+            >
+              <MaterialIcons name="search" size={20} color={isDark ? '#a8a29e' : '#64748b'} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.onSurface }]}
+                placeholder="Search city, landmark, country, or cafe..."
+                placeholderTextColor={isDark ? '#78716c' : '#94a3b8'}
+                value={searchQuery}
+                onChangeText={handleSearchQueryChange}
+                autoFocus={true}
+                returnKeyType="search"
+                onSubmitEditing={handleExecuteSearch}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialIcons name="close" size={18} color={isDark ? '#a8a29e' : '#64748b'} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Loading Indicator */}
+            {isSearching && (
+              <ActivityIndicator size="small" color={isDark ? yellowAccent : '#92400e'} style={{ marginVertical: 14 }} />
+            )}
+
+            {/* Suggestions List */}
+            {searchResults.length > 0 && (
+              <ScrollView
+                style={styles.searchSuggestionsList}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={true}
+              >
+                {searchResults.map((item, idx) => {
+                  const placeName = item.name || (item.display_name ? item.display_name.split(',')[0] : 'Place');
+                  const placeSubtitle = item.display_name || '';
+                  const type = (item.type || '').toLowerCase();
+                  let iconName = 'place';
+                  if (type === 'city' || type === 'town' || type === 'administrative') iconName = 'location-city';
+                  else if (type === 'country') iconName = 'public';
+                  else if (type === 'restaurant' || type === 'cafe') iconName = 'local-cafe';
+                  else if (type === 'hospital') iconName = 'local-hospital';
+                  else if (type === 'park') iconName = 'park';
+
+                  return (
+                    <TouchableOpacity
+                      key={item.place_id || idx}
+                      style={[
+                        styles.searchSuggestionItem,
+                        { borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)' },
+                      ]}
+                      onPress={() => handleSelectSearchResult(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.suggestionIconWrap,
+                          { backgroundColor: isDark ? '#262320' : '#f1f5f9' },
+                        ]}
+                      >
+                        <MaterialIcons name={iconName as any} size={16} color={isDark ? yellowAccent : '#92400e'} />
+                      </View>
+                      <View style={styles.suggestionTextWrap}>
+                        <Text style={[styles.suggestionMainText, { color: colors.onSurface }]} numberOfLines={1}>
+                          {placeName}
+                        </Text>
+                        <Text style={[styles.suggestionSubText, { color: colors.tertiary }]} numberOfLines={1}>
+                          {placeSubtitle}
+                        </Text>
+                      </View>
+                      <MaterialIcons name="north-west" size={14} color={isDark ? '#57534e' : '#94a3b8'} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Empty state when searched and no results */}
+            {searchQuery.trim().length >= 2 && !isSearching && searchResults.length === 0 && (
+              <Text style={[styles.searchEmptyText, { color: colors.tertiary }]}>
+                No matching places found. Tap Search to query coordinates.
+              </Text>
+            )}
+
+            {/* Buttons Row */}
+            <View style={styles.searchModalActionsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.searchModalCancelBtn,
+                  {
+                    backgroundColor: isDark ? '#262320' : '#f1f5f9',
+                    borderColor: isDark ? '#38332d' : '#cbd5e1',
+                  },
+                ]}
+                onPress={() => {
+                  setIsSearchModalVisible(false);
+                  setSearchQuery('');
+                  setSearchResults([]);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.searchModalCancelText, { color: colors.onSurface }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.searchModalSubmitBtn,
+                  { backgroundColor: yellowAccent },
+                ]}
+                onPress={handleExecuteSearch}
+                activeOpacity={0.85}
+              >
+                <MaterialIcons name="search" size={16} color={darkBrown} />
+                <Text style={styles.searchModalSubmitText}>Search</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Bottom Selected Entity Preview Card */}
       {selectedEntity && (
@@ -2833,6 +3360,13 @@ const styles = StyleSheet.create({
   webView: {
     flex: 1,
   },
+  topHeaderGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 70,
+  },
   headerOverlay: {
     position: 'absolute',
     left: Spacing.md,
@@ -2852,14 +3386,139 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   nexusMapTitle: {
-    fontFamily: 'DINNextRoundedLTW01',
+    fontFamily: 'DIN Next Rounded',
     fontSize: 34,
-    fontWeight: '900',
     color: '#ffffff',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.85)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
+    letterSpacing: -0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 4,
+  },
+  searchFloatingBtnWrap: {
+    position: 'absolute',
+    right: Spacing.md,
+    zIndex: 98,
+  },
+  searchFloatingBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.md,
+  },
+  searchModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  searchModalCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 18,
+    ...Shadows.lg,
+  },
+  searchModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 8,
+  },
+  searchModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: -0.2,
+  },
+  searchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 46,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    height: '100%',
+    paddingVertical: 0,
+  },
+  searchSuggestionsList: {
+    maxHeight: 220,
+    marginTop: 8,
+  },
+  searchSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  suggestionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionTextWrap: {
+    flex: 1,
+  },
+  suggestionMainText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  suggestionSubText: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  searchEmptyText: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '600',
+    marginVertical: 14,
+  },
+  searchModalActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 16,
+  },
+  searchModalCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchModalCancelText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  searchModalSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 6,
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  searchModalSubmitText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#281800',
   },
   appTitle: {
     fontSize: 15,

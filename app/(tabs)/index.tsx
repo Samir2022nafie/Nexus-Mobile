@@ -903,9 +903,9 @@ export default function HomeScreen() {
                             const txt = formatDistance(d);
                             if (txt) {
                               return (
-                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surfaceContainerHigh, paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 6 }}>
-                                  <MaterialIcons name="near-me" size={10} color={colors.tertiary} style={{ marginRight: 2 }} />
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: cat.isPassed ? 'transparent' : colors.surfaceContainerHigh, paddingHorizontal: cat.isPassed ? 0 : 5, paddingVertical: cat.isPassed ? 0 : 1.5, borderRadius: 6 }}>
+                                  <MaterialIcons name="near-me" size={10} color={cat.isPassed ? colors.outline : colors.tertiary} style={{ marginRight: 2 }} />
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: cat.isPassed ? colors.outline : colors.onSurface }}>{txt}</Text>
                                 </View>
                               );
                             }
@@ -1078,27 +1078,31 @@ export default function HomeScreen() {
                                   style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    backgroundColor: isDark ? colors.surfaceContainerHigh : '#ffffff',
-                                    borderWidth: isDark ? 0 : 1,
+                                    backgroundColor: cat.isPassed
+                                      ? 'transparent'
+                                      : isDark
+                                      ? colors.surfaceContainerHigh
+                                      : '#ffffff',
+                                    borderWidth: cat.isPassed ? 0 : isDark ? 0 : 1,
                                     borderColor: isDark ? 'transparent' : colors.cardBorder,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 2,
+                                    paddingHorizontal: cat.isPassed ? 0 : 6,
+                                    paddingVertical: cat.isPassed ? 0 : 2,
                                     borderRadius: 6,
                                     alignSelf: 'flex-start',
                                     shadowColor: '#000',
                                     shadowOffset: { width: 0, height: 1 },
-                                    shadowOpacity: isDark ? 0 : 0.08,
+                                    shadowOpacity: isDark || cat.isPassed ? 0 : 0.08,
                                     shadowRadius: 2,
-                                    elevation: isDark ? 0 : 1,
+                                    elevation: isDark || cat.isPassed ? 0 : 1,
                                   }}
                                 >
                                   <MaterialIcons
                                     name="near-me"
                                     size={10}
-                                    color={isDark ? colors.tertiary : colors.primary}
+                                    color={cat.isPassed ? colors.outline : isDark ? colors.tertiary : colors.primary}
                                     style={{ marginRight: 3 }}
                                   />
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: colors.onSurface }}>{txt}</Text>
+                                  <Text style={{ fontSize: 10, fontWeight: '700', color: cat.isPassed ? colors.outline : colors.onSurface }}>{txt}</Text>
                                 </View>
                               );
                             }

@@ -311,8 +311,9 @@ export default function ProfileScreen() {
 
 
   useEffect(() => {
+    refreshUser();
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, refreshUser]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -758,15 +759,15 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            {(user?.location?.placeName || user?.location?.name) && (
-              <View style={styles.locationBadge}>
+            {(user?.location?.placeName || user?.location?.name || (user?.location as any)?.place_name) && (
+              <View style={[styles.locationBadge, isDark && { backgroundColor: colors.surfaceContainer, borderColor: colors.cardBorder }]}>
                 <MaterialIcons
                   name={Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? 'lock' : 'place'}
                   size={14}
-                  color={Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? colors.outline : colors.primaryContainer}
+                  color={Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? (isDark ? colors.outline : colors.outline) : colors.primaryContainer}
                 />
-                <Text style={styles.trustBadgeText} numberOfLines={1}>
-                  {user?.location?.placeName || user?.location?.name}
+                <Text style={[styles.trustBadgeText, isDark && { color: colors.onSurface }]} numberOfLines={1}>
+                  {user?.location?.placeName || user?.location?.name || (user?.location as any)?.place_name}
                   {Boolean(user?.isLocationPrivate ?? user?.is_location_private) ? ' (Private)' : ''}
                 </Text>
               </View>

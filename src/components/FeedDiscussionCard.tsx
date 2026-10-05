@@ -8,7 +8,7 @@
  *
  * Feature: Top line contains community name on left, and category pill on right edge.
  */
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ViewStyle, Share } from 'react-native';
 import { useSafeRouter } from '../hooks/useSafeRouter';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -157,6 +157,28 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
   const rawMedia = post.mediaUrl || post.media_url || (Array.isArray(post.mediaUrls) ? post.mediaUrls[0] : null);
   const postMedia = extractDirectImageUrl(rawMedia);
 
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!postMedia) {
+      setMediaAspectRatio(null);
+      return;
+    }
+    let isMounted = true;
+    Image.getSize(
+      postMedia,
+      (w, h) => {
+        if (isMounted && w > 0 && h > 0) {
+          setMediaAspectRatio(w / h);
+        }
+      },
+      () => {}
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [postMedia]);
+
   const handlePostPress = () => {
     if (onPressPost) {
       onPressPost(post.id);
@@ -253,7 +275,12 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
       <TouchableOpacity onPress={handlePostPress} activeOpacity={0.85}>
         {post.title ? <Text style={styles.postTitle}>{post.title}</Text> : null}
         {postMedia ? (
-          <View style={styles.postMediaContainer}>
+          <View
+            style={[
+              styles.postMediaContainer,
+              mediaAspectRatio ? { aspectRatio: mediaAspectRatio } : { height: 200 },
+            ]}
+          >
             <Image
               source={{ uri: postMedia }}
               style={styles.postMediaImage}
@@ -450,8 +477,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       marginBottom: 4,
     },
     postMediaContainer: {
-      height: 180,
       width: '100%',
+      maxHeight: 480,
+      minHeight: 140,
       borderRadius: BorderRadius.lg,
       overflow: 'hidden',
       backgroundColor: colors.surfaceContainerHigh,

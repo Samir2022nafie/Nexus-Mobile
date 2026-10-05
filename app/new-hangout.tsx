@@ -33,6 +33,7 @@ import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
+import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -154,6 +155,7 @@ export default function NewHangoutScreen() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditing);
   const [generalError, setGeneralError] = useState('');
+  const [cropModalVisible, setCropModalVisible] = useState(false);
 
   useEffect(() => {
     if (!params.hangoutId) return;
@@ -518,6 +520,14 @@ export default function NewHangoutScreen() {
               >
                 <MaterialIcons name="close" size={16} color="#ffffff" />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.coverCropBadgeBtn}
+                onPress={() => setCropModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="crop" size={14} color="#ffffff" />
+                <Text style={styles.coverCropBadgeText}>Crop / Adjust</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           <View style={styles.inputBox}>
@@ -542,6 +552,18 @@ export default function NewHangoutScreen() {
             />
             <MaterialIcons name="image" size={20} color={colors.primaryContainer} />
           </View>
+          {form.coverImageUrl.trim() ? (
+            <TouchableOpacity
+              style={styles.cropCoverTriggerBtn}
+              onPress={() => setCropModalVisible(true)}
+              activeOpacity={0.75}
+            >
+              <MaterialIcons name="crop" size={15} color={colors.primaryContainer} />
+              <Text style={[styles.cropCoverTriggerText, { color: colors.primaryContainer }]}>
+                Crop / Adjust Cover
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Join Type Selector */}
@@ -736,6 +758,20 @@ export default function NewHangoutScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* 16:9 Hangout Cover Cropper Modal */}
+      <ImageCropModal
+        visible={cropModalVisible}
+        imageUri={form.coverImageUrl.trim() || null}
+        cropShape="wide-rectangle"
+        aspectRatio={16 / 9}
+        title="Crop Hangout Cover"
+        onConfirm={(croppedUri) => {
+          updateField('coverImageUrl', croppedUri);
+          setCropModalVisible(false);
+        }}
+        onCancel={() => setCropModalVisible(false)}
+      />
     </View>
   );
 }
@@ -926,6 +962,38 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   },
   catChipTextActive: {
     color: colors.onPrimaryContainer,
+    fontWeight: '700',
+  },
+  coverCropBadgeBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+  },
+  coverCropBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cropCoverTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(254, 186, 72, 0.12)',
+    alignSelf: 'flex-start',
+  },
+  cropCoverTriggerText: {
+    fontSize: 12,
     fontWeight: '700',
   },
 });

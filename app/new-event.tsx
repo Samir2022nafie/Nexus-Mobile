@@ -40,6 +40,7 @@ import { ApiRequestError } from '../src/services/api';
 import { ManagedCommunity } from '../src/types';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
+import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -153,6 +154,8 @@ export default function NewEventScreen() {
   const [communities, setCommunities] = useState<ManagedCommunity[]>([]);
   const [selectedSlug, setSelectedSlug] = useState(incomingSlug);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [cropCandidateUri, setCropCandidateUri] = useState<string | null>(null);
   const [form, setForm] = useState({
     title: '',
     location: '',
@@ -278,13 +281,13 @@ export default function NewEventScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
+        allowsEditing: false,
+        quality: 0.9,
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        setCoverImage(result.assets[0].uri);
+        setCropCandidateUri(result.assets[0].uri);
+        setCropModalVisible(true);
       }
     } catch {
       Alert.alert('Error', 'Could not pick image.');
@@ -575,11 +578,14 @@ export default function NewEventScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.coverChangeBtn}
-                onPress={handlePickCoverImage}
+                onPress={() => {
+                  setCropCandidateUri(coverImage);
+                  setCropModalVisible(true);
+                }}
                 activeOpacity={0.8}
               >
-                <MaterialIcons name="photo-camera" size={14} color="#ffffff" />
-                <Text style={styles.coverChangeText}>Change</Text>
+                <MaterialIcons name="crop" size={14} color="#ffffff" />
+                <Text style={styles.coverChangeText}>Crop / Adjust</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -623,6 +629,21 @@ export default function NewEventScreen() {
               <MaterialIcons name="link" size={20} color={colors.tertiary} />
             )}
           </View>
+          {coverImage ? (
+            <TouchableOpacity
+              style={styles.cropCoverTriggerBtn}
+              onPress={() => {
+                setCropCandidateUri(coverImage);
+                setCropModalVisible(true);
+              }}
+              activeOpacity={0.75}
+            >
+              <MaterialIcons name="crop" size={15} color={colors.primaryContainer} />
+              <Text style={[styles.cropCoverTriggerText, { color: colors.primaryContainer }]}>
+                Crop / Adjust Cover
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Title */}
@@ -829,6 +850,24 @@ export default function NewEventScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* 16:9 Cover Cropper Modal */}
+      <ImageCropModal
+        visible={cropModalVisible}
+        imageUri={cropCandidateUri || coverImage}
+        cropShape="wide-rectangle"
+        aspectRatio={16 / 9}
+        title="Crop Event Cover"
+        onConfirm={(croppedUri) => {
+          setCoverImage(croppedUri);
+          setCropCandidateUri(null);
+          setCropModalVisible(false);
+        }}
+        onCancel={() => {
+          setCropCandidateUri(null);
+          setCropModalVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -1039,6 +1078,21 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  cropCoverTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(254, 186, 72, 0.12)',
+    alignSelf: 'flex-start',
+  },
+  cropCoverTriggerText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
 

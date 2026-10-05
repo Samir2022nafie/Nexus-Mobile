@@ -1300,11 +1300,9 @@ export default function ExploreMapScreen() {
 
           // Style load: Snapchat Dark Globe Aesthetics + Selective Labels
           map.on('style.load', function() {
-            var z = map.getZoom();
-            var targetProj = z >= 7.0 ? 'mercator' : 'globe';
-            currentProjection = targetProj;
+            currentProjection = 'globe';
             try {
-              map.setProjection({ type: targetProj });
+              map.setProjection({ type: 'globe' });
             } catch(e) {}
 
             // 1. Generate & register the Snapchat dark navy sinusoidal wave pattern for water
@@ -1960,7 +1958,7 @@ export default function ExploreMapScreen() {
                 var lng = item.location.longitude;
                 if (Math.abs(lat) < 0.001 && Math.abs(lng) < 0.001) return;
                 var locName = (item.location.name || item.location.placeName || '').toLowerCase().trim();
-                if ((locName === 'online' || locName === 'virtual') && Math.abs(lat - 40.7128) < 0.5 && Math.abs(lng - (-74.0060)) < 0.5) return;
+                if (locName === 'online' || locName === 'virtual') return;
 
                 var wrapped = Object.assign({}, item, { entityType: type });
                 var isTargetItem = window.pendingFocus && (

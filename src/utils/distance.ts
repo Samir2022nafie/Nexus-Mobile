@@ -104,8 +104,7 @@ export function hasActualMapLocation(item: any): boolean {
     item.location?.place_id === 'plain_text' ||
     item.location?.placeId === 'plain_text' ||
     item.place_id === 'plain_text' ||
-    item.placeId === 'plain_text' ||
-    (Math.abs(lat - 40.7128) < 0.5 && Math.abs(lng - (-74.0060)) < 0.5)
+    item.placeId === 'plain_text'
   ) {
     return false;
   }

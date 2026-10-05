@@ -29,6 +29,7 @@ import { usersService } from '../src/services/users';
 import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
+import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
 export default function EditProfileScreen() {
   const router = useSafeRouter();
@@ -49,6 +50,7 @@ export default function EditProfileScreen() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cropModalVisible, setCropModalVisible] = useState(false);
 
   const handleSave = async () => {
     setLoading(true);
@@ -116,7 +118,15 @@ export default function EditProfileScreen() {
       >
         {/* Profile Avatar Section */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarWrapper}>
+          <TouchableOpacity
+            style={styles.avatarWrapper}
+            onPress={() => {
+              if (form.profilePictureUrl || user?.profile_picture_url) {
+                setCropModalVisible(true);
+              }
+            }}
+            activeOpacity={0.8}
+          >
             {(form.profilePictureUrl || user?.profile_picture_url) ? (
               <Image
                 source={{
@@ -129,7 +139,12 @@ export default function EditProfileScreen() {
                 <MaterialIcons name="person" size={48} color={colors.onSurfaceVariant} />
               </View>
             )}
-          </View>
+            {(form.profilePictureUrl || user?.profile_picture_url) ? (
+              <View style={styles.cameraBadge}>
+                <MaterialIcons name="crop" size={14} color="#18130e" />
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
 
         {error ? (
@@ -219,6 +234,18 @@ export default function EditProfileScreen() {
                 <MaterialIcons name="link" size={18} color={colors.tertiary} />
               )}
             </View>
+            {(form.profilePictureUrl || user?.profile_picture_url) ? (
+              <TouchableOpacity
+                style={styles.cropTriggerBtn}
+                onPress={() => setCropModalVisible(true)}
+                activeOpacity={0.75}
+              >
+                <MaterialIcons name="crop" size={16} color={colors.primaryContainer} />
+                <Text style={[styles.cropTriggerText, { color: colors.primaryContainer }]}>
+                  Crop / Adjust Avatar
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {/* Location & Privacy */}
@@ -248,6 +275,20 @@ export default function EditProfileScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Profile Picture Circular Cropper Modal */}
+      <ImageCropModal
+        visible={cropModalVisible}
+        imageUri={form.profilePictureUrl || user?.profile_picture_url || null}
+        cropShape="circle"
+        aspectRatio={1.0}
+        title="Crop Profile Picture"
+        onConfirm={(croppedUri) => {
+          setForm((p) => ({ ...p, profilePictureUrl: croppedUri }));
+          setCropModalVisible(false);
+        }}
+        onCancel={() => setCropModalVisible(false)}
+      />
     </View>
   );
 }
@@ -340,6 +381,34 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.sm,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#feba48',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  cropTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(254, 186, 72, 0.12)',
+  },
+  cropTriggerText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   avatarHint: {
     ...Typography.captionMd,

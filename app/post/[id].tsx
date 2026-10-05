@@ -312,6 +312,28 @@ export default function ThreadDetailScreen() {
 
   const postMedia = extractDirectImageUrl(post.mediaUrl || post.media_url);
 
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!postMedia) {
+      setMediaAspectRatio(null);
+      return;
+    }
+    let isMounted = true;
+    Image.getSize(
+      postMedia,
+      (w, h) => {
+        if (isMounted && w > 0 && h > 0) {
+          setMediaAspectRatio(w / h);
+        }
+      },
+      () => {}
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [postMedia]);
+
   const communityPfp =
     post.community?.profile_picture_url ||
     post.community?.profilePictureUrl ||
@@ -424,7 +446,12 @@ export default function ThreadDetailScreen() {
 
             {/* Post Media Image (Below Title, Above Description) */}
             {postMedia ? (
-              <View style={styles.postMediaContainer}>
+              <View
+                style={[
+                  styles.postMediaContainer,
+                  mediaAspectRatio ? { aspectRatio: mediaAspectRatio } : { height: 240 },
+                ]}
+              >
                 <Image
                   source={{ uri: postMedia }}
                   style={styles.postMediaImage}
@@ -912,8 +939,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     lineHeight: 24,
   },
   postMediaContainer: {
-    height: 240,
     width: '100%',
+    maxHeight: 480,
+    minHeight: 160,
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
     backgroundColor: colors.surfaceContainerHigh,

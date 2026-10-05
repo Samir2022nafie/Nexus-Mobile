@@ -29,6 +29,7 @@ import { Community } from '../src/types';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { setCommunitySelectionListener } from '../src/utils/communitySelectionStore';
+import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
 export default function NewPostScreen() {
   const router = useRouter();
@@ -58,6 +59,9 @@ export default function NewPostScreen() {
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cropModalVisible, setCropModalVisible] = useState(false);
+  const [cropTargetUri, setCropTargetUri] = useState<string | null>(null);
+  const [cropTargetIndex, setCropTargetIndex] = useState<number | null>(null);
 
   // Listen for community selection from the dedicated screen
   useEffect(() => {
@@ -135,13 +139,14 @@ export default function NewPostScreen() {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [16, 9],
-        quality: 0.8,
+        allowsEditing: false,
+        quality: 0.9,
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        setImages((prev) => [...prev, result.assets[0].uri]);
+        setCropTargetUri(result.assets[0].uri);
+        setCropTargetIndex(null);
+        setCropModalVisible(true);
       }
     } catch (err) {
       Alert.alert('Error', 'Could not pick image.');
@@ -368,6 +373,18 @@ export default function NewPostScreen() {
           <View key={uri} style={styles.imagePreviewContainer}>
             <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
             <TouchableOpacity
+              style={styles.cropImageBtn}
+              onPress={() => {
+                setCropTargetUri(uri);
+                setCropTargetIndex(idx);
+                setCropModalVisible(true);
+              }}
+              accessibilityLabel="Crop image"
+            >
+              <MaterialIcons name="crop" size={14} color="#ffffff" />
+              <Text style={styles.cropImageBtnText}>Crop / Adjust</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.removeImageBtn}
               onPress={() => {
                 handleRemoveImage(idx);
@@ -422,6 +439,30 @@ export default function NewPostScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Post Image Cropper Modal */}
+      <ImageCropModal
+        visible={cropModalVisible}
+        imageUri={cropTargetUri}
+        cropShape="rectangle"
+        aspectRatio={16 / 9}
+        title="Crop Post Image"
+        onConfirm={(croppedUri) => {
+          if (cropTargetIndex !== null) {
+            setImages((prev) => prev.map((img, i) => (i === cropTargetIndex ? croppedUri : img)));
+          } else {
+            setImages((prev) => [...prev, croppedUri]);
+          }
+          setCropTargetUri(null);
+          setCropTargetIndex(null);
+          setCropModalVisible(false);
+        }}
+        onCancel={() => {
+          setCropTargetUri(null);
+          setCropTargetIndex(null);
+          setCropModalVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -556,6 +597,23 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       ...Shadows.sm,
+    },
+    cropImageBtn: {
+      position: 'absolute',
+      bottom: Spacing.sm,
+      right: Spacing.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: BorderRadius.full,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    },
+    cropImageBtnText: {
+      color: '#ffffff',
+      fontSize: 12,
+      fontWeight: '600',
     },
     tagsSection: {
       gap: Spacing.xs,

@@ -25,6 +25,7 @@ import { ApiRequestError } from '../src/services/api';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
 import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
+import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
 export default function NewCommunityScreen() {
   const router = useRouter();
@@ -51,6 +52,13 @@ export default function NewCommunityScreen() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditing);
   const [generalError, setGeneralError] = useState('');
+  const [cropperState, setCropperState] = useState<{
+    visible: boolean;
+    field: 'profilePictureUrl' | 'bannerUrl';
+    uri: string;
+    shape: 'circle' | 'wide-rectangle';
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isEditing || !params.slug) return;
@@ -336,7 +344,27 @@ export default function NewCommunityScreen() {
           {form.profilePictureUrl.trim().startsWith('http') ? (
             <View style={styles.avatarPreviewBox}>
               <Image source={{ uri: form.profilePictureUrl.trim() }} style={styles.avatarPreviewImg} resizeMode="cover" />
-              <Text style={styles.previewSuccessText}>Avatar Preview</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.previewSuccessText}>Avatar Preview</Text>
+                <TouchableOpacity
+                  style={styles.previewCropBtn}
+                  onPress={() =>
+                    setCropperState({
+                      visible: true,
+                      field: 'profilePictureUrl',
+                      uri: form.profilePictureUrl.trim(),
+                      shape: 'circle',
+                      title: 'Crop Community Avatar',
+                    })
+                  }
+                  activeOpacity={0.75}
+                >
+                  <MaterialIcons name="crop" size={14} color={colors.primaryContainer} />
+                  <Text style={[styles.previewCropBtnText, { color: colors.primaryContainer }]}>
+                    Crop / Adjust Avatar
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : null}
         </View>
@@ -369,7 +397,27 @@ export default function NewCommunityScreen() {
           {form.bannerUrl.trim().startsWith('http') ? (
             <View style={styles.bannerPreviewBox}>
               <Image source={{ uri: form.bannerUrl.trim() }} style={styles.bannerPreviewImg} resizeMode="cover" />
-              <Text style={styles.previewSuccessText}>Banner Preview</Text>
+              <View style={styles.bannerActionsRow}>
+                <Text style={styles.previewSuccessText}>Banner Preview</Text>
+                <TouchableOpacity
+                  style={styles.previewCropBtn}
+                  onPress={() =>
+                    setCropperState({
+                      visible: true,
+                      field: 'bannerUrl',
+                      uri: form.bannerUrl.trim(),
+                      shape: 'wide-rectangle',
+                      title: 'Crop Community Banner',
+                    })
+                  }
+                  activeOpacity={0.75}
+                >
+                  <MaterialIcons name="crop" size={14} color={colors.primaryContainer} />
+                  <Text style={[styles.previewCropBtnText, { color: colors.primaryContainer }]}>
+                    Crop / Adjust Banner
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : null}
         </View>
@@ -399,6 +447,22 @@ export default function NewCommunityScreen() {
           style={{ marginTop: Spacing.md }}
         />
       </ScrollView>
+
+      {/* Image Crop Modal for Avatar & Banner */}
+      {cropperState && (
+        <ImageCropModal
+          visible={cropperState.visible}
+          imageUri={cropperState.uri}
+          cropShape={cropperState.shape}
+          aspectRatio={cropperState.shape === 'circle' ? 1.0 : 16 / 9}
+          title={cropperState.title}
+          onConfirm={(croppedUri) => {
+            updateField(cropperState.field, croppedUri);
+            setCropperState(null);
+          }}
+          onCancel={() => setCropperState(null)}
+        />
+      )}
     </View>
   );
 }
@@ -576,5 +640,27 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     color: colors.primaryContainer,
     fontWeight: '600',
     marginTop: 4,
+  },
+  previewCropBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(254, 186, 72, 0.12)',
+    alignSelf: 'flex-start',
+  },
+  previewCropBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  bannerActionsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
   },
 });

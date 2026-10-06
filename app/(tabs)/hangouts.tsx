@@ -764,16 +764,6 @@ export default function ExploreMapScreen() {
             z-index: 1;
           }
 
-          /* Hide MapLibre Attribution & Copyright Controls */
-          .maplibregl-ctrl-attrib,
-          .maplibregl-ctrl-bottom-right,
-          .maplibregl-ctrl {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-          }
-
           /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
@@ -1238,32 +1228,18 @@ export default function ExploreMapScreen() {
             pitch: ${initialZoom < 5.0 ? 0 : initialPitch},
             maxPitch: 60,
             bearing: ${initialBearing},
-            projection: { type: ${initialZoom < 7.0 ? "'globe'" : "'mercator'"} },
+            projection: { type: 'globe' },
             antialias: false,
             fadeDuration: 0,
             trackResize: false,
-            attributionControl: false,
             cooperativeGestures: false,
             renderWorldCopies: true
           });
 
           // Decremental smooth zoom scale calculation (throttled for 60fps performance)
-          var currentProjection = ${initialZoom < 7.0 ? "'globe'" : "'mercator'"};
-          function updateProjectionForZoom() {
-            var z = map.getZoom();
-            var targetProj = z < 7.0 ? 'globe' : 'mercator';
-            if (currentProjection !== targetProj) {
-              currentProjection = targetProj;
-              try {
-                map.setProjection({ type: targetProj });
-              } catch(e) {}
-            }
-          }
-
           var lastZoomScale = -1;
           var zoomScaleRaf = null;
           function updateZoomScale() {
-            updateProjectionForZoom();
             var z = map.getZoom();
             var minZ = 1.45;
             var maxZ = 13.0;
@@ -1333,31 +1309,54 @@ export default function ExploreMapScreen() {
 
           // Style load: Snapchat Dark Globe Aesthetics + Selective Labels
           map.on('style.load', function() {
-            var initialTargetProj = map.getZoom() < 7.0 ? 'globe' : 'mercator';
-            currentProjection = initialTargetProj;
+            currentProjection = 'globe';
             try {
-              map.setProjection({ type: initialTargetProj });
+              map.setProjection({ type: 'globe' });
             } catch(e) {}
 
-            // 1. Snapchat Continent & Landscape Dark Mode Styling
-            // Keep natural_earth visible for low zooms (< 7) on 3D globe, styled to dark aesthetic
+            // 1. Generate & register the Snapchat dark navy sinusoidal wave pattern for water
+            function createOceanWavePattern() {
+              var c = document.createElement('canvas');
+              c.width = 64;
+              c.height = 32;
+              var ctx = c.getContext('2d');
+              // Obsidian black ocean base
+              ctx.fillStyle = '#070b11';
+              ctx.fillRect(0, 0, 64, 32);
+
+              // Snapchat dark navy sinusoidal wave lines
+              ctx.strokeStyle = '#18283e';
+              ctx.lineWidth = 2.2;
+              ctx.lineCap = 'round';
+              ctx.lineJoin = 'round';
+
+              [8, 24].forEach(function(baseY) {
+                ctx.beginPath();
+                for (var x = 0; x <= 64; x++) {
+                  var y = baseY + Math.sin((x / 64) * Math.PI * 2) * 4.2;
+                  if (x === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+              });
+              return ctx.getImageData(0, 0, 64, 32);
+            }
+
+            try {
+              if (!map.hasImage('snap-ocean-waves')) {
+                map.addImage('snap-ocean-waves', createOceanWavePattern());
+              }
+            } catch(e) {}
+
+            // 2. Snapchat Continent & Landscape Dark Mode Styling
+            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
             try {
               map.getStyle().layers.forEach(function(l) {
-                if (l.id.indexOf('hillshade') !== -1 || (l.type === 'raster' && l.id.indexOf('natural_earth') === -1)) {
+                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
                   try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
                 }
               });
             } catch(e) {}
-
-            if (map.getLayer('natural_earth')) {
-              try {
-                map.setLayoutProperty('natural_earth', 'visibility', 'visible');
-                map.setPaintProperty('natural_earth', 'raster-opacity', 0.85);
-                map.setPaintProperty('natural_earth', 'raster-saturation', -0.6);
-                map.setPaintProperty('natural_earth', 'raster-brightness-max', 0.65);
-                map.setPaintProperty('natural_earth', 'raster-contrast', 0.25);
-              } catch(e) {}
-            }
 
             // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
             [
@@ -1392,9 +1391,10 @@ export default function ExploreMapScreen() {
             });
             if (map.getLayer('water')) {
               try {
-                map.setPaintProperty('water', 'fill-color', '#070b11');
-                map.setPaintProperty('water', 'fill-opacity', 0.95);
-              } catch(e) {}
+                map.setPaintProperty('water', 'fill-pattern', 'snap-ocean-waves');
+              } catch(e) {
+                try { map.setPaintProperty('water', 'fill-color', '#070b11'); } catch(e2) {}
+              }
             }
 
             // Waterways
@@ -2466,9 +2466,6 @@ export default function ExploreMapScreen() {
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
             }
-          });
-          window.addEventListener('resize', function() {
-            if (map) map.resize();
           });
         </script>
       </body>

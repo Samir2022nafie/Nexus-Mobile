@@ -286,6 +286,63 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         const touches = evt.nativeEvent.touches;
         if (!touches || touches.length === 0) return;
 
+        // Dynamic 2-finger detection: anytime 2 fingers are touching, transition to pinch
+        if (touches.length >= 2) {
+          if (!isPinching.current || pinchStartDist.current <= 0) {
+            isPinching.current = true;
+            gestureMode.current = 'pinch';
+            pinchStartDist.current = Math.hypot(
+              touches[1].pageX - touches[0].pageX,
+              touches[1].pageY - touches[0].pageY
+            );
+            pinchStartZoom.current = zoomRef.current;
+            pinchStartCenter.current = {
+              x: (touches[0].pageX + touches[1].pageX) / 2,
+              y: (touches[0].pageY + touches[1].pageY) / 2,
+            };
+            pinchStartPan.current = { ...panRef.current };
+            return;
+          }
+
+          const currentDist = Math.hypot(
+            touches[1].pageX - touches[0].pageX,
+            touches[1].pageY - touches[0].pageY
+          );
+
+          if (pinchStartDist.current > 0) {
+            const scaleRatio = currentDist / pinchStartDist.current;
+            const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom.current * scaleRatio));
+
+            const midX = (touches[0].pageX + touches[1].pageX) / 2;
+            const midY = (touches[0].pageY + touches[1].pageY) / 2;
+            const deltaMidX = midX - pinchStartCenter.current.x;
+            const deltaMidY = midY - pinchStartCenter.current.y;
+
+            const rawPanX = pinchStartPan.current.x + deltaMidX;
+            const rawPanY = pinchStartPan.current.y + deltaMidY;
+
+            const clamped = clampPan(rawPanX, rawPanY, targetZoom, cropHeightRef.current);
+
+            zoomRef.current = targetZoom;
+            panRef.current = clamped;
+
+            zoomAnim.setValue(targetZoom);
+            panXAnim.setValue(clamped.x);
+            panYAnim.setValue(clamped.y);
+            setDisplayZoom(Number(targetZoom.toFixed(1)));
+          }
+          return;
+        }
+
+        // Single finger: if was previously pinching and lifted one finger, transition back to pan seamlessly
+        if (isPinching.current) {
+          isPinching.current = false;
+          gestureMode.current = 'pan';
+          dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
+          dragStartPan.current = { ...panRef.current };
+          return;
+        }
+
         // Mode: Resize Top Handle
         if (gestureMode.current === 'resize-top') {
           const deltaY = touches[0].pageY - resizeStartTouchY.current;
@@ -320,39 +377,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           return;
         }
 
-        // Mode: Two-Finger Pinch-to-Zoom
-        if (gestureMode.current === 'pinch' && touches.length >= 2) {
-          const currentDist = Math.hypot(
-            touches[1].pageX - touches[0].pageX,
-            touches[1].pageY - touches[0].pageY
-          );
-
-          if (pinchStartDist.current > 0) {
-            const scaleRatio = currentDist / pinchStartDist.current;
-            const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom.current * scaleRatio));
-
-            const midX = (touches[0].pageX + touches[1].pageX) / 2;
-            const midY = (touches[0].pageY + touches[1].pageY) / 2;
-            const deltaMidX = midX - pinchStartCenter.current.x;
-            const deltaMidY = midY - pinchStartCenter.current.y;
-
-            const rawPanX = pinchStartPan.current.x + deltaMidX;
-            const rawPanY = pinchStartPan.current.y + deltaMidY;
-
-            const clamped = clampPan(rawPanX, rawPanY, targetZoom, cropHeightRef.current);
-
-            zoomRef.current = targetZoom;
-            panRef.current = clamped;
-
-            zoomAnim.setValue(targetZoom);
-            panXAnim.setValue(clamped.x);
-            panYAnim.setValue(clamped.y);
-          }
-          return;
-        }
-
         // Mode: Single-Finger Drag
-        if (gestureMode.current === 'pan' && touches.length === 1) {
+        if (gestureMode.current === 'pan') {
           const deltaX = touches[0].pageX - dragStartTouch.current.x;
           const deltaY = touches[0].pageY - dragStartTouch.current.y;
 
@@ -413,8 +439,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
     // 1. If the image is ALREADY a remote/HTTP URL:
     // Keep it as an HTTP URL with crop parameters.
-    // DO NOT convert it into a local file:/// URI, which would trigger failed storage uploads,
-    // "WARN Response.blob()" warnings, and backend "Invalid url" validation errors.
     if (cleanImageUri.startsWith('http://') || cleanImageUri.startsWith('https://')) {
       const encodedCropUrl = encodeCropUrl(
         cleanImageUri,
@@ -429,7 +453,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     }
 
     // 2. If it's a local file (file:/// from camera roll / gallery):
-    // Physically crop the local file via expo-image-manipulator.
+    // Physically crop the local file via expo-image-manipulator and export base64 data URI
     if (origSize && origSize.width > 0 && origSize.height > 0) {
       try {
         const currentScale = baseScale * zoomRef.current;
@@ -455,9 +479,17 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 height: cropH,
               },
             },
+            ...(cropW > 1080 ? [{ resize: { width: 1080 } }] : []),
           ],
-          { compress: 0.92, format: SaveFormat.JPEG }
+          { compress: 0.85, format: SaveFormat.JPEG, base64: true }
         );
+
+        if (manipResult && manipResult.base64) {
+          const dataUri = `data:image/jpeg;base64,${manipResult.base64}`;
+          setIsApplying(false);
+          onConfirm(dataUri);
+          return;
+        }
 
         if (manipResult && manipResult.uri) {
           setIsApplying(false);

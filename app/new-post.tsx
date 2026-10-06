@@ -31,6 +31,7 @@ import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
 import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl, encodeCropUrl } from '../src/utils/imageUrl';
 import { setCommunitySelectionListener } from '../src/utils/communitySelectionStore';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 export default function NewPostScreen() {
   const router = useRouter();
@@ -191,29 +192,39 @@ export default function NewPostScreen() {
       let mediaUrl: string | null | undefined = undefined;
       const rawUri = (images.length > 0 ? images[0] : undefined) || imageUrlInput.trim();
       if (rawUri) {
-        if (rawUri.startsWith('http')) {
+        if (rawUri.startsWith('http') || rawUri.startsWith('data:image/')) {
           mediaUrl = rawUri;
         } else {
           const effectiveUri = extractDirectImageUrl(rawUri);
           const cropData = parseCropFromUrl(rawUri);
           try {
-            const filename = effectiveUri.split('/').pop() || 'post-image.jpg';
-            const presigned = await uploadService.getPresignedUrl(filename, 'image/jpeg');
-            await uploadService.uploadFile(presigned.uploadUrl, effectiveUri, 'image/jpeg');
-            if (cropData.zoom > 1 || cropData.panX !== 0 || cropData.panY !== 0 || cropData.aspectRatio) {
-              mediaUrl = encodeCropUrl(presigned.publicUrl, cropData.zoom, cropData.panX, cropData.panY, cropData.aspectRatio);
-            } else {
-              mediaUrl = presigned.publicUrl;
+            // First try converting local file to optimized base64 data URI
+            const manip = await manipulateAsync(
+              effectiveUri,
+              [],
+              { compress: 0.85, format: SaveFormat.JPEG, base64: true }
+            );
+            if (manip && manip.base64) {
+              const dataUri = `data:image/jpeg;base64,${manip.base64}`;
+              if (cropData.zoom > 1 || cropData.panX !== 0 || cropData.panY !== 0 || cropData.aspectRatio) {
+                mediaUrl = encodeCropUrl(dataUri, cropData.zoom, cropData.panX, cropData.panY, cropData.aspectRatio);
+              } else {
+                mediaUrl = dataUri;
+              }
             }
-          } catch (uploadErr) {
-            console.warn('Image upload failed:', uploadErr);
-            if (rawUri.startsWith('http')) {
-              mediaUrl = rawUri;
-            } else {
-              Alert.alert(
-                'Upload Failed',
-                'Unable to upload image to storage server. Please verify your connection or enter an image link.'
-              );
+          } catch {
+            // If base64 conversion fails, attempt presigned storage upload
+            try {
+              const filename = effectiveUri.split('/').pop() || 'post-image.jpg';
+              const presigned = await uploadService.getPresignedUrl(filename, 'image/jpeg');
+              await uploadService.uploadFile(presigned.uploadUrl, effectiveUri, 'image/jpeg');
+              if (cropData.zoom > 1 || cropData.panX !== 0 || cropData.panY !== 0 || cropData.aspectRatio) {
+                mediaUrl = encodeCropUrl(presigned.publicUrl, cropData.zoom, cropData.panX, cropData.panY, cropData.aspectRatio);
+              } else {
+                mediaUrl = presigned.publicUrl;
+              }
+            } catch (uploadErr) {
+              Alert.alert('Upload Failed', 'Unable to process image. Please try another image or paste an image link.');
               setSubmitting(false);
               return;
             }

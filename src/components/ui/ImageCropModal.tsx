@@ -1,13 +1,14 @@
 /**
  * ImageCropModal — Universal image cropping modal for Mobile.
  * Supports:
- * - 'circle': 1:1 circular crop for user & community avatars/PFPs
+ * - 'circle': 1:1 circular crop for user & community avatars/PFPs (large 360px viewport)
  * - 'wide-rectangle': 16:9 crop for community banners, event covers, hangout covers
- * - 'rectangle': Post images (enforced full container width, vertical height crop)
+ * - 'rectangle': Post images (expansive container width, height crop presets)
  * Features:
- * - GPU-accelerated two-finger pinch-to-zoom (1.0x to 3.0x limit)
- * - Single-finger panning strictly bounded so image fills container completely with zero edge gaps
- * - Dedicated zoom controls (-, +, Reset)
+ * - Multi-touch two-finger pinch-to-zoom (1.0x to 3.0x limit) working across the entire viewport
+ * - Single-finger dragging strictly clamped so image can NEVER detach from container borders
+ * - Expansive, prominent canvas sizing
+ * - Pure gesture zoom (no +/- buttons) with live zoom indicator & Reset action
  * - Full light & dark theme support using Nexus warm palette
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -29,7 +30,7 @@ import { Typography, BorderRadius, Shadows, ThemeColors } from '../../constants/
 import { useTheme } from '../../context/ThemeContext';
 import { parseCropFromUrl, encodeCropUrl, extractDirectImageUrl } from '../../utils/imageUrl';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const MIN_ZOOM = 1.0;
 const MAX_ZOOM = 3.0;
@@ -60,7 +61,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const [origSize, setOrigSize] = useState<{ width: number; height: number } | null>(null);
   const [loadingOrig, setLoadingOrig] = useState(true);
 
-  // Display zoom readout state (only updated on gesture end or button step to prevent render lag)
+  // Display zoom readout state
   const [displayZoom, setDisplayZoom] = useState<number>(1.0);
 
   // Animated values for GPU transforms
@@ -72,7 +73,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const zoomRef = useRef<number>(1.0);
   const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Pinch tracking refs
+  // Multi-touch pinch tracking refs
   const isPinching = useRef<boolean>(false);
   const pinchStartDist = useRef<number>(0);
   const pinchStartZoom = useRef<number>(1.0);
@@ -80,32 +81,36 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const pinchStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Single-touch drag tracking refs
+  const dragStartTouch = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Post crop aspect ratio choice
   const [aspectChoice, setAspectChoice] = useState<'original' | '16:9' | '4:3' | '1:1'>('original');
 
-  // Compute crop box dimensions
-  const maxBoxWidth = SCREEN_WIDTH - 32;
-  const boxWidth = cropShape === 'rectangle' ? maxBoxWidth : Math.min(320, maxBoxWidth);
+  // Large, generous canvas sizing
+  let boxWidth: number;
+  let boxHeight: number;
 
-  let boxHeight = 220;
   if (cropShape === 'circle') {
+    boxWidth = Math.min(360, SCREEN_WIDTH - 28);
     boxHeight = boxWidth;
   } else if (cropShape === 'wide-rectangle') {
+    boxWidth = SCREEN_WIDTH - 24;
     const targetRatio = aspectRatio ?? (16 / 9);
-    boxHeight = Math.min(480, Math.round(boxWidth / targetRatio));
+    boxHeight = Math.round(boxWidth / targetRatio);
   } else {
-    // cropShape === 'rectangle' (Post image)
+    // Post image (rectangle)
+    boxWidth = SCREEN_WIDTH - 24;
     const naturalRatio = origSize ? origSize.width / origSize.height : (16 / 9);
-    const naturalBoxHeight = Math.min(480, Math.max(140, Math.round(boxWidth / naturalRatio)));
+    const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.52), 480);
+    const naturalBoxHeight = Math.min(maxPostHeight, Math.max(180, Math.round(boxWidth / naturalRatio)));
 
     if (aspectChoice === '16:9') {
       boxHeight = Math.round(boxWidth / (16 / 9));
     } else if (aspectChoice === '4:3') {
       boxHeight = Math.round(boxWidth / (4 / 3));
     } else if (aspectChoice === '1:1') {
-      boxHeight = Math.min(boxWidth, 380);
+      boxHeight = boxWidth;
     } else {
       boxHeight = naturalBoxHeight;
     }
@@ -116,7 +121,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const baseW = origSize ? origSize.width * baseScale : boxWidth;
   const baseH = origSize ? origSize.height * baseScale : boxHeight;
 
-  // Clamping helper: guarantees image never detaches from container edges
+  // Strict clamping helper: guarantees image can NEVER detach from container borders
   const clampPan = (rawX: number, rawY: number, z: number) => {
     const scaledW = baseW * z;
     const scaledH = baseH * z;
@@ -192,14 +197,18 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     );
   }, [visible, imageUri]);
 
-  // Robust PanResponder supporting pinch-to-zoom and drag
+  // Viewport-wide PanResponder for intuitive two-finger pinch-to-zoom and single-finger dragging
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
+
       onPanResponderGrant: (evt) => {
         const touches = evt.nativeEvent.touches;
-        if (touches.length >= 2) {
+        if (touches && touches.length >= 2) {
           isPinching.current = true;
           pinchStartDist.current = Math.hypot(
             touches[1].pageX - touches[0].pageX,
@@ -211,19 +220,26 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             y: (touches[0].pageY + touches[1].pageY) / 2,
           };
           pinchStartPan.current = { ...panRef.current };
-        } else {
+        } else if (touches && touches.length === 1) {
           isPinching.current = false;
+          pinchStartDist.current = 0;
+          dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
           dragStartPan.current = { ...panRef.current };
         }
       },
-      onPanResponderMove: (evt, gestureState) => {
+
+      onPanResponderMove: (evt) => {
         const touches = evt.nativeEvent.touches;
-        if (touches && touches.length >= 2) {
+        if (!touches || touches.length === 0) return;
+
+        // Two-Finger Pinch-to-Zoom
+        if (touches.length >= 2) {
           const currentDist = Math.hypot(
             touches[1].pageX - touches[0].pageX,
             touches[1].pageY - touches[0].pageY
           );
 
+          // If second finger just touched down
           if (!isPinching.current || pinchStartDist.current <= 0) {
             isPinching.current = true;
             pinchStartDist.current = currentDist;
@@ -236,37 +252,43 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             return;
           }
 
-          const scaleRatio = currentDist / pinchStartDist.current;
-          const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom.current * scaleRatio));
+          if (pinchStartDist.current > 0) {
+            const scaleRatio = currentDist / pinchStartDist.current;
+            const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom.current * scaleRatio));
 
-          const currentCenter = {
-            x: (touches[0].pageX + touches[1].pageX) / 2,
-            y: (touches[0].pageY + touches[1].pageY) / 2,
-          };
-          const deltaX = currentCenter.x - pinchStartCenter.current.x;
-          const deltaY = currentCenter.y - pinchStartCenter.current.y;
+            // Midpoint shift while pinching
+            const midX = (touches[0].pageX + touches[1].pageX) / 2;
+            const midY = (touches[0].pageY + touches[1].pageY) / 2;
+            const deltaMidX = midX - pinchStartCenter.current.x;
+            const deltaMidY = midY - pinchStartCenter.current.y;
 
-          const rawPanX = pinchStartPan.current.x + deltaX;
-          const rawPanY = pinchStartPan.current.y + deltaY;
+            const rawPanX = pinchStartPan.current.x + deltaMidX;
+            const rawPanY = pinchStartPan.current.y + deltaMidY;
 
-          const clamped = clampPan(rawPanX, rawPanY, targetZoom);
+            const clamped = clampPan(rawPanX, rawPanY, targetZoom);
 
-          zoomRef.current = targetZoom;
-          panRef.current = clamped;
+            zoomRef.current = targetZoom;
+            panRef.current = clamped;
 
-          zoomAnim.setValue(targetZoom);
-          panXAnim.setValue(clamped.x);
-          panYAnim.setValue(clamped.y);
-        } else if (touches && touches.length === 1) {
+            zoomAnim.setValue(targetZoom);
+            panXAnim.setValue(clamped.x);
+            panYAnim.setValue(clamped.y);
+          }
+        } else if (touches.length === 1) {
+          // Transition back to single-finger drag
           if (isPinching.current) {
             isPinching.current = false;
             pinchStartDist.current = 0;
+            dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
             dragStartPan.current = { ...panRef.current };
             return;
           }
 
-          const rawPanX = dragStartPan.current.x + gestureState.dx;
-          const rawPanY = dragStartPan.current.y + gestureState.dy;
+          const deltaX = touches[0].pageX - dragStartTouch.current.x;
+          const deltaY = touches[0].pageY - dragStartTouch.current.y;
+
+          const rawPanX = dragStartPan.current.x + deltaX;
+          const rawPanY = dragStartPan.current.y + deltaY;
 
           const clamped = clampPan(rawPanX, rawPanY, zoomRef.current);
 
@@ -275,6 +297,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           panYAnim.setValue(clamped.y);
         }
       },
+
       onPanResponderRelease: () => {
         isPinching.current = false;
         pinchStartDist.current = 0;
@@ -287,20 +310,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       },
     })
   ).current;
-
-  const handleStepZoom = (delta: number) => {
-    const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number((zoomRef.current + delta).toFixed(1))));
-    zoomRef.current = nextZoom;
-    const clamped = clampPan(panRef.current.x, panRef.current.y, nextZoom);
-    panRef.current = clamped;
-    setDisplayZoom(nextZoom);
-
-    Animated.parallel([
-      Animated.timing(zoomAnim, { toValue: nextZoom, duration: 140, useNativeDriver: false }),
-      Animated.timing(panXAnim, { toValue: clamped.x, duration: 140, useNativeDriver: false }),
-      Animated.timing(panYAnim, { toValue: clamped.y, duration: 140, useNativeDriver: false }),
-    ]).start();
-  };
 
   const handleReset = () => {
     zoomRef.current = MIN_ZOOM;
@@ -323,6 +332,10 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
     const finalRatio =
       cropShape === 'rectangle' && aspectChoice !== 'original'
+        ? Number((boxWidth / boxHeight).toFixed(3))
+        : cropShape === 'circle'
+        ? 1.0
+        : cropShape === 'wide-rectangle'
         ? Number((boxWidth / boxHeight).toFixed(3))
         : undefined;
 
@@ -371,8 +384,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Viewport Area */}
-        <View style={styles.viewportContainer}>
+        {/* Viewport Area — Captures multi-touch gestures across the entire area */}
+        <View style={styles.viewportContainer} {...panResponder.panHandlers}>
           {loadingOrig ? (
             <ActivityIndicator size="large" color={colors.primary} />
           ) : (
@@ -385,22 +398,26 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                   borderRadius: cropShape === 'circle' ? boxWidth / 2 : 16,
                 },
               ]}
-              {...panResponder.panHandlers}
+              pointerEvents="box-none"
             >
-              {/* Scalable & Draggable Image */}
+              {/* Centered Scalable & Draggable Image */}
               <Animated.View
                 style={[
                   styles.imageWrapper,
                   {
                     width: baseW,
                     height: baseH,
+                    position: 'absolute',
+                    left: (boxWidth - baseW) / 2,
+                    top: (boxHeight - baseH) / 2,
                     transform: [
-                      { scale: zoomAnim },
                       { translateX: panXAnim },
                       { translateY: panYAnim },
+                      { scale: zoomAnim },
                     ],
                   },
                 ]}
+                pointerEvents="none"
               >
                 <Image
                   source={{ uri: extractDirectImageUrl(cleanImageUri) }}
@@ -453,31 +470,10 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         {/* Bottom Control Bar */}
         <View style={styles.bottomBar}>
           <View style={styles.bottomBarInner}>
-            {/* Zoom Stepper & Pill */}
-            <View style={styles.zoomControlsRow}>
-              <TouchableOpacity
-                onPress={() => handleStepZoom(-0.2)}
-                disabled={displayZoom <= MIN_ZOOM}
-                style={[styles.zoomStepBtn, displayZoom <= MIN_ZOOM && styles.zoomStepBtnDisabled]}
-                activeOpacity={0.7}
-                accessibilityLabel="Zoom out"
-              >
-                <MaterialIcons name="remove" size={18} color={colors.primary} />
-              </TouchableOpacity>
-
-              <View style={styles.zoomPill}>
-                <Text style={styles.zoomPillText}>{displayZoom.toFixed(1)}x</Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => handleStepZoom(0.2)}
-                disabled={displayZoom >= MAX_ZOOM}
-                style={[styles.zoomStepBtn, displayZoom >= MAX_ZOOM && styles.zoomStepBtnDisabled]}
-                activeOpacity={0.7}
-                accessibilityLabel="Zoom in"
-              >
-                <MaterialIcons name="add" size={18} color={colors.primary} />
-              </TouchableOpacity>
+            {/* Live Zoom Readout */}
+            <View style={styles.zoomPill}>
+              <MaterialIcons name="zoom-in" size={18} color={colors.primary} />
+              <Text style={styles.zoomPillText}>{displayZoom.toFixed(1)}x</Text>
             </View>
 
             <TouchableOpacity
@@ -547,7 +543,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       paddingVertical: 12,
     },
     cropWindow: {
@@ -558,20 +554,20 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       ...Shadows.md,
     },
     imageWrapper: {
-      position: 'absolute',
+      // Positioned and sized dynamically
     },
     apertureBorder: {
       position: 'absolute',
       top: 0,
       left: 0,
-      borderWidth: 2,
+      borderWidth: 2.5,
     },
     aspectPillsRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      marginTop: 16,
+      marginTop: 18,
     },
     aspectPill: {
       paddingHorizontal: 12,
@@ -595,7 +591,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       fontWeight: '700',
     },
     hintText: {
-      marginTop: 14,
+      marginTop: 16,
       fontSize: 12,
       fontWeight: '500',
       color: colors.outline,
@@ -614,33 +610,17 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'space-between',
     },
-    zoomControlsRow: {
+    zoomPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-    },
-    zoomStepBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.surfaceContainerHigh,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
-    },
-    zoomStepBtnDisabled: {
-      opacity: 0.35,
-    },
-    zoomPill: {
-      minWidth: 54,
-      paddingVertical: 6,
-      paddingHorizontal: 10,
+      gap: 6,
+      minWidth: 72,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
       borderRadius: BorderRadius.full,
       backgroundColor: isDark ? 'rgba(254, 186, 72, 0.15)' : 'rgba(232, 167, 54, 0.15)',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(254, 186, 72, 0.3)' : 'rgba(232, 167, 54, 0.3)',
-      alignItems: 'center',
       justifyContent: 'center',
     },
     zoomPillText: {
@@ -653,7 +633,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       alignItems: 'center',
       gap: 6,
       paddingVertical: 8,
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
       borderRadius: BorderRadius.full,
       backgroundColor: colors.surfaceContainerHigh,
       borderWidth: 1,

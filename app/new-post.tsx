@@ -392,9 +392,9 @@ export default function NewPostScreen() {
                   postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
                     ? {
                         transform: [
-                          { scale: postCrop.zoom },
                           { translateX: (postCrop.panX / 100) * (Dimensions.get('window').width - 32) },
                           { translateY: (postCrop.panY / 100) * 200 },
+                          { scale: postCrop.zoom },
                         ],
                       }
                     : null,

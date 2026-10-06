@@ -240,9 +240,9 @@ export default function PublicUserProfileScreen() {
                     avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
                       ? {
                           transform: [
-                            { scale: avatarCrop.zoom },
                             { translateX: (avatarCrop.panX / 100) * 88 },
                             { translateY: (avatarCrop.panY / 100) * 88 },
+                            { scale: avatarCrop.zoom },
                           ],
                         }
                       : null,

@@ -137,9 +137,9 @@ export default function EditProfileScreen() {
                     avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
                       ? {
                           transform: [
-                            { scale: avatarCrop.zoom },
                             { translateX: (avatarCrop.panX / 100) * 84 },
                             { translateY: (avatarCrop.panY / 100) * 84 },
+                            { scale: avatarCrop.zoom },
                           ],
                         }
                       : null,

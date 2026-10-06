@@ -701,9 +701,9 @@ export default function ProfileScreen() {
                         crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
                           ? {
                               transform: [
-                                { scale: crop.zoom },
                                 { translateX: (crop.panX / 100) * 96 },
                                 { translateY: (crop.panY / 100) * 96 },
+                                { scale: crop.zoom },
                               ],
                             }
                           : null,

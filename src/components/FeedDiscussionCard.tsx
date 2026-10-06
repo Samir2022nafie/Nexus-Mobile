@@ -181,7 +181,8 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     };
   }, [postMedia]);
 
-  const effectiveRatio = postCrop.aspectRatio || mediaAspectRatio;
+  const hasCropParams = postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0;
+  const effectiveRatio = postCrop.aspectRatio || (hasCropParams ? 16 / 9 : mediaAspectRatio);
   const measuredWidth = cardMediaWidth || 340;
   const postDisplayHeight = effectiveRatio
     ? Math.min(480, Math.max(140, Math.round(measuredWidth / effectiveRatio)))
@@ -297,9 +298,9 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
                 postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
                   ? {
                       transform: [
-                        { scale: postCrop.zoom },
                         { translateX: (postCrop.panX / 100) * measuredWidth },
                         { translateY: (postCrop.panY / 100) * postDisplayHeight },
+                        { scale: postCrop.zoom },
                       ],
                     }
                   : null,

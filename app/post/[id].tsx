@@ -90,7 +90,8 @@ export default function ThreadDetailScreen() {
     };
   }, [postMedia]);
 
-  const effectiveRatio = postCrop.aspectRatio || mediaAspectRatio;
+  const hasCropParams = postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0;
+  const effectiveRatio = postCrop.aspectRatio || (hasCropParams ? 16 / 9 : mediaAspectRatio);
   const measuredDetailWidth = detailMediaWidth || 360;
   const postDisplayHeight = effectiveRatio
     ? Math.min(480, Math.max(160, Math.round(measuredDetailWidth / effectiveRatio)))
@@ -470,9 +471,9 @@ export default function ThreadDetailScreen() {
                     postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
                       ? {
                           transform: [
-                            { scale: postCrop.zoom },
                             { translateX: (postCrop.panX / 100) * measuredDetailWidth },
                             { translateY: (postCrop.panY / 100) * postDisplayHeight },
+                            { scale: postCrop.zoom },
                           ],
                         }
                       : null,

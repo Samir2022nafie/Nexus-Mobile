@@ -3,11 +3,13 @@
  * Supports:
  * - 'circle': 1:1 circular crop for user & community avatars/PFPs (large 360px viewport)
  * - 'wide-rectangle': 16:9 crop for community banners, event covers, hangout covers
- * - 'rectangle': Post images (expansive container width, height crop presets)
+ * - 'rectangle': Post images (fixed full container width, vertically resizable gallery-style grid with 1:1 minimum height)
  * Features:
- * - Multi-touch two-finger pinch-to-zoom (1.0x to 3.0x limit) working across the entire viewport
+ * - Gallery-style vertically resizable crop grid with top/bottom drag handles, corner accents, and rule-of-thirds gridlines
+ * - Minimum height strictly enforced at 1:1 aspect ratio (square) for posts
+ * - Multi-touch two-finger pinch-to-zoom (1.0x to 3.0x) working across the entire viewport
  * - Single-finger dragging strictly clamped so image can NEVER detach from container borders
- * - Expansive, prominent canvas sizing
+ * - Physical image cropping via expo-image-manipulator returning real cropped JPEG files
  * - Pure gesture zoom (no +/- buttons) with live zoom indicator & Reset action
  * - Full light & dark theme support using Nexus warm palette
  */
@@ -26,6 +28,7 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Typography, BorderRadius, Shadows, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { parseCropFromUrl, encodeCropUrl, extractDirectImageUrl } from '../../utils/imageUrl';
@@ -60,6 +63,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   // Natural image dimensions
   const [origSize, setOrigSize] = useState<{ width: number; height: number } | null>(null);
   const [loadingOrig, setLoadingOrig] = useState(true);
+  const [isApplying, setIsApplying] = useState(false);
 
   // Display zoom readout state
   const [displayZoom, setDisplayZoom] = useState<number>(1.0);
@@ -84,49 +88,52 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const dragStartTouch = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Post crop aspect ratio choice
-  const [aspectChoice, setAspectChoice] = useState<'original' | '16:9' | '4:3' | '1:1'>('original');
+  // Fixed horizontal width
+  const boxWidth = cropShape === 'circle' ? Math.min(360, SCREEN_WIDTH - 28) : SCREEN_WIDTH - 24;
 
-  // Large, generous canvas sizing
-  let boxWidth: number;
-  let boxHeight: number;
+  // Max and min allowable height for rectangle post crop
+  const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.56), 500);
+  // User requirement: "the minimum height you can crop an image should be a 1:1 ratio"
+  const minPostHeight = boxWidth; // 1:1 ratio minimum height
 
-  if (cropShape === 'circle') {
-    boxWidth = Math.min(360, SCREEN_WIDTH - 28);
-    boxHeight = boxWidth;
-  } else if (cropShape === 'wide-rectangle') {
-    boxWidth = SCREEN_WIDTH - 24;
-    const targetRatio = aspectRatio ?? (16 / 9);
-    boxHeight = Math.round(boxWidth / targetRatio);
-  } else {
-    // Post image (rectangle)
-    boxWidth = SCREEN_WIDTH - 24;
-    const naturalRatio = origSize ? origSize.width / origSize.height : (16 / 9);
-    const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.52), 480);
-    const naturalBoxHeight = Math.min(maxPostHeight, Math.max(180, Math.round(boxWidth / naturalRatio)));
+  // Post crop dynamic height state (gallery-style resizable grid)
+  const [cropHeight, setCropHeight] = useState<number>(boxWidth);
+  const cropHeightRef = useRef<number>(boxWidth);
+  const startResizeHeight = useRef<number>(boxWidth);
 
-    if (aspectChoice === '16:9') {
-      boxHeight = Math.round(boxWidth / (16 / 9));
-    } else if (aspectChoice === '4:3') {
-      boxHeight = Math.round(boxWidth / (4 / 3));
-    } else if (aspectChoice === '1:1') {
-      boxHeight = boxWidth;
-    } else {
-      boxHeight = naturalBoxHeight;
+  // Keep ref synchronized with state
+  useEffect(() => {
+    cropHeightRef.current = cropHeight;
+  }, [cropHeight]);
+
+  // Calculate box height based on crop shape
+  const activeBoxHeight = useMemo(() => {
+    if (cropShape === 'circle') {
+      return boxWidth;
     }
-  }
+    if (cropShape === 'wide-rectangle') {
+      const targetRatio = aspectRatio ?? (16 / 9);
+      return Math.round(boxWidth / targetRatio);
+    }
+    // rectangle (posts)
+    return cropHeight;
+  }, [cropShape, boxWidth, aspectRatio, cropHeight]);
 
   // Base dimensions calculation: image always covers the box completely at baseScale
-  const baseScale = origSize ? Math.max(boxWidth / origSize.width, boxHeight / origSize.height) : 1;
+  const baseScale = origSize ? Math.max(boxWidth / origSize.width, activeBoxHeight / origSize.height) : 1;
   const baseW = origSize ? origSize.width * baseScale : boxWidth;
-  const baseH = origSize ? origSize.height * baseScale : boxHeight;
+  const baseH = origSize ? origSize.height * baseScale : activeBoxHeight;
 
   // Strict clamping helper: guarantees image can NEVER detach from container borders
-  const clampPan = (rawX: number, rawY: number, z: number) => {
-    const scaledW = baseW * z;
-    const scaledH = baseH * z;
+  const clampPan = (rawX: number, rawY: number, z: number, bH: number = activeBoxHeight) => {
+    const scale = origSize ? Math.max(boxWidth / origSize.width, bH / origSize.height) : 1;
+    const currentBaseW = origSize ? origSize.width * scale : boxWidth;
+    const currentBaseH = origSize ? origSize.height * scale : bH;
+
+    const scaledW = currentBaseW * z;
+    const scaledH = currentBaseH * z;
     const maxX = Math.max(0, (scaledW - boxWidth) / 2);
-    const maxY = Math.max(0, (scaledH - boxHeight) / 2);
+    const maxY = Math.max(0, (scaledH - bH) / 2);
     return {
       x: Math.max(-maxX, Math.min(maxX, rawX)),
       y: Math.max(-maxY, Math.min(maxY, rawY)),
@@ -136,11 +143,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   // Keep pan bounded when container dimensions or base size change
   useEffect(() => {
     if (!origSize) return;
-    const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current);
+    const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current, activeBoxHeight);
     panRef.current = clamped;
     panXAnim.setValue(clamped.x);
     panYAnim.setValue(clamped.y);
-  }, [boxWidth, boxHeight, baseW, baseH]);
+  }, [boxWidth, activeBoxHeight, origSize]);
 
   // Clean image URL without any previous crop hash
   const parsedImage = parseCropFromUrl(imageUri);
@@ -153,24 +160,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       zoomRef.current = 1.0;
       panRef.current = { x: 0, y: 0 };
       setDisplayZoom(1.0);
-      setAspectChoice('original');
       zoomAnim.setValue(1.0);
       panXAnim.setValue(0);
       panYAnim.setValue(0);
+      setIsApplying(false);
       return;
     }
 
     setLoadingOrig(true);
-
-    if (parsedImage.aspectRatio) {
-      const ar = parsedImage.aspectRatio;
-      if (Math.abs(ar - 16 / 9) < 0.08) setAspectChoice('16:9');
-      else if (Math.abs(ar - 4 / 3) < 0.08) setAspectChoice('4:3');
-      else if (Math.abs(ar - 1.0) < 0.08) setAspectChoice('1:1');
-      else setAspectChoice('original');
-    } else {
-      setAspectChoice('original');
-    }
+    setIsApplying(false);
 
     const initialZ = parsedImage.zoom > 0 ? Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, parsedImage.zoom)) : 1.0;
     zoomRef.current = initialZ;
@@ -178,7 +176,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     zoomAnim.setValue(initialZ);
 
     const initialX = (parsedImage.panX / 100) * boxWidth;
-    const initialY = (parsedImage.panY / 100) * boxHeight;
+    const initialY = (parsedImage.panY / 100) * boxWidth;
     panRef.current = { x: initialX, y: initialY };
     panXAnim.setValue(initialX);
     panYAnim.setValue(initialY);
@@ -189,21 +187,35 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       (w, h) => {
         setOrigSize({ width: w, height: h });
         setLoadingOrig(false);
+
+        if (cropShape === 'rectangle') {
+          // Calculate natural height at full container width
+          const naturalRatio = w / h;
+          const naturalH = Math.round(boxWidth / naturalRatio);
+          // Default post height: clamp between 1:1 minimum height and max allowed height
+          const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, naturalH));
+          setCropHeight(defaultH);
+          cropHeightRef.current = defaultH;
+        }
       },
       () => {
         setOrigSize({ width: 800, height: 800 });
         setLoadingOrig(false);
+        if (cropShape === 'rectangle') {
+          setCropHeight(boxWidth);
+          cropHeightRef.current = boxWidth;
+        }
       }
     );
   }, [visible, imageUri]);
 
-  // Viewport-wide PanResponder for intuitive two-finger pinch-to-zoom and single-finger dragging
+  // Viewport-wide PanResponder for intuitive two-finger pinch-to-zoom and single-finger image dragging
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
+      onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderTerminationRequest: () => false,
 
       onPanResponderGrant: (evt) => {
@@ -239,7 +251,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             touches[1].pageY - touches[0].pageY
           );
 
-          // If second finger just touched down
           if (!isPinching.current || pinchStartDist.current <= 0) {
             isPinching.current = true;
             pinchStartDist.current = currentDist;
@@ -256,7 +267,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             const scaleRatio = currentDist / pinchStartDist.current;
             const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom.current * scaleRatio));
 
-            // Midpoint shift while pinching
             const midX = (touches[0].pageX + touches[1].pageX) / 2;
             const midY = (touches[0].pageY + touches[1].pageY) / 2;
             const deltaMidX = midX - pinchStartCenter.current.x;
@@ -265,7 +275,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             const rawPanX = pinchStartPan.current.x + deltaMidX;
             const rawPanY = pinchStartPan.current.y + deltaMidY;
 
-            const clamped = clampPan(rawPanX, rawPanY, targetZoom);
+            const clamped = clampPan(rawPanX, rawPanY, targetZoom, cropHeightRef.current);
 
             zoomRef.current = targetZoom;
             panRef.current = clamped;
@@ -275,7 +285,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             panYAnim.setValue(clamped.y);
           }
         } else if (touches.length === 1) {
-          // Transition back to single-finger drag
+          // Single-finger drag
           if (isPinching.current) {
             isPinching.current = false;
             pinchStartDist.current = 0;
@@ -290,7 +300,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           const rawPanX = dragStartPan.current.x + deltaX;
           const rawPanY = dragStartPan.current.y + deltaY;
 
-          const clamped = clampPan(rawPanX, rawPanY, zoomRef.current);
+          const clamped = clampPan(rawPanX, rawPanY, zoomRef.current, cropHeightRef.current);
 
           panRef.current = clamped;
           panXAnim.setValue(clamped.x);
@@ -311,11 +321,67 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     })
   ).current;
 
+  // Draggable top edge handle PanResponder for vertical grid resizing
+  const topHandlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => {
+        startResizeHeight.current = cropHeightRef.current;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Dragging top handle down decreases height; dragging up increases height
+        const nextH = Math.min(
+          maxPostHeight,
+          Math.max(minPostHeight, startResizeHeight.current - gestureState.dy)
+        );
+        setCropHeight(Math.round(nextH));
+      },
+      onPanResponderRelease: () => {
+        cropHeightRef.current = cropHeight;
+      },
+    })
+  ).current;
+
+  // Draggable bottom edge handle PanResponder for vertical grid resizing
+  const bottomHandlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderGrant: () => {
+        startResizeHeight.current = cropHeightRef.current;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        // Dragging bottom handle down increases height; dragging up decreases height
+        const nextH = Math.min(
+          maxPostHeight,
+          Math.max(minPostHeight, startResizeHeight.current + gestureState.dy)
+        );
+        setCropHeight(Math.round(nextH));
+      },
+      onPanResponderRelease: () => {
+        cropHeightRef.current = cropHeight;
+      },
+    })
+  ).current;
+
   const handleReset = () => {
     zoomRef.current = MIN_ZOOM;
     panRef.current = { x: 0, y: 0 };
     setDisplayZoom(MIN_ZOOM);
-    setAspectChoice('original');
+
+    if (cropShape === 'rectangle' && origSize) {
+      const naturalRatio = origSize.width / origSize.height;
+      const naturalH = Math.round(boxWidth / naturalRatio);
+      const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, naturalH));
+      setCropHeight(defaultH);
+      cropHeightRef.current = defaultH;
+    }
+
     Animated.parallel([
       Animated.spring(zoomAnim, { toValue: MIN_ZOOM, useNativeDriver: false }),
       Animated.spring(panXAnim, { toValue: 0, useNativeDriver: false }),
@@ -323,22 +389,58 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     ]).start();
   };
 
-  const handleApplyCrop = () => {
-    if (!cleanImageUri) return;
+  const handleApplyCrop = async () => {
+    if (!cleanImageUri || isApplying) return;
+    setIsApplying(true);
 
-    // Calculate percentage offsets relative to crop window
+    const currentBoxH = activeBoxHeight;
+    const finalRatio = Number((boxWidth / currentBoxH).toFixed(3));
+
+    // Try physical image cropping via expo-image-manipulator first
+    if (origSize && origSize.width > 0 && origSize.height > 0) {
+      try {
+        const currentScale = baseScale * zoomRef.current;
+        const renderW = origSize.width * currentScale;
+        const renderH = origSize.height * currentScale;
+
+        // Position of crop box relative to rendered image
+        const cropXInRender = (renderW - boxWidth) / 2 - panRef.current.x;
+        const cropYInRender = (renderH - currentBoxH) / 2 - panRef.current.y;
+
+        // Translate into original pixel dimensions
+        const originX = Math.max(0, Math.round(cropXInRender / currentScale));
+        const originY = Math.max(0, Math.round(cropYInRender / currentScale));
+        const cropW = Math.min(origSize.width - originX, Math.max(1, Math.round(boxWidth / currentScale)));
+        const cropH = Math.min(origSize.height - originY, Math.max(1, Math.round(currentBoxH / currentScale)));
+
+        const manipResult = await manipulateAsync(
+          cleanImageUri,
+          [
+            {
+              crop: {
+                originX,
+                originY,
+                width: cropW,
+                height: cropH,
+              },
+            },
+          ],
+          { compress: 0.92, format: SaveFormat.JPEG }
+        );
+
+        if (manipResult && manipResult.uri) {
+          setIsApplying(false);
+          onConfirm(manipResult.uri);
+          return;
+        }
+      } catch (manipErr) {
+        console.warn('Physical crop failed, falling back to encoded URL:', manipErr);
+      }
+    }
+
+    // Fallback: encode standard crop parameters onto URL
     const panXPercent = boxWidth > 0 ? (panRef.current.x / boxWidth) * 100 : 0;
-    const panYPercent = boxHeight > 0 ? (panRef.current.y / boxHeight) * 100 : 0;
-
-    const finalRatio =
-      cropShape === 'rectangle' && aspectChoice !== 'original'
-        ? Number((boxWidth / boxHeight).toFixed(3))
-        : cropShape === 'circle'
-        ? 1.0
-        : cropShape === 'wide-rectangle'
-        ? Number((boxWidth / boxHeight).toFixed(3))
-        : undefined;
-
+    const panYPercent = currentBoxH > 0 ? (panRef.current.y / currentBoxH) * 100 : 0;
     const encodedCropUrl = encodeCropUrl(
       cleanImageUri,
       Number(zoomRef.current.toFixed(2)),
@@ -346,6 +448,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       Number(panYPercent.toFixed(1)),
       finalRatio
     );
+
+    setIsApplying(false);
     onConfirm(encodedCropUrl);
   };
 
@@ -357,7 +461,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       ? 'Crop Profile Picture'
       : cropShape === 'wide-rectangle'
       ? 'Crop Banner'
-      : 'Crop Image');
+      : 'Crop Post Image');
 
   return (
     <Modal
@@ -377,10 +481,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           <TouchableOpacity
             onPress={handleApplyCrop}
             style={styles.applyBtn}
-            disabled={loadingOrig}
+            disabled={loadingOrig || isApplying}
             activeOpacity={0.8}
           >
-            <Text style={styles.applyBtnText}>Apply</Text>
+            {isApplying ? (
+              <ActivityIndicator size="small" color={colors.onPrimaryContainer} />
+            ) : (
+              <Text style={styles.applyBtnText}>Apply</Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -394,8 +502,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 styles.cropWindow,
                 {
                   width: boxWidth,
-                  height: boxHeight,
-                  borderRadius: cropShape === 'circle' ? boxWidth / 2 : 16,
+                  height: activeBoxHeight,
+                  borderRadius: cropShape === 'circle' ? boxWidth / 2 : 12,
                 },
               ]}
               pointerEvents="box-none"
@@ -409,7 +517,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                     height: baseH,
                     position: 'absolute',
                     left: (boxWidth - baseW) / 2,
-                    top: (boxHeight - baseH) / 2,
+                    top: (activeBoxHeight - baseH) / 2,
                     transform: [
                       { translateX: panXAnim },
                       { translateY: panYAnim },
@@ -426,45 +534,67 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 />
               </Animated.View>
 
-              {/* Crop Aperture Border / Outline */}
+              {/* Gallery-style 3x3 Rule-of-Thirds Grid (for rectangle post crops) */}
+              {cropShape === 'rectangle' && (
+                <View style={styles.gridOverlay} pointerEvents="none">
+                  {/* Horizontal grid lines */}
+                  <View style={[styles.gridLineH, { top: '33.33%' }]} />
+                  <View style={[styles.gridLineH, { top: '66.66%' }]} />
+                  {/* Vertical grid lines */}
+                  <View style={[styles.gridLineV, { left: '33.33%' }]} />
+                  <View style={[styles.gridLineV, { left: '66.66%' }]} />
+
+                  {/* Corner Accent Brackets */}
+                  <View style={[styles.cornerBracket, styles.cornerTL]} />
+                  <View style={[styles.cornerBracket, styles.cornerTR]} />
+                  <View style={[styles.cornerBracket, styles.cornerBL]} />
+                  <View style={[styles.cornerBracket, styles.cornerBR]} />
+                </View>
+              )}
+
+              {/* Aperture Border / Outline */}
               <View
                 style={[
                   styles.apertureBorder,
                   {
                     width: boxWidth,
-                    height: boxHeight,
-                    borderRadius: cropShape === 'circle' ? boxWidth / 2 : 16,
-                    borderColor: colors.primary,
+                    height: activeBoxHeight,
+                    borderRadius: cropShape === 'circle' ? boxWidth / 2 : 12,
+                    borderColor: cropShape === 'rectangle' ? '#ffffff' : colors.primary,
                   },
                 ]}
                 pointerEvents="none"
               />
+
+              {/* Draggable Top Handle (Vertical resize for posts) */}
+              {cropShape === 'rectangle' && (
+                <View
+                  style={styles.topHandleBar}
+                  {...topHandlePanResponder.panHandlers}
+                  hitSlop={{ top: 15, bottom: 15, left: 20, right: 20 }}
+                >
+                  <View style={styles.handlePill} />
+                </View>
+              )}
+
+              {/* Draggable Bottom Handle (Vertical resize for posts) */}
+              {cropShape === 'rectangle' && (
+                <View
+                  style={styles.bottomHandleBar}
+                  {...bottomHandlePanResponder.panHandlers}
+                  hitSlop={{ top: 15, bottom: 15, left: 20, right: 20 }}
+                >
+                  <View style={styles.handlePill} />
+                </View>
+              )}
             </View>
           )}
 
-          {/* Optional manual aspect ratio presets for posts */}
-          {cropShape === 'rectangle' && !loadingOrig && (
-            <View style={styles.aspectPillsRow}>
-              {(['original', '16:9', '4:3', '1:1'] as const).map((choice) => {
-                const isActive = aspectChoice === choice;
-                const label = choice === 'original' ? 'Original Height' : choice;
-                return (
-                  <TouchableOpacity
-                    key={choice}
-                    style={[styles.aspectPill, isActive && styles.aspectPillActive]}
-                    onPress={() => setAspectChoice(choice)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.aspectPillText, isActive && styles.aspectPillTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          <Text style={styles.hintText}>Pinch with 2 fingers to zoom • Drag to position</Text>
+          <Text style={styles.hintText}>
+            {cropShape === 'rectangle'
+              ? 'Drag top/bottom bars to crop height (min 1:1) • Pinch to zoom'
+              : 'Pinch with 2 fingers to zoom • Drag to position'}
+          </Text>
         </View>
 
         {/* Bottom Control Bar */}
@@ -552,55 +682,111 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       justifyContent: 'center',
       backgroundColor: isDark ? colors.surfaceContainerHighest : colors.surfaceContainerHigh,
       ...Shadows.md,
+      position: 'relative',
     },
     imageWrapper: {
       // Positioned and sized dynamically
     },
     apertureBorder: {
       position: 'absolute',
+      borderWidth: 2,
+    },
+    gridOverlay: {
+      position: 'absolute',
       top: 0,
       left: 0,
-      borderWidth: 2.5,
+      right: 0,
+      bottom: 0,
     },
-    aspectPillsRow: {
-      flexDirection: 'row',
+    gridLineH: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    },
+    gridLineV: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: 1,
+      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    },
+    cornerBracket: {
+      position: 'absolute',
+      width: 22,
+      height: 22,
+      borderColor: '#ffffff',
+    },
+    cornerTL: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3.5,
+      borderLeftWidth: 3.5,
+    },
+    cornerTR: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3.5,
+      borderRightWidth: 3.5,
+    },
+    cornerBL: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3.5,
+      borderLeftWidth: 3.5,
+    },
+    cornerBR: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 3.5,
+      borderRightWidth: 3.5,
+    },
+    topHandleBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 28,
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: 18,
+      justifyContent: 'flex-start',
+      paddingTop: 4,
+      zIndex: 20,
     },
-    aspectPill: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: BorderRadius.full,
-      backgroundColor: colors.surfaceContainerHigh,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
+    bottomHandleBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      paddingBottom: 4,
+      zIndex: 20,
     },
-    aspectPillActive: {
-      backgroundColor: isDark ? 'rgba(254, 186, 72, 0.2)' : 'rgba(232, 167, 54, 0.2)',
-      borderColor: colors.primary,
-    },
-    aspectPillText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.onSurfaceVariant,
-    },
-    aspectPillTextActive: {
-      color: colors.primary,
-      fontWeight: '700',
+    handlePill: {
+      width: 48,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor: '#ffffff',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.5,
+      shadowRadius: 2,
+      elevation: 4,
     },
     hintText: {
-      marginTop: 16,
+      marginTop: 18,
       fontSize: 12,
-      fontWeight: '500',
       color: colors.outline,
+      fontWeight: '500',
       textAlign: 'center',
+      paddingHorizontal: 20,
     },
     bottomBar: {
       paddingHorizontal: 20,
-      paddingBottom: Platform.OS === 'ios' ? 42 : 24,
-      paddingTop: 14,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+      paddingTop: 12,
       borderTopWidth: 1,
       borderTopColor: colors.outlineVariant,
       backgroundColor: colors.surfaceContainerLow,
@@ -613,15 +799,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     zoomPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      minWidth: 72,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
+      backgroundColor: colors.surfaceContainerHigh,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
       borderRadius: BorderRadius.full,
-      backgroundColor: isDark ? 'rgba(254, 186, 72, 0.15)' : 'rgba(232, 167, 54, 0.15)',
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(254, 186, 72, 0.3)' : 'rgba(232, 167, 54, 0.3)',
-      justifyContent: 'center',
+      gap: 5,
     },
     zoomPillText: {
       fontSize: 13,
@@ -631,17 +813,15 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     resetBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: BorderRadius.full,
       backgroundColor: colors.surfaceContainerHigh,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: BorderRadius.full,
+      gap: 4,
     },
     resetBtnText: {
       fontSize: 13,
       fontWeight: '600',
-      color: colors.onSurface,
+      color: colors.primary,
     },
   });

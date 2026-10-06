@@ -482,7 +482,9 @@ export default function NewPostScreen() {
           } else {
             setImages((prev) => [...prev, croppedUri]);
           }
-          setImageUrlInput(parseCropFromUrl(croppedUri).cleanUrl);
+          if (croppedUri.startsWith('http')) {
+            setImageUrlInput(croppedUri);
+          }
           setCropTargetUri(null);
           setCropTargetIndex(null);
           setCropModalVisible(false);

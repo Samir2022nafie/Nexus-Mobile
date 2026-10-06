@@ -5,12 +5,12 @@
  * - 'wide-rectangle': 16:9 crop for community banners, event covers, hangout covers
  * - 'rectangle': Post images (fixed full container width, vertically resizable gallery-style grid with 1:1 minimum height)
  * Features:
- * - Gallery-style vertically resizable crop grid with top/bottom drag handles, corner accents, and rule-of-thirds gridlines
+ * - Gallery-style vertically resizable crop grid with top/bottom drag zones (handles)
  * - Minimum height strictly enforced at 1:1 aspect ratio (square) for posts
  * - Multi-touch two-finger pinch-to-zoom (1.0x to 3.0x) working across the entire viewport
  * - Single-finger dragging strictly clamped so image can NEVER detach from container borders
- * - Physical image cropping via expo-image-manipulator returning real cropped JPEG files
- * - Pure gesture zoom (no +/- buttons) with live zoom indicator & Reset action
+ * - Preserves online/HTTP URLs with encoded crop parameters to prevent upload failures/validation errors
+ * - Physical image cropping via expo-image-manipulator for local gallery files
  * - Full light & dark theme support using Nexus warm palette
  */
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -77,6 +77,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const zoomRef = useRef<number>(1.0);
   const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Viewport container layout measurement ref
+  const viewportLayout = useRef({ width: SCREEN_WIDTH, height: Math.round(SCREEN_HEIGHT * 0.7) });
+
+  // Active gesture mode: 'none' | 'resize-top' | 'resize-bottom' | 'pinch' | 'pan'
+  const gestureMode = useRef<'none' | 'resize-top' | 'resize-bottom' | 'pinch' | 'pan'>('none');
+  const resizeStartTouchY = useRef<number>(0);
+  const resizeStartHeight = useRef<number>(SCREEN_WIDTH - 24);
+
   // Multi-touch pinch tracking refs
   const isPinching = useRef<boolean>(false);
   const pinchStartDist = useRef<number>(0);
@@ -92,14 +100,17 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const boxWidth = cropShape === 'circle' ? Math.min(360, SCREEN_WIDTH - 28) : SCREEN_WIDTH - 24;
 
   // Max and min allowable height for rectangle post crop
-  const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.56), 500);
+  const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.58), 520);
+
   // User requirement: "the minimum height you can crop an image should be a 1:1 ratio"
-  const minPostHeight = boxWidth; // 1:1 ratio minimum height
+  // For tall/portrait images, minPostHeight is boxWidth (1:1 square). For landscape images, natural height is allowed.
+  const naturalRatio = origSize && origSize.height > 0 ? origSize.width / origSize.height : 1.0;
+  const naturalH = origSize && origSize.height > 0 ? Math.round(boxWidth / naturalRatio) : boxWidth;
+  const minPostHeight = Math.min(boxWidth, Math.max(160, naturalH));
 
   // Post crop dynamic height state (gallery-style resizable grid)
   const [cropHeight, setCropHeight] = useState<number>(boxWidth);
   const cropHeightRef = useRef<number>(boxWidth);
-  const startResizeHeight = useRef<number>(boxWidth);
 
   // Keep ref synchronized with state
   useEffect(() => {
@@ -149,7 +160,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     panYAnim.setValue(clamped.y);
   }, [boxWidth, activeBoxHeight, origSize]);
 
-  // Clean image URL without any previous crop hash
+  // Clean image URL without any previous crop hash or query params
   const parsedImage = parseCropFromUrl(imageUri);
   const cleanImageUri = parsedImage.cleanUrl;
 
@@ -189,13 +200,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         setLoadingOrig(false);
 
         if (cropShape === 'rectangle') {
-          // Calculate natural height at full container width
-          const naturalRatio = w / h;
-          const naturalH = Math.round(boxWidth / naturalRatio);
-          // Default post height: clamp between 1:1 minimum height and max allowed height
-          const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, naturalH));
-          setCropHeight(defaultH);
-          cropHeightRef.current = defaultH;
+          const natRatio = w / h;
+          const natH = Math.round(boxWidth / natRatio);
+          const initialH = Math.min(maxPostHeight, Math.max(minPostHeight, natH));
+          setCropHeight(initialH);
+          cropHeightRef.current = initialH;
         }
       },
       () => {
@@ -209,7 +218,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     );
   }, [visible, imageUri]);
 
-  // Viewport-wide PanResponder for intuitive two-finger pinch-to-zoom and single-finger image dragging
+  // Unified PanResponder: handles top resize, bottom resize, pinch zoom, and image drag in ONE responder
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -220,7 +229,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
       onPanResponderGrant: (evt) => {
         const touches = evt.nativeEvent.touches;
-        if (touches && touches.length >= 2) {
+        if (!touches || touches.length === 0) return;
+
+        // 1. Two fingers -> Pinch to zoom
+        if (touches.length >= 2) {
+          gestureMode.current = 'pinch';
           isPinching.current = true;
           pinchStartDist.current = Math.hypot(
             touches[1].pageX - touches[0].pageX,
@@ -232,36 +245,87 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             y: (touches[0].pageY + touches[1].pageY) / 2,
           };
           pinchStartPan.current = { ...panRef.current };
-        } else if (touches && touches.length === 1) {
-          isPinching.current = false;
-          pinchStartDist.current = 0;
-          dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
-          dragStartPan.current = { ...panRef.current };
+          return;
         }
+
+        // 2. Single finger: Check if touch is near top handle or bottom handle of crop box
+        if (cropShape === 'rectangle') {
+          const touchY = evt.nativeEvent.locationY;
+          const currentBoxH = cropHeightRef.current;
+          const vH = viewportLayout.current.height;
+          const boxTop = (vH - currentBoxH) / 2;
+          const boxBottom = boxTop + currentBoxH;
+
+          // Generous handle touch detection zone (45px above & below each border)
+          const isNearTopHandle = Math.abs(touchY - boxTop) <= 45;
+          const isNearBottomHandle = Math.abs(touchY - boxBottom) <= 45;
+
+          if (isNearTopHandle) {
+            gestureMode.current = 'resize-top';
+            resizeStartTouchY.current = touches[0].pageY;
+            resizeStartHeight.current = currentBoxH;
+            return;
+          }
+
+          if (isNearBottomHandle) {
+            gestureMode.current = 'resize-bottom';
+            resizeStartTouchY.current = touches[0].pageY;
+            resizeStartHeight.current = currentBoxH;
+            return;
+          }
+        }
+
+        // 3. Otherwise: pan the image
+        gestureMode.current = 'pan';
+        isPinching.current = false;
+        dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
+        dragStartPan.current = { ...panRef.current };
       },
 
       onPanResponderMove: (evt) => {
         const touches = evt.nativeEvent.touches;
         if (!touches || touches.length === 0) return;
 
-        // Two-Finger Pinch-to-Zoom
-        if (touches.length >= 2) {
+        // Mode: Resize Top Handle
+        if (gestureMode.current === 'resize-top') {
+          const deltaY = touches[0].pageY - resizeStartTouchY.current;
+          // Dragging down (deltaY > 0) shrinks height; dragging up (deltaY < 0) increases height
+          const targetH = resizeStartHeight.current - deltaY;
+          const clampedH = Math.min(maxPostHeight, Math.max(minPostHeight, targetH));
+          const nextH = Math.round(clampedH);
+          setCropHeight(nextH);
+          cropHeightRef.current = nextH;
+
+          const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
+          panRef.current = clamped;
+          panXAnim.setValue(clamped.x);
+          panYAnim.setValue(clamped.y);
+          return;
+        }
+
+        // Mode: Resize Bottom Handle
+        if (gestureMode.current === 'resize-bottom') {
+          const deltaY = touches[0].pageY - resizeStartTouchY.current;
+          // Dragging down (deltaY > 0) increases height; dragging up (deltaY < 0) shrinks height
+          const targetH = resizeStartHeight.current + deltaY;
+          const clampedH = Math.min(maxPostHeight, Math.max(minPostHeight, targetH));
+          const nextH = Math.round(clampedH);
+          setCropHeight(nextH);
+          cropHeightRef.current = nextH;
+
+          const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
+          panRef.current = clamped;
+          panXAnim.setValue(clamped.x);
+          panYAnim.setValue(clamped.y);
+          return;
+        }
+
+        // Mode: Two-Finger Pinch-to-Zoom
+        if (gestureMode.current === 'pinch' && touches.length >= 2) {
           const currentDist = Math.hypot(
             touches[1].pageX - touches[0].pageX,
             touches[1].pageY - touches[0].pageY
           );
-
-          if (!isPinching.current || pinchStartDist.current <= 0) {
-            isPinching.current = true;
-            pinchStartDist.current = currentDist;
-            pinchStartZoom.current = zoomRef.current;
-            pinchStartCenter.current = {
-              x: (touches[0].pageX + touches[1].pageX) / 2,
-              y: (touches[0].pageY + touches[1].pageY) / 2,
-            };
-            pinchStartPan.current = { ...panRef.current };
-            return;
-          }
 
           if (pinchStartDist.current > 0) {
             const scaleRatio = currentDist / pinchStartDist.current;
@@ -284,16 +348,11 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             panXAnim.setValue(clamped.x);
             panYAnim.setValue(clamped.y);
           }
-        } else if (touches.length === 1) {
-          // Single-finger drag
-          if (isPinching.current) {
-            isPinching.current = false;
-            pinchStartDist.current = 0;
-            dragStartTouch.current = { x: touches[0].pageX, y: touches[0].pageY };
-            dragStartPan.current = { ...panRef.current };
-            return;
-          }
+          return;
+        }
 
+        // Mode: Single-Finger Drag
+        if (gestureMode.current === 'pan' && touches.length === 1) {
           const deltaX = touches[0].pageX - dragStartTouch.current.x;
           const deltaY = touches[0].pageY - dragStartTouch.current.y;
 
@@ -309,62 +368,16 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       },
 
       onPanResponderRelease: () => {
+        gestureMode.current = 'none';
         isPinching.current = false;
         pinchStartDist.current = 0;
         setDisplayZoom(Number(zoomRef.current.toFixed(1)));
       },
       onPanResponderTerminate: () => {
+        gestureMode.current = 'none';
         isPinching.current = false;
         pinchStartDist.current = 0;
         setDisplayZoom(Number(zoomRef.current.toFixed(1)));
-      },
-    })
-  ).current;
-
-  // Draggable top edge handle PanResponder for vertical grid resizing
-  const topHandlePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
-      onPanResponderGrant: () => {
-        startResizeHeight.current = cropHeightRef.current;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Dragging top handle down decreases height; dragging up increases height
-        const nextH = Math.min(
-          maxPostHeight,
-          Math.max(minPostHeight, startResizeHeight.current - gestureState.dy)
-        );
-        setCropHeight(Math.round(nextH));
-      },
-      onPanResponderRelease: () => {
-        cropHeightRef.current = cropHeight;
-      },
-    })
-  ).current;
-
-  // Draggable bottom edge handle PanResponder for vertical grid resizing
-  const bottomHandlePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => true,
-      onPanResponderGrant: () => {
-        startResizeHeight.current = cropHeightRef.current;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        // Dragging bottom handle down increases height; dragging up decreases height
-        const nextH = Math.min(
-          maxPostHeight,
-          Math.max(minPostHeight, startResizeHeight.current + gestureState.dy)
-        );
-        setCropHeight(Math.round(nextH));
-      },
-      onPanResponderRelease: () => {
-        cropHeightRef.current = cropHeight;
       },
     })
   ).current;
@@ -375,9 +388,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     setDisplayZoom(MIN_ZOOM);
 
     if (cropShape === 'rectangle' && origSize) {
-      const naturalRatio = origSize.width / origSize.height;
-      const naturalH = Math.round(boxWidth / naturalRatio);
-      const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, naturalH));
+      const natRatio = origSize.width / origSize.height;
+      const natH = Math.round(boxWidth / natRatio);
+      const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, natH));
       setCropHeight(defaultH);
       cropHeightRef.current = defaultH;
     }
@@ -395,19 +408,37 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
     const currentBoxH = activeBoxHeight;
     const finalRatio = Number((boxWidth / currentBoxH).toFixed(3));
+    const panXPercent = boxWidth > 0 ? (panRef.current.x / boxWidth) * 100 : 0;
+    const panYPercent = currentBoxH > 0 ? (panRef.current.y / currentBoxH) * 100 : 0;
 
-    // Try physical image cropping via expo-image-manipulator first
+    // 1. If the image is ALREADY a remote/HTTP URL:
+    // Keep it as an HTTP URL with crop parameters.
+    // DO NOT convert it into a local file:/// URI, which would trigger failed storage uploads,
+    // "WARN Response.blob()" warnings, and backend "Invalid url" validation errors.
+    if (cleanImageUri.startsWith('http://') || cleanImageUri.startsWith('https://')) {
+      const encodedCropUrl = encodeCropUrl(
+        cleanImageUri,
+        Number(zoomRef.current.toFixed(2)),
+        Number(panXPercent.toFixed(1)),
+        Number(panYPercent.toFixed(1)),
+        finalRatio
+      );
+      setIsApplying(false);
+      onConfirm(encodedCropUrl);
+      return;
+    }
+
+    // 2. If it's a local file (file:/// from camera roll / gallery):
+    // Physically crop the local file via expo-image-manipulator.
     if (origSize && origSize.width > 0 && origSize.height > 0) {
       try {
         const currentScale = baseScale * zoomRef.current;
         const renderW = origSize.width * currentScale;
         const renderH = origSize.height * currentScale;
 
-        // Position of crop box relative to rendered image
         const cropXInRender = (renderW - boxWidth) / 2 - panRef.current.x;
         const cropYInRender = (renderH - currentBoxH) / 2 - panRef.current.y;
 
-        // Translate into original pixel dimensions
         const originX = Math.max(0, Math.round(cropXInRender / currentScale));
         const originY = Math.max(0, Math.round(cropYInRender / currentScale));
         const cropW = Math.min(origSize.width - originX, Math.max(1, Math.round(boxWidth / currentScale)));
@@ -438,9 +469,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       }
     }
 
-    // Fallback: encode standard crop parameters onto URL
-    const panXPercent = boxWidth > 0 ? (panRef.current.x / boxWidth) * 100 : 0;
-    const panYPercent = currentBoxH > 0 ? (panRef.current.y / currentBoxH) * 100 : 0;
+    // Fallback: encode standard parameters onto URL
     const encodedCropUrl = encodeCropUrl(
       cleanImageUri,
       Number(zoomRef.current.toFixed(2)),
@@ -448,7 +477,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       Number(panYPercent.toFixed(1)),
       finalRatio
     );
-
     setIsApplying(false);
     onConfirm(encodedCropUrl);
   };
@@ -492,8 +520,17 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </TouchableOpacity>
         </View>
 
-        {/* Viewport Area — Captures multi-touch gestures across the entire area */}
-        <View style={styles.viewportContainer} {...panResponder.panHandlers}>
+        {/* Viewport Area — Captures multi-touch gestures and handle drags across the area */}
+        <View
+          style={styles.viewportContainer}
+          onLayout={(e) => {
+            viewportLayout.current = {
+              width: e.nativeEvent.layout.width,
+              height: e.nativeEvent.layout.height,
+            };
+          }}
+          {...panResponder.panHandlers}
+        >
           {loadingOrig ? (
             <ActivityIndicator size="large" color={colors.primary} />
           ) : (
@@ -506,7 +543,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                   borderRadius: cropShape === 'circle' ? boxWidth / 2 : 12,
                 },
               ]}
-              pointerEvents="box-none"
+              pointerEvents="none"
             >
               {/* Centered Scalable & Draggable Image */}
               <Animated.View
@@ -525,7 +562,6 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                     ],
                   },
                 ]}
-                pointerEvents="none"
               >
                 <Image
                   source={{ uri: extractDirectImageUrl(cleanImageUri) }}
@@ -536,7 +572,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
               {/* Gallery-style 3x3 Rule-of-Thirds Grid (for rectangle post crops) */}
               {cropShape === 'rectangle' && (
-                <View style={styles.gridOverlay} pointerEvents="none">
+                <View style={styles.gridOverlay}>
                   {/* Horizontal grid lines */}
                   <View style={[styles.gridLineH, { top: '33.33%' }]} />
                   <View style={[styles.gridLineH, { top: '66.66%' }]} />
@@ -563,27 +599,18 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                     borderColor: cropShape === 'rectangle' ? '#ffffff' : colors.primary,
                   },
                 ]}
-                pointerEvents="none"
               />
 
-              {/* Draggable Top Handle (Vertical resize for posts) */}
+              {/* Visual Top Handle Pill (Draggable vertical resize) */}
               {cropShape === 'rectangle' && (
-                <View
-                  style={styles.topHandleBar}
-                  {...topHandlePanResponder.panHandlers}
-                  hitSlop={{ top: 15, bottom: 15, left: 20, right: 20 }}
-                >
+                <View style={styles.topHandleBar}>
                   <View style={styles.handlePill} />
                 </View>
               )}
 
-              {/* Draggable Bottom Handle (Vertical resize for posts) */}
+              {/* Visual Bottom Handle Pill (Draggable vertical resize) */}
               {cropShape === 'rectangle' && (
-                <View
-                  style={styles.bottomHandleBar}
-                  {...bottomHandlePanResponder.panHandlers}
-                  hitSlop={{ top: 15, bottom: 15, left: 20, right: 20 }}
-                >
+                <View style={styles.bottomHandleBar}>
                   <View style={styles.handlePill} />
                 </View>
               )}
@@ -605,6 +632,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               <MaterialIcons name="zoom-in" size={18} color={colors.primary} />
               <Text style={styles.zoomPillText}>{displayZoom.toFixed(1)}x</Text>
             </View>
+
+            {cropShape === 'rectangle' && (
+              <View style={styles.ratioBadge}>
+                <Text style={styles.ratioBadgeText}>
+                  Ratio: {(boxWidth / activeBoxHeight).toFixed(2)}
+                </Text>
+              </View>
+            )}
 
             <TouchableOpacity
               onPress={handleReset}
@@ -703,14 +738,14 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       left: 0,
       right: 0,
       height: 1,
-      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+      backgroundColor: 'rgba(255, 255, 255, 0.45)',
     },
     gridLineV: {
       position: 'absolute',
       top: 0,
       bottom: 0,
       width: 1,
-      backgroundColor: 'rgba(255, 255, 255, 0.4)',
+      backgroundColor: 'rgba(255, 255, 255, 0.45)',
     },
     cornerBracket: {
       position: 'absolute',
@@ -747,10 +782,9 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       top: 0,
       left: 0,
       right: 0,
-      height: 28,
+      height: 20,
       alignItems: 'center',
-      justifyContent: 'flex-start',
-      paddingTop: 4,
+      justifyContent: 'center',
       zIndex: 20,
     },
     bottomHandleBar: {
@@ -758,22 +792,21 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       bottom: 0,
       left: 0,
       right: 0,
-      height: 28,
+      height: 20,
       alignItems: 'center',
-      justifyContent: 'flex-end',
-      paddingBottom: 4,
+      justifyContent: 'center',
       zIndex: 20,
     },
     handlePill: {
-      width: 48,
-      height: 5,
-      borderRadius: 2.5,
+      width: 52,
+      height: 6,
+      borderRadius: 3,
       backgroundColor: '#ffffff',
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.5,
-      shadowRadius: 2,
-      elevation: 4,
+      shadowOpacity: 0.6,
+      shadowRadius: 3,
+      elevation: 5,
     },
     hintText: {
       marginTop: 18,
@@ -809,6 +842,17 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       fontSize: 13,
       fontWeight: '700',
       color: colors.primary,
+    },
+    ratioBadge: {
+      backgroundColor: colors.surfaceContainerHigh,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: BorderRadius.full,
+    },
+    ratioBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.tertiary,
     },
     resetBtn: {
       flexDirection: 'row',

@@ -205,8 +205,18 @@ export default function NewPostScreen() {
             } else {
               mediaUrl = presigned.publicUrl;
             }
-          } catch {
-            mediaUrl = rawUri;
+          } catch (uploadErr) {
+            console.warn('Image upload failed:', uploadErr);
+            if (rawUri.startsWith('http')) {
+              mediaUrl = rawUri;
+            } else {
+              Alert.alert(
+                'Upload Failed',
+                'Unable to upload image to storage server. Please verify your connection or enter an image link.'
+              );
+              setSubmitting(false);
+              return;
+            }
           }
         }
       } else if (isEditing) {

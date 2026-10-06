@@ -24,6 +24,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../../src/components/ui/LoadingSpinner';
+import { Avatar } from '../../../src/components/ui/Avatar';
 import { usersService } from '../../../src/services/users';
 import { communitiesService } from '../../../src/services/communities';
 import { formatCategoryName } from '../../../src/utils/categories';
@@ -156,13 +157,7 @@ export default function PublicUserCommunitiesScreen() {
         activeOpacity={0.85}
       >
         <View style={styles.cardHeader}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.communityAvatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <MaterialIcons name="groups" size={26} color={colors.primaryContainer} />
-            </View>
-          )}
+          <Avatar uri={avatarUri} size={48} name={item.name} shape="rounded" />
 
           <View style={styles.cardInfo}>
             <View style={styles.titleRow}>

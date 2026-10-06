@@ -30,6 +30,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from 
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { Avatar } from '../../src/components/ui/Avatar';
 import { useAuth } from '../../src/context/AuthContext';
 import { communitiesService } from '../../src/services/communities';
 import { usersService } from '../../src/services/users';
@@ -694,13 +695,7 @@ export default function HomeScreen() {
                             activeOpacity={0.85}
                           >
                             <View style={styles.storyRing}>
-                              {comm.profile_picture_url ? (
-                                <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
-                              ) : (
-                                <View style={styles.storyAvatarFallback}>
-                                  <MaterialIcons name="groups" size={38} color={colors.primary} />
-                                </View>
-                              )}
+                              <Avatar uri={comm.profile_picture_url} size={90} name={comm.name} />
                               {isOwner ? (
                                 <View style={styles.stackCrownBadge}>
                                   <MaterialCommunityIcons name="crown" size={13} color="#ffffff" />
@@ -791,13 +786,7 @@ export default function HomeScreen() {
                   activeOpacity={0.8}
                 >
                   <View style={styles.storyRing}>
-                    {comm.profile_picture_url ? (
-                      <Image source={{ uri: comm.profile_picture_url }} style={styles.storyAvatar} />
-                    ) : (
-                      <View style={styles.storyAvatarFallback}>
-                        <MaterialIcons name="groups" size={38} color={colors.primary} />
-                      </View>
-                    )}
+                    <Avatar uri={comm.profile_picture_url} size={90} name={comm.name} />
                   </View>
                   <Text style={styles.storyName} numberOfLines={1}>
                     {comm.name}

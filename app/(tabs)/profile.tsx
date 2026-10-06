@@ -39,7 +39,7 @@ import { commentsService } from '../../src/services/comments';
 import { hangoutsService } from '../../src/services/hangouts';
 import { eventsService } from '../../src/services/events';
 import { communitiesService } from '../../src/services/communities';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../../src/components/ui';
 import { categorizeItemByDate } from '../../src/utils/dateUtils';
 import { formatCategoryName } from '../../src/utils/categories';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
@@ -689,35 +689,11 @@ export default function ProfileScreen() {
             onPress={() => router.push('/edit-profile')}
             activeOpacity={0.85}
           >
-            {user?.profile_picture_url ? (
-              (() => {
-                const crop = parseCropFromUrl(user.profile_picture_url);
-                return (
-                  <View style={styles.avatarImage}>
-                    <Image
-                      source={{ uri: crop.cleanUrl }}
-                      style={[
-                        styles.avatarImageInner,
-                        crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
-                          ? {
-                              transform: [
-                                { translateX: (crop.panX / 100) * 96 },
-                                { translateY: (crop.panY / 100) * 96 },
-                                { scale: crop.zoom },
-                              ],
-                            }
-                          : null,
-                      ]}
-                      resizeMode="cover"
-                    />
-                  </View>
-                );
-              })()
-            ) : (
-              <View style={[styles.avatarImage, styles.avatarFallback]}>
-                <MaterialIcons name="person" size={54} color={colors.tertiary} />
-              </View>
-            )}
+            <Avatar
+              uri={user?.profile_picture_url}
+              size={96}
+              name={displayName}
+            />
           </TouchableOpacity>
 
           {/* User Identity */}
@@ -1041,14 +1017,14 @@ export default function ProfileScreen() {
                       activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
                       <View style={styles.savedEventCoverWrapper}>
-                        <Image
-                          source={{
-                            uri:
-                              ev.cover_image_url ||
-                              ev.coverImageUrl ||
-                              'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                          }}
+                        <CroppedImage
+                          uri={
+                            ev.cover_image_url ||
+                            ev.coverImageUrl ||
+                            'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600'
+                          }
                           style={styles.savedEventCover}
+                          fill
                         />
                         <View style={styles.eventCategoryBadge}>
                           <Text style={styles.eventCategoryBadgeText} numberOfLines={1}>
@@ -1147,18 +1123,11 @@ export default function ProfileScreen() {
                       <View>
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
-                            {h.creatorAvatar || h.creator?.profile_picture_url ? (
-                              <Image
-                                source={{
-                                  uri: h.creatorAvatar || h.creator?.profile_picture_url,
-                                }}
-                                style={styles.hangoutCreatorAvatar}
-                              />
-                            ) : (
-                              <View style={styles.hangoutAvatarFallback}>
-                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
-                              </View>
-                            )}
+                            <Avatar
+                              uri={h.creatorAvatar || h.creator?.profile_picture_url}
+                              size={24}
+                              name={h.creatorName || h.creator?.first_name || 'Host'}
+                            />
                             <Text style={styles.hangoutCreatorName} numberOfLines={1}>
                               {h.creatorName || h.creator?.first_name || 'Host'}
                             </Text>
@@ -1282,18 +1251,11 @@ export default function ProfileScreen() {
                       <View>
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
-                            {h.creatorAvatar || h.creator?.profile_picture_url ? (
-                              <Image
-                                source={{
-                                  uri: h.creatorAvatar || h.creator?.profile_picture_url,
-                                }}
-                                style={styles.hangoutCreatorAvatar}
-                              />
-                            ) : (
-                              <View style={styles.hangoutAvatarFallback}>
-                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
-                              </View>
-                            )}
+                            <Avatar
+                              uri={h.creatorAvatar || h.creator?.profile_picture_url}
+                              size={24}
+                              name={h.creatorName || h.creator?.first_name || 'Host'}
+                            />
                             <Text style={styles.hangoutCreatorName} numberOfLines={1}>
                               {h.creatorName || h.creator?.first_name || 'Host'}
                             </Text>
@@ -1388,14 +1350,14 @@ export default function ProfileScreen() {
                     activeOpacity={cat.isPassed ? 0.38 : 0.85}
                   >
                     <View style={styles.savedEventCoverWrapper}>
-                      <Image
-                        source={{
-                          uri:
-                            ev.cover_image_url ||
-                            ev.coverImageUrl ||
-                            'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                        }}
+                      <CroppedImage
+                        uri={
+                          ev.cover_image_url ||
+                          ev.coverImageUrl ||
+                          'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600'
+                        }
                         style={styles.savedEventCover}
+                        fill
                       />
                       <View style={styles.eventCategoryBadge}>
                         <Text style={styles.eventCategoryBadgeText} numberOfLines={1}>

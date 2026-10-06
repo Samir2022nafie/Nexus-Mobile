@@ -24,6 +24,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
 import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
+import { Avatar } from '../src/components/ui/Avatar';
 
 export default function SettingsScreen() {
   const router = useSafeRouter();
@@ -89,16 +90,7 @@ export default function SettingsScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.rowLeft}>
-                {user?.profile_picture_url ? (
-                  <Image
-                    source={{ uri: user.profile_picture_url }}
-                    style={styles.userRowAvatar}
-                  />
-                ) : (
-                  <View style={[styles.userRowAvatar, styles.avatarPlaceholder]}>
-                    <MaterialIcons name="person" size={20} color={colors.onSurfaceVariant} />
-                  </View>
-                )}
+                <Avatar uri={user?.profile_picture_url} size={32} name={displayName} />
                 <View style={styles.textCol}>
                   <Text style={styles.rowTitle}>Edit Profile</Text>
                   <Text style={styles.rowSubtitle}>{displayName}</Text>

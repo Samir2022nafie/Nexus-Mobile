@@ -26,6 +26,7 @@ import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing, Shadows } from '../../src/constants/theme';
+import { Avatar, CroppedImage } from '../../src/components/ui';
 import { useTheme } from '../../src/context/ThemeContext';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -1710,16 +1711,29 @@ export default function ExploreMapScreen() {
 
             function formatCroppedImgHtml(url, fallbackHtml) {
               if (!url) return fallbackHtml;
-              var cIdx = url.indexOf('#crop=');
-              if (cIdx === -1) {
-                return '<img src="' + url + '" />';
+              var trimmed = (url || '').trim();
+              if (trimmed.indexOf('data:image/') === 0) {
+                return '<img src="' + trimmed + '" />';
               }
-              var clean = url.slice(0, cIdx);
-              var cropPart = url.slice(cIdx + 6).split(',');
-              var zoom = parseFloat(cropPart[0]) || 1;
-              var x = parseFloat(cropPart[1]) || 0;
-              var y = parseFloat(cropPart[2]) || 0;
-              return '<img src="' + clean + '" style="transform: scale(' + zoom + ') translate(' + x + '%, ' + y + '%); transform-origin: center center;" />';
+              var hashIdx = trimmed.indexOf('#crop=');
+              var queryMatch = trimmed.match(/[?&]crop=([^&#]+)/);
+              var cropPart = '';
+              var clean = trimmed;
+              if (hashIdx !== -1) {
+                clean = trimmed.slice(0, hashIdx);
+                cropPart = trimmed.slice(hashIdx + 6).split('&')[0];
+              } else if (queryMatch) {
+                cropPart = decodeURIComponent(queryMatch[1]);
+                clean = trimmed.replace(/[?&]crop=[^&#]+/, '').replace(/\?&/, '?').replace(/[?&]$/, '');
+              }
+              if (!cropPart) {
+                return '<img src="' + clean + '" />';
+              }
+              var parts = cropPart.split(',');
+              var zoom = parseFloat(parts[0]) || 1;
+              var x = parseFloat(parts[1]) || 0;
+              var y = parseFloat(parts[2]) || 0;
+              return '<img src="' + clean + '" style="transform: translate(' + x + '%, ' + y + '%) scale(' + zoom + '); transform-origin: center center;" />';
             }
 
             if (type === 'hangout') {
@@ -3230,30 +3244,17 @@ export default function ExploreMapScreen() {
             {/* Visual Thumbnail */}
             <View style={styles.entityImageWrap}>
               {selectedEntity.type === 'user' ? (
-                selectedEntity.data.profilePictureUrl ? (
-                  <Image
-                    source={{ uri: selectedEntity.data.profilePictureUrl }}
-                    style={styles.entityAvatarCircle}
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.entityAvatarCircle,
-                      {
-                        backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      },
-                    ]}
-                  >
-                    <MaterialIcons name="person" size={28} color={colors.tertiary} />
-                  </View>
-                )
+                <Avatar
+                  uri={selectedEntity.data.profilePictureUrl}
+                  size={56}
+                  name={selectedEntity.data.name || selectedEntity.data.username || 'User'}
+                />
               ) : selectedEntity.type === 'community' ? (
                 selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl ? (
-                  <Image
-                    source={{ uri: selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl }}
+                  <CroppedImage
+                    uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl}
                     style={styles.entityImageSquare}
+                    fill
                   />
                 ) : (
                   <View
@@ -3271,9 +3272,10 @@ export default function ExploreMapScreen() {
                 )
               ) : selectedEntity.type === 'event' ? (
                 selectedEntity.data.coverImageUrl ? (
-                  <Image
-                    source={{ uri: selectedEntity.data.coverImageUrl }}
+                  <CroppedImage
+                    uri={selectedEntity.data.coverImageUrl}
                     style={styles.entityImageRect}
+                    fill
                   />
                 ) : (
                   <View
@@ -3291,9 +3293,10 @@ export default function ExploreMapScreen() {
                 )
               ) : (
                 selectedEntity.data.coverImageUrl ? (
-                  <Image
-                    source={{ uri: selectedEntity.data.coverImageUrl }}
+                  <CroppedImage
+                    uri={selectedEntity.data.coverImageUrl}
                     style={styles.entityImageSquare}
+                    fill
                   />
                 ) : (
                   <View

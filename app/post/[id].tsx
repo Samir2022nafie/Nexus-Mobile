@@ -40,6 +40,7 @@ import { commentsService } from '../../src/services/comments';
 import { Post, Comment } from '../../src/types';
 import { formatCategoryName } from '../../src/utils/categories';
 import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
+import { Avatar } from '../../src/components/ui/Avatar';
 
 export default function ThreadDetailScreen() {
   const router = useSafeRouter();
@@ -375,7 +376,7 @@ export default function ThreadDetailScreen() {
               activeOpacity={0.75}
             >
               {communityPfp ? (
-                <Image source={{ uri: communityPfp }} style={styles.topBarCommunityAvatar} />
+                <Avatar uri={communityPfp} size={24} name={post.community.name} />
               ) : (
                 <MaterialIcons name="groups" size={16} color={colors.primary} />
               )}
@@ -432,16 +433,11 @@ export default function ThreadDetailScreen() {
                 }}
                 activeOpacity={0.75}
               >
-                {post.author?.profile_picture_url ? (
-                  <Image
-                    source={{ uri: post.author.profile_picture_url }}
-                    style={styles.authorAvatar}
-                  />
-                ) : (
-                  <View style={styles.authorAvatarFallback}>
-                    <MaterialIcons name="person" size={20} color={colors.tertiary} />
-                  </View>
-                )}
+                <Avatar
+                  uri={post.author?.profile_picture_url}
+                  size={40}
+                  name={`${post.author?.first_name || ''} ${post.author?.last_name || ''}`.trim() || post.author?.username}
+                />
                 <View style={styles.authorDetails}>
                   <Text style={styles.authorFullName}>
                     {post.author?.first_name} {post.author?.last_name || ''}
@@ -615,16 +611,11 @@ export default function ThreadDetailScreen() {
                         }}
                         activeOpacity={0.7}
                       >
-                        {comment.author?.profile_picture_url ? (
-                          <Image
-                            source={{ uri: comment.author.profile_picture_url }}
-                            style={styles.commentAvatar}
-                          />
-                        ) : (
-                          <View style={styles.commentAvatarFallback}>
-                            <MaterialIcons name="person" size={16} color={colors.tertiary} />
-                          </View>
-                        )}
+                        <Avatar
+                          uri={comment.author?.profile_picture_url}
+                          size={32}
+                          name={`${comment.author?.first_name || ''} ${comment.author?.last_name || ''}`.trim() || comment.author?.username}
+                        />
                       </TouchableOpacity>
                       <View style={styles.commentBody}>
                         <View style={styles.commentAuthorLine}>
@@ -697,16 +688,11 @@ export default function ThreadDetailScreen() {
           ]}
         >
           <View style={styles.composerBox}>
-            {user?.profile_picture_url ? (
-              <Image
-                source={{ uri: user.profile_picture_url }}
-                style={styles.composerAvatar}
-              />
-            ) : (
-              <View style={styles.composerAvatarFallback}>
-                <MaterialIcons name="person" size={16} color={colors.tertiary} />
-              </View>
-            )}
+            <Avatar
+              uri={user?.profile_picture_url}
+              size={28}
+              name={`${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.username}
+            />
             <View style={styles.composerInputWrapper}>
               <TextInput
                 style={styles.composerInput}

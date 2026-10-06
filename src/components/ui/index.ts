@@ -10,3 +10,4 @@ export * from './TabBar';
 export * from './Toast';
 export * from './LocationInput';
 export * from './MapPickerModal';
+export * from './CroppedImage';

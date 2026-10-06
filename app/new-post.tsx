@@ -27,7 +27,7 @@ import { postsService } from '../src/services/posts';
 import { communitiesService } from '../src/services/communities';
 import { uploadService } from '../src/services/upload';
 import { Community } from '../src/types';
-import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../src/components/ui';
 import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl, encodeCropUrl } from '../src/utils/imageUrl';
 import { setCommunitySelectionListener } from '../src/utils/communitySelectionStore';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
@@ -307,13 +307,11 @@ export default function NewPostScreen() {
           activeOpacity={isCommunityLocked ? 1 : 0.8}
           disabled={isCommunityLocked}
         >
-          {communityAvatarUri ? (
-            <Image source={{ uri: communityAvatarUri }} style={styles.communityPillAvatar} />
-          ) : (
-            <View style={styles.communityPillAvatarFallback}>
-              <MaterialIcons name="groups" size={16} color={colors.primary} />
-            </View>
-          )}
+          <Avatar
+            uri={communityAvatarUri}
+            size={24}
+            name={selectedCommunity ? selectedCommunity.name : 'Community'}
+          />
           <Text style={styles.communityName}>
             {selectedCommunity ? selectedCommunity.name : 'Select a community'}
           </Text>
@@ -406,21 +404,10 @@ export default function NewPostScreen() {
                 postCrop.aspectRatio ? { aspectRatio: postCrop.aspectRatio, height: undefined, maxHeight: 380 } : null,
               ]}
             >
-              <Image
-                source={{ uri: postCrop.cleanUrl }}
-                style={[
-                  styles.previewImage,
-                  postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
-                    ? {
-                        transform: [
-                          { translateX: (postCrop.panX / 100) * (Dimensions.get('window').width - 32) },
-                          { translateY: (postCrop.panY / 100) * 200 },
-                          { scale: postCrop.zoom },
-                        ],
-                      }
-                    : null,
-                ]}
-                resizeMode="cover"
+              <CroppedImage
+                uri={uri}
+                style={styles.previewImage}
+                fill
               />
               <TouchableOpacity
                 style={styles.cropImageBtn}

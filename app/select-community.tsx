@@ -25,6 +25,7 @@ import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { communitiesService } from '../src/services/communities';
 import { Community } from '../src/types';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
+import { Avatar } from '../src/components/ui/Avatar';
 import { formatCategoryName } from '../src/utils/categories';
 import { notifyCommunitySelected } from '../src/utils/communitySelectionStore';
 
@@ -170,13 +171,7 @@ export default function SelectCommunityScreen() {
                 >
                   <View style={styles.commTopRow}>
                     <View style={styles.commMetaGroup}>
-                      {avatarUri ? (
-                        <Image source={{ uri: avatarUri }} style={styles.commAvatar} />
-                      ) : (
-                        <View style={styles.commAvatarFallback}>
-                          <MaterialIcons name="groups" size={24} color={colors.primary} />
-                        </View>
-                      )}
+                      <Avatar uri={avatarUri} size={48} name={comm.name} />
                       <View style={styles.commTextGroup}>
                         <Text style={styles.commName} numberOfLines={1}>
                           {comm.name}

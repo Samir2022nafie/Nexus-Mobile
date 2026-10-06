@@ -22,6 +22,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { Avatar } from '../../src/components/ui/Avatar';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 import { usersService } from '../../src/services/users';
 import { reportsService } from '../../src/services/reports';
@@ -229,33 +230,11 @@ export default function PublicUserProfileScreen() {
         {/* Profile Card */}
         <View style={styles.profileCard}>
           {/* Avatar */}
-          <View style={styles.avatarWrapper}>
-            {(() => {
-              const avatarCrop = parseCropFromUrl(avatarUrl);
-              return avatarCrop.cleanUrl ? (
-                <Image
-                  source={{ uri: avatarCrop.cleanUrl }}
-                  style={[
-                    styles.avatarImage,
-                    avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
-                      ? {
-                          transform: [
-                            { translateX: (avatarCrop.panX / 100) * 88 },
-                            { translateY: (avatarCrop.panY / 100) * 88 },
-                            { scale: avatarCrop.zoom },
-                          ],
-                        }
-                      : null,
-                  ]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.avatarFallback}>
-                  <MaterialIcons name="person" size={50} color={colors.tertiary} />
-                </View>
-              );
-            })()}
-          </View>
+            <Avatar
+              uri={avatarUrl}
+              size={88}
+              name={displayName}
+            />
 
           {/* User Details */}
           <Text style={styles.displayNameText}>{displayName}</Text>

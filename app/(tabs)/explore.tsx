@@ -30,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../../src/components/ui';
 import { communitiesService } from '../../src/services/communities';
 import { postsService } from '../../src/services/posts';
 import { eventsService } from '../../src/services/events';
@@ -545,24 +545,18 @@ export default function ExploreScreen() {
                     >
                       <View style={styles.commTopRow}>
                         <View style={styles.commMetaGroup}>
-                          {comm.profile_picture_url || comm.profilePictureUrl || comm.cover_image_url || comm.coverImageUrl || comm.banner_url || comm.bannerUrl ? (
-                            <Image
-                              source={{
-                                uri:
-                                  comm.profile_picture_url ||
-                                  comm.profilePictureUrl ||
-                                  comm.cover_image_url ||
-                                  comm.coverImageUrl ||
-                                  comm.banner_url ||
-                                  comm.bannerUrl,
-                              }}
-                              style={styles.commAvatar}
-                            />
-                          ) : (
-                            <View style={styles.commAvatarFallback}>
-                              <MaterialIcons name="groups" size={24} color={colors.primary} />
-                            </View>
-                          )}
+                          <Avatar
+                            uri={
+                              comm.profile_picture_url ||
+                              comm.profilePictureUrl ||
+                              comm.cover_image_url ||
+                              comm.coverImageUrl ||
+                              comm.banner_url ||
+                              comm.bannerUrl
+                            }
+                            size={48}
+                            name={comm.name}
+                          />
                           <View style={styles.commTextGroup}>
                             <Text style={styles.commName} numberOfLines={1}>
                               {comm.name}
@@ -670,9 +664,10 @@ export default function ExploreScreen() {
                             event.community?.coverImageUrl ||
                             'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800';
                           return (
-                            <Image
-                              source={{ uri: coverUrl }}
+                            <CroppedImage
+                              uri={coverUrl}
                               style={styles.eventCover}
+                              fill
                             />
                           );
                         })()}
@@ -710,13 +705,7 @@ export default function ExploreScreen() {
                           const commName = event.communityName || event.community?.name || 'Nexus Community';
                           return (
                             <View style={styles.eventCommunityRow}>
-                              {commAvatar ? (
-                                <Image source={{ uri: commAvatar }} style={styles.eventCommunityAvatar} />
-                              ) : (
-                                <View style={styles.eventCommunityAvatarFallback}>
-                                  <MaterialIcons name="groups" size={14} color={colors.primary} />
-                                </View>
-                              )}
+                              <Avatar uri={commAvatar} size={20} name={commName} />
                               <Text style={styles.eventCommunityName} numberOfLines={1}>
                                 {commName}
                               </Text>

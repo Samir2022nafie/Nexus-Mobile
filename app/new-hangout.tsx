@@ -34,6 +34,7 @@ import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
+import { CroppedImage } from '../src/components/ui';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -508,27 +509,11 @@ export default function NewHangoutScreen() {
           <Text style={styles.label}>COVER IMAGE (OPTIONAL)</Text>
           {form.coverImageUrl.trim() ? (
             <View style={styles.coverPreviewContainer}>
-              {(() => {
-                const hangoutCrop = parseCropFromUrl(form.coverImageUrl);
-                return (
-                  <Image
-                    source={{ uri: hangoutCrop.cleanUrl }}
-                    style={[
-                      styles.coverPreviewImage,
-                      hangoutCrop.zoom > 1 || hangoutCrop.panX !== 0 || hangoutCrop.panY !== 0
-                        ? {
-                            transform: [
-                              { scale: hangoutCrop.zoom },
-                              { translateX: (hangoutCrop.panX / 100) * (Dimensions.get('window').width - 32) },
-                              { translateY: (hangoutCrop.panY / 100) * 150 },
-                            ],
-                          }
-                        : null,
-                    ]}
-                    resizeMode="cover"
-                  />
-                );
-              })()}
+              <CroppedImage
+                uri={form.coverImageUrl}
+                style={styles.coverPreviewImage}
+                fill
+              />
               <TouchableOpacity
                 style={styles.coverRemoveBtn}
                 onPress={() => updateField('coverImageUrl', '')}

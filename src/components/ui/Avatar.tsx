@@ -6,10 +6,12 @@ import { View, Text, Image, StyleSheet } from 'react-native';
 import { Colors, Typography } from '../../constants/theme';
 import { parseCropFromUrl } from '../../utils/imageUrl';
 
-interface AvatarProps {
+export interface AvatarProps {
   uri?: string | null;
   name?: string;
   size?: number;
+  shape?: 'circle' | 'rounded' | 'square';
+  borderRadius?: number;
   borderColor?: string;
   showBorder?: boolean;
 }
@@ -40,48 +42,67 @@ export const Avatar: React.FC<AvatarProps> = ({
   uri,
   name,
   size = 40,
+  shape = 'circle',
+  borderRadius: customRadius,
   borderColor,
   showBorder = false,
 }) => {
+  const [loadError, setLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    setLoadError(false);
+  }, [uri]);
+
+  const resolvedRadius = customRadius !== undefined
+    ? customRadius
+    : shape === 'circle'
+    ? size / 2
+    : shape === 'rounded'
+    ? Math.round(size * 0.25)
+    : 0;
+
   const borderStyle = showBorder
     ? { borderWidth: 2, borderColor: borderColor || Colors.primaryContainer }
     : {};
 
-  if (uri) {
+  if (uri && !loadError) {
     const crop = parseCropFromUrl(uri);
-    return (
-      <View
-        style={[
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            overflow: 'hidden',
-          },
-          borderStyle,
-        ]}
-      >
-        <Image
-          source={{ uri: crop.cleanUrl }}
+    if (crop.cleanUrl) {
+      return (
+        <View
           style={[
             {
               width: size,
               height: size,
+              borderRadius: resolvedRadius,
+              overflow: 'hidden',
             },
-            crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
-              ? {
-                  transform: [
-                    { translateX: (crop.panX / 100) * size },
-                    { translateY: (crop.panY / 100) * size },
-                    { scale: crop.zoom },
-                  ],
-                }
-              : null,
+            borderStyle,
           ]}
-          resizeMode="cover"
-        />
-      </View>
-    );
+        >
+          <Image
+            source={{ uri: crop.cleanUrl }}
+            style={[
+              {
+                width: size,
+                height: size,
+              },
+              crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
+                ? {
+                    transform: [
+                      { translateX: (crop.panX / 100) * size },
+                      { translateY: (crop.panY / 100) * size },
+                      { scale: crop.zoom },
+                    ],
+                  }
+                : null,
+            ]}
+            resizeMode="cover"
+            onError={() => setLoadError(true)}
+          />
+        </View>
+      );
+    }
   }
 
   const bgColor = getColorFromName(name);
@@ -94,7 +115,7 @@ export const Avatar: React.FC<AvatarProps> = ({
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
+          borderRadius: resolvedRadius,
           backgroundColor: bgColor,
           alignItems: 'center',
           justifyContent: 'center',

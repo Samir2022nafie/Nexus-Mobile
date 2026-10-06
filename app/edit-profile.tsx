@@ -30,6 +30,7 @@ import { ApiRequestError } from '../src/services/api';
 import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
+import { Avatar } from '../src/components/ui/Avatar';
 
 export default function EditProfileScreen() {
   const router = useSafeRouter();
@@ -127,31 +128,11 @@ export default function EditProfileScreen() {
             }}
             activeOpacity={0.8}
           >
-            {(() => {
-              const avatarCrop = parseCropFromUrl(form.profilePictureUrl || user?.profile_picture_url);
-              return avatarCrop.cleanUrl ? (
-                <Image
-                  source={{ uri: avatarCrop.cleanUrl }}
-                  style={[
-                    styles.avatarImage,
-                    avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
-                      ? {
-                          transform: [
-                            { translateX: (avatarCrop.panX / 100) * 84 },
-                            { translateY: (avatarCrop.panY / 100) * 84 },
-                            { scale: avatarCrop.zoom },
-                          ],
-                        }
-                      : null,
-                  ]}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.avatarImage, styles.avatarFallback]}>
-                  <MaterialIcons name="person" size={48} color={colors.onSurfaceVariant} />
-                </View>
-              );
-            })()}
+            <Avatar
+              uri={form.profilePictureUrl || user?.profile_picture_url}
+              size={84}
+              name={user?.first_name || user?.name || user?.username}
+            />
           </TouchableOpacity>
         </View>
 

@@ -26,14 +26,13 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Typography, BorderRadius, Shadows, ThemeColors } from '../../constants/theme';
 import { useTheme } from '../../context/ThemeContext';
 import { parseCropFromUrl, encodeCropUrl, extractDirectImageUrl } from '../../utils/imageUrl';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const MIN_ZOOM = 1.0;
 const MAX_ZOOM = 3.0;
@@ -60,6 +59,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => getStyles(colors, isDark), [colors, isDark]);
 
+  // Dynamic window dimensions from hook
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
   // Natural image dimensions
   const [origSize, setOrigSize] = useState<{ width: number; height: number } | null>(null);
   const [loadingOrig, setLoadingOrig] = useState(true);
@@ -78,12 +80,12 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Viewport container layout measurement ref
-  const viewportLayout = useRef({ width: SCREEN_WIDTH, height: Math.round(SCREEN_HEIGHT * 0.7) });
+  const viewportLayout = useRef({ width: windowWidth, height: Math.round(windowHeight * 0.7) });
 
   // Active gesture mode: 'none' | 'resize-top' | 'resize-bottom' | 'pinch' | 'pan'
   const gestureMode = useRef<'none' | 'resize-top' | 'resize-bottom' | 'pinch' | 'pan'>('none');
   const resizeStartTouchY = useRef<number>(0);
-  const resizeStartHeight = useRef<number>(SCREEN_WIDTH - 24);
+  const resizeStartHeight = useRef<number>(windowWidth - 20);
 
   // Multi-touch pinch tracking refs
   const isPinching = useRef<boolean>(false);
@@ -96,17 +98,15 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const dragStartTouch = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragStartPan = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Fixed horizontal width
-  const boxWidth = cropShape === 'circle' ? Math.min(360, SCREEN_WIDTH - 28) : SCREEN_WIDTH - 24;
-
-  // Max and min allowable height for rectangle post crop
-  const maxPostHeight = Math.min(Math.round(SCREEN_HEIGHT * 0.58), 520);
+  // Generous horizontal width: fills almost the entire screen width
+  const boxWidth = cropShape === 'circle'
+    ? Math.min(windowWidth - 28, Math.round(windowHeight * 0.46), 360)
+    : Math.max(280, windowWidth - 20);
 
   // User requirement: "the minimum height you can crop an image should be a 1:1 ratio"
-  // For tall/portrait images, minPostHeight is boxWidth (1:1 square). For landscape images, natural height is allowed.
-  const naturalRatio = origSize && origSize.height > 0 ? origSize.width / origSize.height : 1.0;
-  const naturalH = origSize && origSize.height > 0 ? Math.round(boxWidth / naturalRatio) : boxWidth;
-  const minPostHeight = Math.min(boxWidth, Math.max(160, naturalH));
+  // For posts: min height is 1:1 (square = boxWidth), max height is 4:5 portrait (boxWidth * 1.25)
+  const minPostHeight = boxWidth;
+  const maxPostHeight = Math.min(Math.round(boxWidth * 1.25), Math.round(windowHeight * 0.55));
 
   // Post crop dynamic height state (gallery-style resizable grid)
   const [cropHeight, setCropHeight] = useState<number>(boxWidth);
@@ -200,9 +200,10 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         setLoadingOrig(false);
 
         if (cropShape === 'rectangle') {
-          const natRatio = w / h;
-          const natH = Math.round(boxWidth / natRatio);
-          const initialH = Math.min(maxPostHeight, Math.max(minPostHeight, natH));
+          const prevH = parsedImage.aspectRatio && parsedImage.aspectRatio > 0
+            ? Math.round(boxWidth / parsedImage.aspectRatio)
+            : boxWidth;
+          const initialH = Math.min(maxPostHeight, Math.max(minPostHeight, prevH));
           setCropHeight(initialH);
           cropHeightRef.current = initialH;
         }
@@ -740,8 +741,8 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 12,
+      paddingHorizontal: 6,
+      paddingVertical: 8,
     },
     cropWindow: {
       overflow: 'hidden',

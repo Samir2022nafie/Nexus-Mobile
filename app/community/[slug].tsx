@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../../src/components/ui';
 import { AppBottomBar } from '../../src/components/navigation/AppBottomBar';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { communitiesService } from '../../src/services/communities';
@@ -431,13 +431,13 @@ export default function CommunityDetailScreen() {
       >
         {/* Narrower Cover Hero Banner (~125 height), no share button */}
         <View style={styles.heroCard}>
-          <Image
-            source={{
-              uri:
-                community.banner_url ||
-                'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800',
-            }}
+          <CroppedImage
+            uri={
+              community.banner_url ||
+              'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800'
+            }
             style={styles.heroBanner}
+            fill
           />
           <View style={styles.heroOverlay} />
 
@@ -478,16 +478,11 @@ export default function CommunityDetailScreen() {
             {/* Avatar & Membership Button Row */}
             <View style={styles.avatarRow}>
               <View style={styles.avatarOverlapContainer}>
-                {community.profile_picture_url ? (
-                  <Image
-                    source={{ uri: community.profile_picture_url }}
-                    style={styles.communityAvatar}
-                  />
-                ) : (
-                  <View style={styles.communityAvatarFallback}>
-                    <MaterialIcons name="groups" size={32} color={colors.primary} />
-                  </View>
-                )}
+                <Avatar
+                  uri={community.profile_picture_url}
+                  size={60}
+                  name={community.name}
+                />
               </View>
 
               {/* Membership State Action & Notification Toggle */}

@@ -21,6 +21,7 @@ import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { Avatar } from '../../src/components/ui/Avatar';
 import { hangoutsService } from '../../src/services/hangouts';
 import { useAuth } from '../../src/context/AuthContext';
 import { useUserLocation } from '../../src/context/LocationContext';
@@ -304,16 +305,11 @@ export default function HangoutsPage() {
                   {/* Header Row */}
                   <View style={styles.cardHeader}>
                     <View style={styles.hostGroup}>
-                      {creatorAvatar ? (
-                        <Image
-                          source={{ uri: creatorAvatar }}
-                          style={styles.hostAvatar}
-                        />
-                      ) : (
-                        <View style={styles.hostAvatarFallback}>
-                          <MaterialIcons name="person" size={20} color={colors.tertiary} />
-                        </View>
-                      )}
+                      <Avatar
+                        uri={creatorAvatar}
+                        size={36}
+                        name={h.creatorName || h.creator?.first_name || 'Host'}
+                      />
                       <View>
                         <Text style={styles.hostName}>
                           {h.creatorName || h.creator?.first_name || 'Host'}

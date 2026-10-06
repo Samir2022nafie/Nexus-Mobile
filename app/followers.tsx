@@ -23,6 +23,7 @@ import { useSafeRouter } from '../src/hooks/useSafeRouter';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../src/constants/theme';
 import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
+import { Avatar } from '../src/components/ui/Avatar';
 import { usersService, FollowerItem } from '../src/services/users';
 
 export default function FollowersScreen() {
@@ -169,13 +170,7 @@ export default function FollowersScreen() {
         activeOpacity={0.8}
       >
         <View style={styles.cardLeft}>
-          {item.profilePictureUrl ? (
-            <Image source={{ uri: item.profilePictureUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <MaterialIcons name="person" size={24} color={colors.tertiary} />
-            </View>
-          )}
+          <Avatar uri={item.profilePictureUrl} size={48} name={displayName} />
 
           <View style={styles.userInfo}>
             <View style={styles.nameRow}>

@@ -17,6 +17,7 @@ import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { formatCategoryName } from '../utils/categories';
 import { usePostState } from '../context/PostStateContext';
 import { extractDirectImageUrl, parseCropFromUrl } from '../utils/imageUrl';
+import { Avatar } from './ui/Avatar';
 
 export function formatPostRelativeDate(rawDate?: string): string {
   if (!rawDate) return '';
@@ -240,31 +241,9 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
           activeOpacity={0.75}
         >
           {showAuthor ? (
-            !authorImgFailed && authorPic ? (
-              <Image
-                source={{ uri: authorPic }}
-                style={styles.commAvatar}
-                onError={() => setAuthorImgFailed(true)}
-              />
-            ) : (
-              <View style={styles.commAvatarFallback}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary }}>
-                  {authorName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )
+            <Avatar uri={authorPic} size={34} name={authorName} />
           ) : (
-            !commImgFailed && commPic ? (
-              <Image
-                source={{ uri: commPic }}
-                style={styles.commAvatar}
-                onError={() => setCommImgFailed(true)}
-              />
-            ) : (
-              <View style={styles.commAvatarFallback}>
-                <MaterialIcons name="groups" size={16} color={colors.primary} />
-              </View>
-            )
+            <Avatar uri={commPic} size={34} name={commDisplayName} />
           )}
           <Text style={styles.communityNameText} numberOfLines={1}>
             {showAuthor ? authorName : commDisplayName}

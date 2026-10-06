@@ -26,7 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../../src/components/ui';
 import { useAuth } from '../../src/context/AuthContext';
 import { eventsService } from '../../src/services/events';
 import { communitiesService } from '../../src/services/communities';
@@ -334,14 +334,14 @@ export default function EventDetailScreen() {
       >
         {/* Cover Hero Banner */}
         <View style={styles.heroContainer}>
-          <Image
-            source={{
-              uri:
-                event.cover_image_url ||
-                event.coverImageUrl ||
-                'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800',
-            }}
+          <CroppedImage
+            uri={
+              event.cover_image_url ||
+              event.coverImageUrl ||
+              'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800'
+            }
             style={styles.heroImage}
+            fill
           />
 
           {/* Quick Nav Actions: Back Button & Author Controls */}
@@ -417,13 +417,11 @@ export default function EventDetailScreen() {
             onPress={() => communitySlug && router.push(`/community/${communitySlug}`)}
             activeOpacity={0.8}
           >
-            {communityPfp ? (
-              <Image source={{ uri: communityPfp }} style={styles.commAvatarProminent} />
-            ) : (
-              <View style={styles.commIconProminent}>
-                <MaterialIcons name="groups" size={20} color={colors.primary} />
-              </View>
-            )}
+            <Avatar
+              uri={communityPfp}
+              size={32}
+              name={event.community?.name || 'Nexus Community'}
+            />
             <Text style={styles.communityNameProminent} numberOfLines={1}>
               {event.community?.name || 'Nexus Community'}
             </Text>
@@ -540,13 +538,7 @@ export default function EventDetailScreen() {
                   const pName = p.user?.first_name || p.first_name || p.name || 'Member';
                   return (
                     <View key={p.id || idx} style={styles.participantItem}>
-                      {avatarUrl ? (
-                        <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
-                      ) : (
-                        <View style={styles.participantAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
-                        </View>
-                      )}
+                      <Avatar uri={avatarUrl} size={40} name={pName} />
                       <Text style={styles.participantNameText} numberOfLines={1}>
                         {pName}
                       </Text>

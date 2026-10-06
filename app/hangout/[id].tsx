@@ -24,7 +24,7 @@ import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../s
 import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { hangoutsService } from '../../src/services/hangouts';
 import { HangoutItem } from '../../src/types';
-import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
+import { LoadingSpinner, Avatar, CroppedImage } from '../../src/components/ui';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { DropdownMenu } from '../../src/components/ui/DropdownMenu';
 import { formatCategoryName } from '../../src/utils/categories';
@@ -365,14 +365,14 @@ export default function HangoutDetailScreen() {
       >
         {/* Visual Cover Banner with Overlay Actions */}
         <View style={styles.coverContainer}>
-          <Image
-            source={{
-              uri:
-                hangout.cover_image_url ||
-                hangout.coverImageUrl ||
-                'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800',
-            }}
+          <CroppedImage
+            uri={
+              hangout.cover_image_url ||
+              hangout.coverImageUrl ||
+              'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800'
+            }
             style={styles.coverImage}
+            fill
           />
           <View style={styles.coverGradient} />
 
@@ -489,16 +489,11 @@ export default function HangoutDetailScreen() {
               }}
               activeOpacity={0.7}
             >
-              {hangout.creator?.profile_picture_url ? (
-                <Image
-                  source={{ uri: hangout.creator.profile_picture_url }}
-                  style={styles.creatorAvatarImg}
-                />
-              ) : (
-                <View style={styles.creatorAvatarFallback}>
-                  <MaterialIcons name="person" size={22} color={colors.tertiary} />
-                </View>
-              )}
+              <Avatar
+                uri={hangout.creator?.profile_picture_url}
+                size={34}
+                name={hangout.creator?.first_name || hangout.creator?.username || 'Host'}
+              />
               <View>
                 <Text style={styles.creatorHandle}>
                   @{hangout.creator?.username || 'host'}
@@ -626,13 +621,7 @@ export default function HangoutDetailScreen() {
                   return (
                     <View key={req.userId} style={styles.requestItemRow}>
                       <View style={styles.requestUserGroup}>
-                        {rAvatar ? (
-                          <Image source={{ uri: rAvatar }} style={styles.requestAvatar} />
-                        ) : (
-                          <View style={styles.requestAvatarFallback}>
-                            <MaterialIcons name="person" size={18} color={colors.tertiary} />
-                          </View>
-                        )}
+                        <Avatar uri={rAvatar} size={36} name={rName} />
                         <View style={styles.requestUserInfo}>
                           <Text style={styles.requestUserName} numberOfLines={1}>
                             {rName}
@@ -698,13 +687,7 @@ export default function HangoutDetailScreen() {
                   const pName = p.user?.first_name || p.first_name || p.name || 'Member';
                   return (
                     <View key={p.id || idx} style={styles.participantItem}>
-                      {avatarUrl ? (
-                        <Image source={{ uri: avatarUrl }} style={styles.participantAvatarImg} />
-                      ) : (
-                        <View style={styles.participantAvatarFallback}>
-                          <MaterialIcons name="person" size={16} color={colors.tertiary} />
-                        </View>
-                      )}
+                      <Avatar uri={avatarUrl} size={40} name={pName} />
                       <Text style={styles.participantNameText} numberOfLines={1}>
                         {pName}
                       </Text>

@@ -41,6 +41,7 @@ import { ManagedCommunity } from '../src/types';
 import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
+import { CroppedImage } from '../src/components/ui';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const ITEM_HEIGHT = 44;
@@ -568,27 +569,11 @@ export default function NewEventScreen() {
           <Text style={styles.label}>EVENT BANNER (OPTIONAL)</Text>
           {coverImage ? (
             <View style={styles.coverPreviewContainer}>
-              {(() => {
-                const eventCoverCrop = parseCropFromUrl(coverImage);
-                return (
-                  <Image
-                    source={{ uri: eventCoverCrop.cleanUrl }}
-                    style={[
-                      styles.coverPreviewImage,
-                      eventCoverCrop.zoom > 1 || eventCoverCrop.panX !== 0 || eventCoverCrop.panY !== 0
-                        ? {
-                            transform: [
-                              { scale: eventCoverCrop.zoom },
-                              { translateX: (eventCoverCrop.panX / 100) * (Dimensions.get('window').width - 32) },
-                              { translateY: (eventCoverCrop.panY / 100) * 150 },
-                            ],
-                          }
-                        : null,
-                    ]}
-                    resizeMode="cover"
-                  />
-                );
-              })()}
+              <CroppedImage
+                uri={coverImage}
+                style={styles.coverPreviewImage}
+                fill
+              />
               <TouchableOpacity
                 style={styles.coverRemoveBtn}
                 onPress={() => setCoverImage(null)}

@@ -334,15 +334,21 @@ export default function EventDetailScreen() {
       >
         {/* Cover Hero Banner */}
         <View style={styles.heroContainer}>
-          <CroppedImage
-            uri={
-              event.cover_image_url ||
-              event.coverImageUrl ||
-              'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=800'
-            }
-            style={styles.heroImage}
-            fill
-          />
+          {event.cover_image_url || event.coverImageUrl ? (
+            <CroppedImage
+              uri={event.cover_image_url || event.coverImageUrl}
+              style={styles.heroImage}
+              fallback={
+                <View style={[styles.heroImage, styles.coverPlaceholder]}>
+                  <MaterialIcons name="event" size={54} color={colors.tertiary} />
+                </View>
+              }
+            />
+          ) : (
+            <View style={[styles.heroImage, styles.coverPlaceholder]}>
+              <MaterialIcons name="event" size={54} color={colors.tertiary} />
+            </View>
+          )}
 
           {/* Quick Nav Actions: Back Button & Author Controls */}
           <View style={[styles.heroNavRow, { top: insets.top + Spacing.xs }]}>
@@ -669,6 +675,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   heroImage: {
     width: '100%',
     height: '100%',
+  },
+  coverPlaceholder: {
+    backgroundColor: isDark ? '#1f1c19' : '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroGradientTop: {
     ...StyleSheet.absoluteFill as any,

@@ -109,7 +109,6 @@ export default function ExploreMapScreen() {
   useFocusEffect(
     useCallback(() => {
       showTabBar();
-      webViewRef.current?.injectJavaScript(`if (window.map) { window.map.resize(); } true;`);
     }, [showTabBar])
   );
 
@@ -1239,19 +1238,32 @@ export default function ExploreMapScreen() {
             pitch: ${initialZoom < 5.0 ? 0 : initialPitch},
             maxPitch: 60,
             bearing: ${initialBearing},
-            projection: { type: 'globe' },
+            projection: { type: ${initialZoom < 7.0 ? "'globe'" : "'mercator'"} },
             antialias: false,
             fadeDuration: 0,
-            trackResize: true,
+            trackResize: false,
             attributionControl: false,
             cooperativeGestures: false,
             renderWorldCopies: true
           });
 
           // Decremental smooth zoom scale calculation (throttled for 60fps performance)
+          var currentProjection = ${initialZoom < 7.0 ? "'globe'" : "'mercator'"};
+          function updateProjectionForZoom() {
+            var z = map.getZoom();
+            var targetProj = z < 7.0 ? 'globe' : 'mercator';
+            if (currentProjection !== targetProj) {
+              currentProjection = targetProj;
+              try {
+                map.setProjection({ type: targetProj });
+              } catch(e) {}
+            }
+          }
+
           var lastZoomScale = -1;
           var zoomScaleRaf = null;
           function updateZoomScale() {
+            updateProjectionForZoom();
             var z = map.getZoom();
             var minZ = 1.45;
             var maxZ = 13.0;
@@ -1321,54 +1333,31 @@ export default function ExploreMapScreen() {
 
           // Style load: Snapchat Dark Globe Aesthetics + Selective Labels
           map.on('style.load', function() {
-            currentProjection = 'globe';
+            var initialTargetProj = map.getZoom() < 7.0 ? 'globe' : 'mercator';
+            currentProjection = initialTargetProj;
             try {
-              map.setProjection({ type: 'globe' });
+              map.setProjection({ type: initialTargetProj });
             } catch(e) {}
 
-            // 1. Generate & register the Snapchat dark navy sinusoidal wave pattern for water
-            function createOceanWavePattern() {
-              var c = document.createElement('canvas');
-              c.width = 64;
-              c.height = 32;
-              var ctx = c.getContext('2d');
-              // Obsidian black ocean base
-              ctx.fillStyle = '#070b11';
-              ctx.fillRect(0, 0, 64, 32);
-
-              // Snapchat dark navy sinusoidal wave lines
-              ctx.strokeStyle = '#18283e';
-              ctx.lineWidth = 2.2;
-              ctx.lineCap = 'round';
-              ctx.lineJoin = 'round';
-
-              [8, 24].forEach(function(baseY) {
-                ctx.beginPath();
-                for (var x = 0; x <= 64; x++) {
-                  var y = baseY + Math.sin((x / 64) * Math.PI * 2) * 4.2;
-                  if (x === 0) ctx.moveTo(x, y);
-                  else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-              });
-              return ctx.getImageData(0, 0, 64, 32);
-            }
-
-            try {
-              if (!map.hasImage('snap-ocean-waves')) {
-                map.addImage('snap-ocean-waves', createOceanWavePattern());
-              }
-            } catch(e) {}
-
-            // 2. Snapchat Continent & Landscape Dark Mode Styling
-            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
+            // 1. Snapchat Continent & Landscape Dark Mode Styling
+            // Keep natural_earth visible for low zooms (< 7) on 3D globe, styled to dark aesthetic
             try {
               map.getStyle().layers.forEach(function(l) {
-                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
+                if (l.id.indexOf('hillshade') !== -1 || (l.type === 'raster' && l.id.indexOf('natural_earth') === -1)) {
                   try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
                 }
               });
             } catch(e) {}
+
+            if (map.getLayer('natural_earth')) {
+              try {
+                map.setLayoutProperty('natural_earth', 'visibility', 'visible');
+                map.setPaintProperty('natural_earth', 'raster-opacity', 0.85);
+                map.setPaintProperty('natural_earth', 'raster-saturation', -0.6);
+                map.setPaintProperty('natural_earth', 'raster-brightness-max', 0.65);
+                map.setPaintProperty('natural_earth', 'raster-contrast', 0.25);
+              } catch(e) {}
+            }
 
             // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
             [
@@ -1403,10 +1392,9 @@ export default function ExploreMapScreen() {
             });
             if (map.getLayer('water')) {
               try {
-                map.setPaintProperty('water', 'fill-pattern', 'snap-ocean-waves');
-              } catch(e) {
-                try { map.setPaintProperty('water', 'fill-color', '#070b11'); } catch(e2) {}
-              }
+                map.setPaintProperty('water', 'fill-color', '#070b11');
+                map.setPaintProperty('water', 'fill-opacity', 0.95);
+              } catch(e) {}
             }
 
             // Waterways
@@ -1723,7 +1711,11 @@ export default function ExploreMapScreen() {
                 clean = trimmed.slice(0, hashIdx);
                 cropPart = trimmed.slice(hashIdx + 6).split('&')[0];
               } else if (queryMatch) {
-                cropPart = decodeURIComponent(queryMatch[1]);
+                try {
+                  cropPart = decodeURIComponent(queryMatch[1]);
+                } catch(e) {
+                  cropPart = queryMatch[1];
+                }
                 clean = trimmed.replace(/[?&]crop=[^&#]+/, '').replace(/\?&/, '?').replace(/[?&]$/, '');
               }
               if (!cropPart) {
@@ -1741,25 +1733,29 @@ export default function ExploreMapScreen() {
               labelClass = 'hangout-label';
               title = item.title || 'Hangout';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              contentHtml = formatCroppedImgHtml(banner, '<div class="hangout-placeholder">☕</div>');
+              var hangoutFallback = '<div class="hangout-placeholder"><svg viewBox="0 0 24 24" width="28" height="28" fill="#34d399"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg></div>';
+              contentHtml = formatCroppedImgHtml(banner, hangoutFallback);
             } else if (type === 'event') {
               pinClass = 'event-pin';
               labelClass = 'event-label';
               title = item.title || 'Event';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              contentHtml = formatCroppedImgHtml(banner, '<div class="event-placeholder">🎟️</div>');
+              var eventFallback = '<div class="event-placeholder"><svg viewBox="0 0 24 24" width="28" height="28" fill="#feba48"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg></div>';
+              contentHtml = formatCroppedImgHtml(banner, eventFallback);
             } else if (type === 'community') {
               pinClass = 'community-pin';
               labelClass = 'community-label';
               title = item.name || 'Community';
-              var pic = item.profilePictureUrl || item.bannerUrl;
-              contentHtml = formatCroppedImgHtml(pic, '<div class="community-placeholder">🌐</div>');
+              var pic = item.profilePictureUrl || item.profile_picture_url || item.bannerUrl || item.banner_url;
+              var commFallback = '<div class="community-placeholder"><svg viewBox="0 0 24 24" width="26" height="26" fill="#60a5fa"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>';
+              contentHtml = formatCroppedImgHtml(pic, commFallback);
             } else {
               pinClass = 'user-pin';
               labelClass = 'user-label';
               title = item.name || item.username || 'User';
-              var initial = (title || 'U').charAt(0).toUpperCase();
-              contentHtml = formatCroppedImgHtml(item.profilePictureUrl, '<div class="user-avatar-fallback">' + initial + '</div>');
+              var userPic = item.profilePictureUrl || item.profile_picture_url || item.avatarUrl || item.avatar_url;
+              var userFallback = '<div class="user-avatar-fallback"><svg viewBox="0 0 24 24" width="20" height="20" fill="#d5c4b4"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>';
+              contentHtml = formatCroppedImgHtml(userPic, userFallback);
             }
 
             var pinWrapHtml = '<div class="pin-wrap' + (isOverlapping && count > 1 ? ' is-stacked' : '') + '">';
@@ -2467,14 +2463,9 @@ export default function ExploreMapScreen() {
           });
 
           map.on('load', function() {
-            setTimeout(function() { if (map) map.resize(); }, 60);
-            setTimeout(function() { if (map) map.resize(); }, 300);
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
             }
-          });
-          map.on('style.load', function() {
-            if (map) map.resize();
           });
           window.addEventListener('resize', function() {
             if (map) map.resize();
@@ -3245,16 +3236,30 @@ export default function ExploreMapScreen() {
             <View style={styles.entityImageWrap}>
               {selectedEntity.type === 'user' ? (
                 <Avatar
-                  uri={selectedEntity.data.profilePictureUrl}
+                  uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.avatar_url || selectedEntity.data.avatarUrl}
                   size={56}
                   name={selectedEntity.data.name || selectedEntity.data.username || 'User'}
+                  type="user"
                 />
               ) : selectedEntity.type === 'community' ? (
-                selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl ? (
+                (selectedEntity.data.profilePictureUrl || selectedEntity.data.profile_picture_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
                   <CroppedImage
-                    uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl}
+                    uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.profile_picture_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
                     style={styles.entityImageSquare}
-                    fill
+                    fallback={
+                      <View
+                        style={[
+                          styles.entityImageSquare,
+                          {
+                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons name="groups" size={28} color={colors.primary} />
+                      </View>
+                    }
                   />
                 ) : (
                   <View
@@ -3271,11 +3276,24 @@ export default function ExploreMapScreen() {
                   </View>
                 )
               ) : selectedEntity.type === 'event' ? (
-                selectedEntity.data.coverImageUrl ? (
+                (selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
                   <CroppedImage
-                    uri={selectedEntity.data.coverImageUrl}
+                    uri={selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
                     style={styles.entityImageRect}
-                    fill
+                    fallback={
+                      <View
+                        style={[
+                          styles.entityImageRect,
+                          {
+                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons name="event" size={28} color={colors.primary} />
+                      </View>
+                    }
                   />
                 ) : (
                   <View
@@ -3292,11 +3310,24 @@ export default function ExploreMapScreen() {
                   </View>
                 )
               ) : (
-                selectedEntity.data.coverImageUrl ? (
+                (selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
                   <CroppedImage
-                    uri={selectedEntity.data.coverImageUrl}
+                    uri={selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
                     style={styles.entityImageSquare}
-                    fill
+                    fallback={
+                      <View
+                        style={[
+                          styles.entityImageSquare,
+                          {
+                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          },
+                        ]}
+                      >
+                        <MaterialIcons name="local-cafe" size={28} color={colors.primary} />
+                      </View>
+                    }
                   />
                 ) : (
                   <View

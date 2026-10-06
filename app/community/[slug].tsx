@@ -431,46 +431,55 @@ export default function CommunityDetailScreen() {
       >
         {/* Narrower Cover Hero Banner (~125 height), no share button */}
         <View style={styles.heroCard}>
-          <CroppedImage
-            uri={
-              community.banner_url ||
-              'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800'
-            }
-            style={styles.heroBanner}
-            fill
-          />
-          <View style={styles.heroOverlay} />
-
-          {/* Top Actions Row: Back Button & Admin Edit */}
-          <View style={[styles.coverNavRow, { top: insets.top + 6 }]}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={styles.navCircleBtn}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
-            </TouchableOpacity>
-
-            {Boolean(
-              user?.id &&
-                ((community as any)?.role === 'owner' ||
-                  (community as any)?.role === 'admin' ||
-                  (community as any)?.creatorId === user.id ||
-                  (community as any)?.creator_id === user.id)
-            ) && (
-              <DropdownMenu
-                items={[
-                  {
-                    label: 'Edit Community',
-                    icon: 'edit',
-                    onPress: () =>
-                      router.push({ pathname: '/new-community', params: { slug: community.slug } }),
-                  },
-                ]}
-                iconColor={colors.onSurface}
-                triggerStyle={styles.navCircleBtn}
+          <View style={styles.heroBannerWrap}>
+            {community.banner_url ? (
+              <CroppedImage
+                uri={community.banner_url}
+                style={styles.heroBanner}
+                fallback={
+                  <View style={[styles.heroBanner, styles.bannerPlaceholder]}>
+                    <MaterialIcons name="groups" size={42} color={colors.tertiary} />
+                  </View>
+                }
               />
+            ) : (
+              <View style={[styles.heroBanner, styles.bannerPlaceholder]}>
+                <MaterialIcons name="groups" size={42} color={colors.tertiary} />
+              </View>
             )}
+            <View style={styles.heroOverlay} />
+
+            {/* Top Actions Row: Back Button & Admin Edit */}
+            <View style={[styles.coverNavRow, { top: insets.top + 6 }]}>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={styles.navCircleBtn}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="arrow-back" size={22} color={colors.onSurface} />
+              </TouchableOpacity>
+
+              {Boolean(
+                user?.id &&
+                  ((community as any)?.role === 'owner' ||
+                    (community as any)?.role === 'admin' ||
+                    (community as any)?.creatorId === user.id ||
+                    (community as any)?.creator_id === user.id)
+              ) && (
+                <DropdownMenu
+                  items={[
+                    {
+                      label: 'Edit Community',
+                      icon: 'edit',
+                      onPress: () =>
+                        router.push({ pathname: '/new-community', params: { slug: community.slug } }),
+                    },
+                  ]}
+                  iconColor={colors.onSurface}
+                  triggerStyle={styles.navCircleBtn}
+                />
+              )}
+            </View>
           </View>
 
           {/* Profile & Info Overlay Section */}
@@ -482,6 +491,7 @@ export default function CommunityDetailScreen() {
                   uri={community.profile_picture_url}
                   size={60}
                   name={community.name}
+                  type="community"
                 />
               </View>
 
@@ -854,14 +864,26 @@ const getStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
     borderColor: colors.cardBorder,
     marginBottom: Spacing.sm,
   },
+  heroBannerWrap: {
+    width: '100%',
+    height: 125,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: isDark ? '#1f1c19' : '#f8fafc',
+  },
   heroBanner: {
     width: '100%',
     height: 125,
   },
+  bannerPlaceholder: {
+    backgroundColor: isDark ? '#1f1c19' : '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroOverlay: {
     ...StyleSheet.absoluteFill as any,
     height: 125,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
   coverNavRow: {
     position: 'absolute',

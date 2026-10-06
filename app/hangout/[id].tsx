@@ -365,15 +365,21 @@ export default function HangoutDetailScreen() {
       >
         {/* Visual Cover Banner with Overlay Actions */}
         <View style={styles.coverContainer}>
-          <CroppedImage
-            uri={
-              hangout.cover_image_url ||
-              hangout.coverImageUrl ||
-              'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800'
-            }
-            style={styles.coverImage}
-            fill
-          />
+          {hangout.cover_image_url || hangout.coverImageUrl ? (
+            <CroppedImage
+              uri={hangout.cover_image_url || hangout.coverImageUrl}
+              style={styles.coverImage}
+              fallback={
+                <View style={[styles.coverImage, styles.coverPlaceholder]}>
+                  <MaterialIcons name="local-cafe" size={54} color={colors.tertiary} />
+                </View>
+              }
+            />
+          ) : (
+            <View style={[styles.coverImage, styles.coverPlaceholder]}>
+              <MaterialIcons name="local-cafe" size={54} color={colors.tertiary} />
+            </View>
+          )}
           <View style={styles.coverGradient} />
 
           {/* Floating Top Nav: Back Button + Host Controls */}
@@ -823,6 +829,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     coverImage: {
       width: '100%',
       height: '100%',
+    },
+    coverPlaceholder: {
+      backgroundColor: isDark ? '#1f1c19' : '#f1f5f9',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     coverGradient: {
       ...StyleSheet.absoluteFill as any,

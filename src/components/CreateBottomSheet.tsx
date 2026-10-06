@@ -51,7 +51,7 @@ const CREATE_OPTIONS: CreateOption[] = [
     route: '/new-event',
   },
   {
-    icon: 'diversity-3',
+    icon: 'groups',
     title: 'New Community',
     description: 'Start a new community around your interests',
     route: '/new-community',

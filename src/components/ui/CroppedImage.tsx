@@ -38,12 +38,100 @@ export const CroppedImage: React.FC<CroppedImageProps> = ({
   const [loadError, setLoadError] = useState<boolean>(false);
 
   if (!uri || typeof uri !== 'string' || !uri.trim() || loadError) {
-    return fallback ? <>{fallback}</> : null;
+    if (fallback) {
+      const {
+        width,
+        height,
+        borderRadius,
+        borderTopLeftRadius,
+        borderTopRightRadius,
+        borderBottomLeftRadius,
+        borderBottomRightRadius,
+        margin,
+        marginTop,
+        marginBottom,
+        marginLeft,
+        marginRight,
+        marginHorizontal,
+        marginVertical,
+      } = (style || {}) as ImageStyle;
+      return (
+        <View
+          style={[
+            styles.container,
+            width !== undefined ? { width } : null,
+            height !== undefined ? { height } : null,
+            borderRadius !== undefined ? { borderRadius } : null,
+            borderTopLeftRadius !== undefined ? { borderTopLeftRadius } : null,
+            borderTopRightRadius !== undefined ? { borderTopRightRadius } : null,
+            borderBottomLeftRadius !== undefined ? { borderBottomLeftRadius } : null,
+            borderBottomRightRadius !== undefined ? { borderBottomRightRadius } : null,
+            margin !== undefined ? { margin } : null,
+            marginTop !== undefined ? { marginTop } : null,
+            marginBottom !== undefined ? { marginBottom } : null,
+            marginLeft !== undefined ? { marginLeft } : null,
+            marginRight !== undefined ? { marginRight } : null,
+            marginHorizontal !== undefined ? { marginHorizontal } : null,
+            marginVertical !== undefined ? { marginVertical } : null,
+            fill && width === undefined ? { width: '100%' } : null,
+            fill && height === undefined ? { height: '100%' } : null,
+            containerStyle,
+          ]}
+        >
+          {fallback}
+        </View>
+      );
+    }
+    return null;
   }
 
   const crop = parseCropFromUrl(uri);
   if (!crop.cleanUrl) {
-    return fallback ? <>{fallback}</> : null;
+    if (fallback) {
+      const {
+        width,
+        height,
+        borderRadius,
+        borderTopLeftRadius,
+        borderTopRightRadius,
+        borderBottomLeftRadius,
+        borderBottomRightRadius,
+        margin,
+        marginTop,
+        marginBottom,
+        marginLeft,
+        marginRight,
+        marginHorizontal,
+        marginVertical,
+      } = (style || {}) as ImageStyle;
+      return (
+        <View
+          style={[
+            styles.container,
+            width !== undefined ? { width } : null,
+            height !== undefined ? { height } : null,
+            borderRadius !== undefined ? { borderRadius } : null,
+            borderTopLeftRadius !== undefined ? { borderTopLeftRadius } : null,
+            borderTopRightRadius !== undefined ? { borderTopRightRadius } : null,
+            borderBottomLeftRadius !== undefined ? { borderBottomLeftRadius } : null,
+            borderBottomRightRadius !== undefined ? { borderBottomRightRadius } : null,
+            margin !== undefined ? { margin } : null,
+            marginTop !== undefined ? { marginTop } : null,
+            marginBottom !== undefined ? { marginBottom } : null,
+            marginLeft !== undefined ? { marginLeft } : null,
+            marginRight !== undefined ? { marginRight } : null,
+            marginHorizontal !== undefined ? { marginHorizontal } : null,
+            marginVertical !== undefined ? { marginVertical } : null,
+            fill && width === undefined ? { width: '100%' } : null,
+            fill && height === undefined ? { height: '100%' } : null,
+            containerStyle,
+          ]}
+        >
+          {fallback}
+        </View>
+      );
+    }
+    return null;
   }
 
   const hasCrop = crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0;
@@ -110,7 +198,8 @@ export const CroppedImage: React.FC<CroppedImageProps> = ({
         marginRight !== undefined ? { marginRight } : null,
         marginHorizontal !== undefined ? { marginHorizontal } : null,
         marginVertical !== undefined ? { marginVertical } : null,
-        fill ? styles.fill : null,
+        fill && width === undefined && containerStyle?.width === undefined ? { width: '100%' } : null,
+        fill && height === undefined && containerStyle?.height === undefined ? { height: '100%' } : null,
         effectiveRatio && !fill ? { aspectRatio: effectiveRatio } : null,
         containerStyle,
       ]}

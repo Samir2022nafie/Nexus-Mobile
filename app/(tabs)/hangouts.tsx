@@ -24,9 +24,10 @@ import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Colors, Typography, BorderRadius, Spacing, Shadows } from '../../src/constants/theme';
 import { useTheme } from '../../src/context/ThemeContext';
+import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useUserLocation } from '../../src/context/LocationContext';
 import {
@@ -102,6 +103,14 @@ export default function ExploreMapScreen() {
   const { user } = useAuth();
   const { userLocation, requestLocation, isLoadingLocation } = useUserLocation();
   const webViewRef = useRef<WebView>(null);
+  const { showTabBar } = useTabBarVisibility();
+
+  useFocusEffect(
+    useCallback(() => {
+      showTabBar();
+      webViewRef.current?.injectJavaScript(`if (window.map) { window.map.resize(); } true;`);
+    }, [showTabBar])
+  );
 
   // Tabs always default to 'all' — opening an entity does NOT force the tab filter
   const [selectedEntityTypes, setSelectedEntityTypes] = useState<string[]>(['all']);
@@ -755,6 +764,16 @@ export default function ExploreMapScreen() {
             z-index: 1;
           }
 
+          /* Hide MapLibre Attribution & Copyright Controls */
+          .maplibregl-ctrl-attrib,
+          .maplibregl-ctrl-bottom-right,
+          .maplibregl-ctrl {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+
           /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
@@ -1222,7 +1241,8 @@ export default function ExploreMapScreen() {
             projection: { type: 'globe' },
             antialias: false,
             fadeDuration: 0,
-            trackResize: false,
+            trackResize: true,
+            attributionControl: false,
             cooperativeGestures: false,
             renderWorldCopies: true
           });
@@ -1688,30 +1708,44 @@ export default function ExploreMapScreen() {
             var title = '';
             var isPassed = checkIsPassed(item);
 
+            function formatCroppedImgHtml(url, fallbackHtml) {
+              if (!url) return fallbackHtml;
+              var cIdx = url.indexOf('#crop=');
+              if (cIdx === -1) {
+                return '<img src="' + url + '" />';
+              }
+              var clean = url.slice(0, cIdx);
+              var cropPart = url.slice(cIdx + 6).split(',');
+              var zoom = parseFloat(cropPart[0]) || 1;
+              var x = parseFloat(cropPart[1]) || 0;
+              var y = parseFloat(cropPart[2]) || 0;
+              return '<img src="' + clean + '" style="transform: scale(' + zoom + ') translate(' + x + '%, ' + y + '%); transform-origin: center center;" />';
+            }
+
             if (type === 'hangout') {
               pinClass = 'hangout-pin';
               labelClass = 'hangout-label';
               title = item.title || 'Hangout';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              contentHtml = banner ? '<img src="' + banner + '" />' : '<div class="hangout-placeholder">☕</div>';
+              contentHtml = formatCroppedImgHtml(banner, '<div class="hangout-placeholder">☕</div>');
             } else if (type === 'event') {
               pinClass = 'event-pin';
               labelClass = 'event-label';
               title = item.title || 'Event';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              contentHtml = banner ? '<img src="' + banner + '" />' : '<div class="event-placeholder">🎟️</div>';
+              contentHtml = formatCroppedImgHtml(banner, '<div class="event-placeholder">🎟️</div>');
             } else if (type === 'community') {
               pinClass = 'community-pin';
               labelClass = 'community-label';
               title = item.name || 'Community';
               var pic = item.profilePictureUrl || item.bannerUrl;
-              contentHtml = pic ? '<img src="' + pic + '" />' : '<div class="community-placeholder">🌐</div>';
+              contentHtml = formatCroppedImgHtml(pic, '<div class="community-placeholder">🌐</div>');
             } else {
               pinClass = 'user-pin';
               labelClass = 'user-label';
               title = item.name || item.username || 'User';
               var initial = (title || 'U').charAt(0).toUpperCase();
-              contentHtml = item.profilePictureUrl ? '<img src="' + item.profilePictureUrl + '" />' : '<div class="user-avatar-fallback">' + initial + '</div>';
+              contentHtml = formatCroppedImgHtml(item.profilePictureUrl, '<div class="user-avatar-fallback">' + initial + '</div>');
             }
 
             var pinWrapHtml = '<div class="pin-wrap' + (isOverlapping && count > 1 ? ' is-stacked' : '') + '">';
@@ -2419,9 +2453,17 @@ export default function ExploreMapScreen() {
           });
 
           map.on('load', function() {
+            setTimeout(function() { if (map) map.resize(); }, 60);
+            setTimeout(function() { if (map) map.resize(); }, 300);
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
             }
+          });
+          map.on('style.load', function() {
+            if (map) map.resize();
+          });
+          window.addEventListener('resize', function() {
+            if (map) map.resize();
           });
         </script>
       </body>

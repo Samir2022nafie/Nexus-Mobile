@@ -13,6 +13,7 @@ import {
   Switch,
   TextInput,
   Image,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ import { Button } from '../src/components/ui/Button';
 import { communitiesService } from '../src/services/communities';
 import { ApiRequestError } from '../src/services/api';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
-import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
@@ -324,7 +325,7 @@ export default function NewCommunityScreen() {
               style={styles.textInput}
               placeholder="https://example.com/avatar.jpg"
               placeholderTextColor={colors.outline}
-              value={form.profilePictureUrl}
+              value={parseCropFromUrl(form.profilePictureUrl).cleanUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
                 updateField('profilePictureUrl', direct);
@@ -343,7 +344,29 @@ export default function NewCommunityScreen() {
           </View>
           {form.profilePictureUrl.trim().startsWith('http') ? (
             <View style={styles.avatarPreviewBox}>
-              <Image source={{ uri: form.profilePictureUrl.trim() }} style={styles.avatarPreviewImg} resizeMode="cover" />
+              {(() => {
+                const commAvatarCrop = parseCropFromUrl(form.profilePictureUrl);
+                return (
+                  <View style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden' }}>
+                    <Image
+                      source={{ uri: commAvatarCrop.cleanUrl }}
+                      style={[
+                        styles.avatarPreviewImg,
+                        commAvatarCrop.zoom > 1 || commAvatarCrop.panX !== 0 || commAvatarCrop.panY !== 0
+                          ? {
+                              transform: [
+                                { scale: commAvatarCrop.zoom },
+                                { translateX: (commAvatarCrop.panX / 100) * 44 },
+                                { translateY: (commAvatarCrop.panY / 100) * 44 },
+                              ],
+                            }
+                          : null,
+                      ]}
+                      resizeMode="cover"
+                    />
+                  </View>
+                );
+              })()}
               <View style={{ flex: 1 }}>
                 <Text style={styles.previewSuccessText}>Avatar Preview</Text>
                 <TouchableOpacity
@@ -377,7 +400,7 @@ export default function NewCommunityScreen() {
               style={styles.textInput}
               placeholder="https://example.com/banner.jpg"
               placeholderTextColor={colors.outline}
-              value={form.bannerUrl}
+              value={parseCropFromUrl(form.bannerUrl).cleanUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
                 updateField('bannerUrl', direct);
@@ -396,7 +419,29 @@ export default function NewCommunityScreen() {
           </View>
           {form.bannerUrl.trim().startsWith('http') ? (
             <View style={styles.bannerPreviewBox}>
-              <Image source={{ uri: form.bannerUrl.trim() }} style={styles.bannerPreviewImg} resizeMode="cover" />
+              {(() => {
+                const commBannerCrop = parseCropFromUrl(form.bannerUrl);
+                return (
+                  <View style={{ width: '100%', height: 110, borderRadius: 12, overflow: 'hidden' }}>
+                    <Image
+                      source={{ uri: commBannerCrop.cleanUrl }}
+                      style={[
+                        styles.bannerPreviewImg,
+                        commBannerCrop.zoom > 1 || commBannerCrop.panX !== 0 || commBannerCrop.panY !== 0
+                          ? {
+                              transform: [
+                                { scale: commBannerCrop.zoom },
+                                { translateX: (commBannerCrop.panX / 100) * (Dimensions.get('window').width - 32) },
+                                { translateY: (commBannerCrop.panY / 100) * 110 },
+                              ],
+                            }
+                          : null,
+                      ]}
+                      resizeMode="cover"
+                    />
+                  </View>
+                );
+              })()}
               <View style={styles.bannerActionsRow}>
                 <Text style={styles.previewSuccessText}>Banner Preview</Text>
                 <TouchableOpacity

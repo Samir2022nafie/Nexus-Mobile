@@ -27,7 +27,7 @@ import { useTheme, useThemedStyles } from '../src/context/ThemeContext';
 import { useAuth } from '../src/context/AuthContext';
 import { usersService } from '../src/services/users';
 import { ApiRequestError } from '../src/services/api';
-import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
@@ -127,23 +127,31 @@ export default function EditProfileScreen() {
             }}
             activeOpacity={0.8}
           >
-            {(form.profilePictureUrl || user?.profile_picture_url) ? (
-              <Image
-                source={{
-                  uri: form.profilePictureUrl || user?.profile_picture_url || '',
-                }}
-                style={styles.avatarImage}
-              />
-            ) : (
-              <View style={[styles.avatarImage, styles.avatarFallback]}>
-                <MaterialIcons name="person" size={48} color={colors.onSurfaceVariant} />
-              </View>
-            )}
-            {(form.profilePictureUrl || user?.profile_picture_url) ? (
-              <View style={styles.cameraBadge}>
-                <MaterialIcons name="crop" size={14} color="#18130e" />
-              </View>
-            ) : null}
+            {(() => {
+              const avatarCrop = parseCropFromUrl(form.profilePictureUrl || user?.profile_picture_url);
+              return avatarCrop.cleanUrl ? (
+                <Image
+                  source={{ uri: avatarCrop.cleanUrl }}
+                  style={[
+                    styles.avatarImage,
+                    avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
+                      ? {
+                          transform: [
+                            { scale: avatarCrop.zoom },
+                            { translateX: (avatarCrop.panX / 100) * 84 },
+                            { translateY: (avatarCrop.panY / 100) * 84 },
+                          ],
+                        }
+                      : null,
+                  ]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.avatarImage, styles.avatarFallback]}>
+                  <MaterialIcons name="person" size={48} color={colors.onSurfaceVariant} />
+                </View>
+              );
+            })()}
           </TouchableOpacity>
         </View>
 
@@ -208,7 +216,7 @@ export default function EditProfileScreen() {
                 style={styles.textInput}
                 placeholder="https://example.com/avatar.jpg"
                 placeholderTextColor={colors.outline}
-                value={form.profilePictureUrl}
+                value={parseCropFromUrl(form.profilePictureUrl).cleanUrl}
                 onChangeText={(v) => {
                   const direct = extractDirectImageUrl(v);
                   setForm((p) => ({ ...p, profilePictureUrl: direct }));

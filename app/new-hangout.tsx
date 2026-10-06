@@ -30,7 +30,7 @@ import { Button } from '../src/components/ui/Button';
 import { hangoutsService } from '../src/services/hangouts';
 import { pushNotifications } from '../src/services/pushNotifications';
 import { ApiRequestError } from '../src/services/api';
-import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { BACKEND_CATEGORIES } from '../src/utils/categories';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
@@ -508,11 +508,27 @@ export default function NewHangoutScreen() {
           <Text style={styles.label}>COVER IMAGE (OPTIONAL)</Text>
           {form.coverImageUrl.trim() ? (
             <View style={styles.coverPreviewContainer}>
-              <Image
-                source={{ uri: form.coverImageUrl.trim() }}
-                style={styles.coverPreviewImage}
-                resizeMode="cover"
-              />
+              {(() => {
+                const hangoutCrop = parseCropFromUrl(form.coverImageUrl);
+                return (
+                  <Image
+                    source={{ uri: hangoutCrop.cleanUrl }}
+                    style={[
+                      styles.coverPreviewImage,
+                      hangoutCrop.zoom > 1 || hangoutCrop.panX !== 0 || hangoutCrop.panY !== 0
+                        ? {
+                            transform: [
+                              { scale: hangoutCrop.zoom },
+                              { translateX: (hangoutCrop.panX / 100) * (Dimensions.get('window').width - 32) },
+                              { translateY: (hangoutCrop.panY / 100) * 150 },
+                            ],
+                          }
+                        : null,
+                    ]}
+                    resizeMode="cover"
+                  />
+                );
+              })()}
               <TouchableOpacity
                 style={styles.coverRemoveBtn}
                 onPress={() => updateField('coverImageUrl', '')}
@@ -535,7 +551,7 @@ export default function NewHangoutScreen() {
               style={styles.textInput}
               placeholder="Paste cover image URL (https://...)"
               placeholderTextColor={colors.outline}
-              value={form.coverImageUrl}
+              value={parseCropFromUrl(form.coverImageUrl).cleanUrl}
               onChangeText={(v) => {
                 const direct = extractDirectImageUrl(v);
                 updateField('coverImageUrl', direct);

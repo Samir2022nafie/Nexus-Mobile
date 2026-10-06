@@ -34,7 +34,7 @@ import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { EmptyState } from '../../src/components/ui/EmptyState';
 import { useAuth } from '../../src/context/AuthContext';
 import { usePostState } from '../../src/context/PostStateContext';
-import { extractDirectImageUrl } from '../../src/utils/imageUrl';
+import { extractDirectImageUrl, parseCropFromUrl } from '../../src/utils/imageUrl';
 import { postsService } from '../../src/services/posts';
 import { commentsService } from '../../src/services/comments';
 import { Post, Comment } from '../../src/types';
@@ -62,6 +62,39 @@ export default function ThreadDetailScreen() {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState('');
   const [commentActionTarget, setCommentActionTarget] = useState<any | null>(null);
+
+  const rawPostMedia = post?.mediaUrl || post?.media_url;
+  const postMedia = extractDirectImageUrl(rawPostMedia);
+  const postCrop = parseCropFromUrl(rawPostMedia);
+
+  const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
+  const [detailMediaWidth, setDetailMediaWidth] = useState<number>(0);
+
+  useEffect(() => {
+    if (!postMedia) {
+      setMediaAspectRatio(null);
+      return;
+    }
+    let isMounted = true;
+    Image.getSize(
+      postMedia,
+      (w, h) => {
+        if (isMounted && w > 0 && h > 0) {
+          setMediaAspectRatio(w / h);
+        }
+      },
+      () => {}
+    );
+    return () => {
+      isMounted = false;
+    };
+  }, [postMedia]);
+
+  const effectiveRatio = postCrop.aspectRatio || mediaAspectRatio;
+  const measuredDetailWidth = detailMediaWidth || 360;
+  const postDisplayHeight = effectiveRatio
+    ? Math.min(480, Math.max(160, Math.round(measuredDetailWidth / effectiveRatio)))
+    : 240;
 
   // Fixed bottom comment bar scroll animation
   const commentBarTranslateY = useRef(new Animated.Value(0)).current;
@@ -310,29 +343,6 @@ export default function ThreadDetailScreen() {
     ((post as any).updated_at && (post as any).created_at && new Date((post as any).updated_at).getTime() - new Date((post as any).created_at).getTime() > 2000)
   );
 
-  const postMedia = extractDirectImageUrl(post.mediaUrl || post.media_url);
-
-  const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!postMedia) {
-      setMediaAspectRatio(null);
-      return;
-    }
-    let isMounted = true;
-    Image.getSize(
-      postMedia,
-      (w, h) => {
-        if (isMounted && w > 0 && h > 0) {
-          setMediaAspectRatio(w / h);
-        }
-      },
-      () => {}
-    );
-    return () => {
-      isMounted = false;
-    };
-  }, [postMedia]);
 
   const communityPfp =
     post.community?.profile_picture_url ||
@@ -447,14 +457,26 @@ export default function ThreadDetailScreen() {
             {/* Post Media Image (Below Title, Above Description) */}
             {postMedia ? (
               <View
+                onLayout={(e) => setDetailMediaWidth(e.nativeEvent.layout.width)}
                 style={[
                   styles.postMediaContainer,
-                  mediaAspectRatio ? { aspectRatio: mediaAspectRatio } : { height: 240 },
+                  { width: '100%', height: postDisplayHeight, alignSelf: 'stretch' },
                 ]}
               >
                 <Image
                   source={{ uri: postMedia }}
-                  style={styles.postMediaImage}
+                  style={[
+                    styles.postMediaImage,
+                    postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
+                      ? {
+                          transform: [
+                            { scale: postCrop.zoom },
+                            { translateX: (postCrop.panX / 100) * measuredDetailWidth },
+                            { translateY: (postCrop.panY / 100) * postDisplayHeight },
+                          ],
+                        }
+                      : null,
+                  ]}
                   resizeMode="cover"
                 />
               </View>
@@ -940,6 +962,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   },
   postMediaContainer: {
     width: '100%',
+    alignSelf: 'stretch',
     maxHeight: 480,
     minHeight: 160,
     borderRadius: BorderRadius.xl,
@@ -950,6 +973,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
   postMediaImage: {
     width: '100%',
     height: '100%',
+    alignSelf: 'stretch',
   },
   postBody: {
     ...Typography.bodyMd,

@@ -14,6 +14,7 @@ import {
   Image,
   Alert,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,7 +28,7 @@ import { communitiesService } from '../src/services/communities';
 import { uploadService } from '../src/services/upload';
 import { Community } from '../src/types';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
-import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl, encodeCropUrl } from '../src/utils/imageUrl';
 import { setCommunitySelectionListener } from '../src/utils/communitySelectionStore';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
@@ -188,19 +189,24 @@ export default function NewPostScreen() {
     try {
       // Upload local image if any or use URL directly
       let mediaUrl: string | null | undefined = undefined;
-      const rawUri = imageUrlInput.trim() || (images.length > 0 ? images[0] : undefined);
-      const effectiveUri = rawUri ? extractDirectImageUrl(rawUri) : undefined;
-      if (effectiveUri) {
-        if (effectiveUri.startsWith('http')) {
-          mediaUrl = effectiveUri;
+      const rawUri = (images.length > 0 ? images[0] : undefined) || imageUrlInput.trim();
+      if (rawUri) {
+        if (rawUri.startsWith('http')) {
+          mediaUrl = rawUri;
         } else {
+          const effectiveUri = extractDirectImageUrl(rawUri);
+          const cropData = parseCropFromUrl(rawUri);
           try {
             const filename = effectiveUri.split('/').pop() || 'post-image.jpg';
             const presigned = await uploadService.getPresignedUrl(filename, 'image/jpeg');
             await uploadService.uploadFile(presigned.uploadUrl, effectiveUri, 'image/jpeg');
-            mediaUrl = presigned.publicUrl;
+            if (cropData.zoom > 1 || cropData.panX !== 0 || cropData.panY !== 0 || cropData.aspectRatio) {
+              mediaUrl = encodeCropUrl(presigned.publicUrl, cropData.zoom, cropData.panX, cropData.panY, cropData.aspectRatio);
+            } else {
+              mediaUrl = presigned.publicUrl;
+            }
           } catch {
-            mediaUrl = effectiveUri;
+            mediaUrl = rawUri;
           }
         }
       } else if (isEditing) {
@@ -369,33 +375,57 @@ export default function NewPostScreen() {
         </View>
 
         {/* Image Previews */}
-        {images.map((uri, idx) => (
-          <View key={uri} style={styles.imagePreviewContainer}>
-            <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
-            <TouchableOpacity
-              style={styles.cropImageBtn}
-              onPress={() => {
-                setCropTargetUri(uri);
-                setCropTargetIndex(idx);
-                setCropModalVisible(true);
-              }}
-              accessibilityLabel="Crop image"
+        {images.map((uri, idx) => {
+          const postCrop = parseCropFromUrl(uri);
+          return (
+            <View
+              key={uri}
+              style={[
+                styles.imagePreviewContainer,
+                postCrop.aspectRatio ? { aspectRatio: postCrop.aspectRatio, height: undefined, maxHeight: 380 } : null,
+              ]}
             >
-              <MaterialIcons name="crop" size={14} color="#ffffff" />
-              <Text style={styles.cropImageBtnText}>Crop / Adjust</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.removeImageBtn}
-              onPress={() => {
-                handleRemoveImage(idx);
-                setImageUrlInput('');
-              }}
-              accessibilityLabel="Remove image"
-            >
-              <MaterialIcons name="close" size={16} color={colors.onSurface} />
-            </TouchableOpacity>
-          </View>
-        ))}
+              <Image
+                source={{ uri: postCrop.cleanUrl }}
+                style={[
+                  styles.previewImage,
+                  postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
+                    ? {
+                        transform: [
+                          { scale: postCrop.zoom },
+                          { translateX: (postCrop.panX / 100) * (Dimensions.get('window').width - 32) },
+                          { translateY: (postCrop.panY / 100) * 200 },
+                        ],
+                      }
+                    : null,
+                ]}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.cropImageBtn}
+                onPress={() => {
+                  setCropTargetUri(uri);
+                  setCropTargetIndex(idx);
+                  setCropModalVisible(true);
+                }}
+                accessibilityLabel="Crop image"
+              >
+                <MaterialIcons name="crop" size={14} color="#ffffff" />
+                <Text style={styles.cropImageBtnText}>Crop / Adjust</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.removeImageBtn}
+                onPress={() => {
+                  handleRemoveImage(idx);
+                  setImageUrlInput('');
+                }}
+                accessibilityLabel="Remove image"
+              >
+                <MaterialIcons name="close" size={16} color={colors.onSurface} />
+              </TouchableOpacity>
+            </View>
+          );
+        })}
 
         <View style={styles.divider} />
 
@@ -445,7 +475,6 @@ export default function NewPostScreen() {
         visible={cropModalVisible}
         imageUri={cropTargetUri}
         cropShape="rectangle"
-        aspectRatio={16 / 9}
         title="Crop Post Image"
         onConfirm={(croppedUri) => {
           if (cropTargetIndex !== null) {
@@ -453,6 +482,7 @@ export default function NewPostScreen() {
           } else {
             setImages((prev) => [...prev, croppedUri]);
           }
+          setImageUrlInput(parseCropFromUrl(croppedUri).cleanUrl);
           setCropTargetUri(null);
           setCropTargetIndex(null);
           setCropModalVisible(false);

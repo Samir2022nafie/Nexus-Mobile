@@ -27,6 +27,7 @@ import { usersService } from '../../src/services/users';
 import { reportsService } from '../../src/services/reports';
 import { useAuth } from '../../src/context/AuthContext';
 import { PublicProfile, Post } from '../../src/types';
+import { parseCropFromUrl } from '../../src/utils/imageUrl';
 
 export default function PublicUserProfileScreen() {
   const router = useSafeRouter();
@@ -229,13 +230,31 @@ export default function PublicUserProfileScreen() {
         <View style={styles.profileCard}>
           {/* Avatar */}
           <View style={styles.avatarWrapper}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <MaterialIcons name="person" size={50} color={colors.tertiary} />
-              </View>
-            )}
+            {(() => {
+              const avatarCrop = parseCropFromUrl(avatarUrl);
+              return avatarCrop.cleanUrl ? (
+                <Image
+                  source={{ uri: avatarCrop.cleanUrl }}
+                  style={[
+                    styles.avatarImage,
+                    avatarCrop.zoom > 1 || avatarCrop.panX !== 0 || avatarCrop.panY !== 0
+                      ? {
+                          transform: [
+                            { scale: avatarCrop.zoom },
+                            { translateX: (avatarCrop.panX / 100) * 88 },
+                            { translateY: (avatarCrop.panY / 100) * 88 },
+                          ],
+                        }
+                      : null,
+                  ]}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.avatarFallback}>
+                  <MaterialIcons name="person" size={50} color={colors.tertiary} />
+                </View>
+              );
+            })()}
           </View>
 
           {/* User Details */}

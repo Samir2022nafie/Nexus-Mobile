@@ -16,7 +16,7 @@ import { Colors, Typography, Spacing, BorderRadius, Shadows, ThemeColors } from 
 import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { formatCategoryName } from '../utils/categories';
 import { usePostState } from '../context/PostStateContext';
-import { extractDirectImageUrl } from '../utils/imageUrl';
+import { extractDirectImageUrl, parseCropFromUrl } from '../utils/imageUrl';
 
 export function formatPostRelativeDate(rawDate?: string): string {
   if (!rawDate) return '';
@@ -156,8 +156,10 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
 
   const rawMedia = post.mediaUrl || post.media_url || (Array.isArray(post.mediaUrls) ? post.mediaUrls[0] : null);
   const postMedia = extractDirectImageUrl(rawMedia);
+  const postCrop = parseCropFromUrl(rawMedia);
 
   const [mediaAspectRatio, setMediaAspectRatio] = useState<number | null>(null);
+  const [cardMediaWidth, setCardMediaWidth] = useState<number>(0);
 
   useEffect(() => {
     if (!postMedia) {
@@ -178,6 +180,12 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
       isMounted = false;
     };
   }, [postMedia]);
+
+  const effectiveRatio = postCrop.aspectRatio || mediaAspectRatio;
+  const measuredWidth = cardMediaWidth || 340;
+  const postDisplayHeight = effectiveRatio
+    ? Math.min(480, Math.max(140, Math.round(measuredWidth / effectiveRatio)))
+    : 220;
 
   const handlePostPress = () => {
     if (onPressPost) {
@@ -276,14 +284,26 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
         {post.title ? <Text style={styles.postTitle}>{post.title}</Text> : null}
         {postMedia ? (
           <View
+            onLayout={(e) => setCardMediaWidth(e.nativeEvent.layout.width)}
             style={[
               styles.postMediaContainer,
-              mediaAspectRatio ? { aspectRatio: mediaAspectRatio } : { height: 200 },
+              { width: '100%', height: postDisplayHeight, alignSelf: 'stretch' },
             ]}
           >
             <Image
               source={{ uri: postMedia }}
-              style={styles.postMediaImage}
+              style={[
+                styles.postMediaImage,
+                postCrop.zoom > 1 || postCrop.panX !== 0 || postCrop.panY !== 0
+                  ? {
+                      transform: [
+                        { scale: postCrop.zoom },
+                        { translateX: (postCrop.panX / 100) * measuredWidth },
+                        { translateY: (postCrop.panY / 100) * postDisplayHeight },
+                      ],
+                    }
+                  : null,
+              ]}
               resizeMode="cover"
             />
           </View>
@@ -478,6 +498,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     },
     postMediaContainer: {
       width: '100%',
+      alignSelf: 'stretch',
       maxHeight: 480,
       minHeight: 140,
       borderRadius: BorderRadius.lg,
@@ -488,6 +509,7 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     postMediaImage: {
       width: '100%',
       height: '100%',
+      alignSelf: 'stretch',
     },
     postContent: {
       ...Typography.bodySm,

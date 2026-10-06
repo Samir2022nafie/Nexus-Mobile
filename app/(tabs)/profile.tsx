@@ -43,6 +43,7 @@ import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { categorizeItemByDate } from '../../src/utils/dateUtils';
 import { formatCategoryName } from '../../src/utils/categories';
 import { useTabBarVisibility } from '../../src/context/TabBarVisibilityContext';
+import { parseCropFromUrl } from '../../src/utils/imageUrl';
 import { usePostState } from '../../src/context/PostStateContext';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 
@@ -689,10 +690,29 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             {user?.profile_picture_url ? (
-              <Image
-                source={{ uri: user.profile_picture_url }}
-                style={styles.avatarImage}
-              />
+              (() => {
+                const crop = parseCropFromUrl(user.profile_picture_url);
+                return (
+                  <View style={styles.avatarImage}>
+                    <Image
+                      source={{ uri: crop.cleanUrl }}
+                      style={[
+                        styles.avatarImageInner,
+                        crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
+                          ? {
+                              transform: [
+                                { scale: crop.zoom },
+                                { translateX: (crop.panX / 100) * 96 },
+                                { translateY: (crop.panY / 100) * 96 },
+                              ],
+                            }
+                          : null,
+                      ]}
+                      resizeMode="cover"
+                    />
+                  </View>
+                );
+              })()
             ) : (
               <View style={[styles.avatarImage, styles.avatarFallback]}>
                 <MaterialIcons name="person" size={54} color={colors.tertiary} />
@@ -1562,6 +1582,11 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
     borderRadius: 48,
     borderWidth: 3,
     borderColor: colors.surfaceContainerHigh,
+    overflow: 'hidden',
+  },
+  avatarImageInner: {
+    width: '100%',
+    height: '100%',
   },
   cameraBadge: {
     position: 'absolute',

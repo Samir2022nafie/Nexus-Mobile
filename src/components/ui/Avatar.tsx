@@ -4,6 +4,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { Colors, Typography } from '../../constants/theme';
+import { parseCropFromUrl } from '../../utils/imageUrl';
 
 interface AvatarProps {
   uri?: string | null;
@@ -47,18 +48,39 @@ export const Avatar: React.FC<AvatarProps> = ({
     : {};
 
   if (uri) {
+    const crop = parseCropFromUrl(uri);
     return (
-      <Image
-        source={{ uri }}
+      <View
         style={[
           {
             width: size,
             height: size,
             borderRadius: size / 2,
+            overflow: 'hidden',
           },
           borderStyle,
         ]}
-      />
+      >
+        <Image
+          source={{ uri: crop.cleanUrl }}
+          style={[
+            {
+              width: size,
+              height: size,
+            },
+            crop.zoom > 1 || crop.panX !== 0 || crop.panY !== 0
+              ? {
+                  transform: [
+                    { scale: crop.zoom },
+                    { translateX: (crop.panX / 100) * size },
+                    { translateY: (crop.panY / 100) * size },
+                  ],
+                }
+              : null,
+          ]}
+          resizeMode="cover"
+        />
+      </View>
     );
   }
 

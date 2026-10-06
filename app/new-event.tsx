@@ -38,7 +38,7 @@ import { communitiesService } from '../src/services/communities';
 import { uploadService } from '../src/services/upload';
 import { ApiRequestError } from '../src/services/api';
 import { ManagedCommunity } from '../src/types';
-import { extractDirectImageUrl, resolveImageUrl } from '../src/utils/imageUrl';
+import { extractDirectImageUrl, resolveImageUrl, parseCropFromUrl } from '../src/utils/imageUrl';
 import { LocationInput } from '../src/components/ui/LocationInput';
 import { ImageCropModal } from '../src/components/ui/ImageCropModal';
 
@@ -568,7 +568,27 @@ export default function NewEventScreen() {
           <Text style={styles.label}>EVENT BANNER (OPTIONAL)</Text>
           {coverImage ? (
             <View style={styles.coverPreviewContainer}>
-              <Image source={{ uri: coverImage }} style={styles.coverPreviewImage} />
+              {(() => {
+                const eventCoverCrop = parseCropFromUrl(coverImage);
+                return (
+                  <Image
+                    source={{ uri: eventCoverCrop.cleanUrl }}
+                    style={[
+                      styles.coverPreviewImage,
+                      eventCoverCrop.zoom > 1 || eventCoverCrop.panX !== 0 || eventCoverCrop.panY !== 0
+                        ? {
+                            transform: [
+                              { scale: eventCoverCrop.zoom },
+                              { translateX: (eventCoverCrop.panX / 100) * (Dimensions.get('window').width - 32) },
+                              { translateY: (eventCoverCrop.panY / 100) * 150 },
+                            ],
+                          }
+                        : null,
+                    ]}
+                    resizeMode="cover"
+                  />
+                );
+              })()}
               <TouchableOpacity
                 style={styles.coverRemoveBtn}
                 onPress={() => setCoverImage(null)}
@@ -606,7 +626,7 @@ export default function NewEventScreen() {
               style={styles.textInput}
               placeholder="Or paste banner image URL (https://...)"
               placeholderTextColor={colors.outline}
-              value={coverImage && coverImage.startsWith('http') ? coverImage : ''}
+              value={parseCropFromUrl(coverImage).cleanUrl}
               onChangeText={(text) => {
                 const direct = extractDirectImageUrl(text);
                 setCoverImage(direct || null);

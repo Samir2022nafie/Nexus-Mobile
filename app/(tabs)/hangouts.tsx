@@ -628,6 +628,8 @@ export default function ExploreMapScreen() {
           sendDataToWebView(mapData, selectedEntityTypes, selectedCategories, selectedCities);
           tryOpenPendingCard(mapData, pendingFocusRef.current);
         }
+      } else if (msg.type === 'webview_error') {
+        console.warn('[Map WebView Error]:', msg.message);
       }
     } catch (e) {
       console.error('WebView message parse error:', e);
@@ -748,6 +750,16 @@ export default function ExploreMapScreen() {
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+        <script>
+          window.onerror = function(msg, url, line, col, err) {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'webview_error',
+                message: msg + ' (' + line + ':' + col + ')'
+              }));
+            }
+          };
+        </script>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body, html {
@@ -1225,21 +1237,25 @@ export default function ExploreMapScreen() {
         <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="globe-atmosphere-halo"></div></div>
         <div id="map"></div>
 
-        <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+        <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.js';"></script>
         <script>
-          // Initialize MapLibre GL v5 with 3D Globe Projection
+          // Initialize MapLibre GL v5 with adaptive projection (Mercator at street zoom, Globe at planet zoom)
           // minZoom lowered to 1.45 so the entire globe sphere fits comfortably on screen without clipping
+          var initialZ = Math.max(1.45, ${initialZoom});
+          var initialProjType = initialZ >= 7.0 ? 'mercator' : 'globe';
+          var currentProjection = initialProjType;
+
           var map = new maplibregl.Map({
             container: 'map',
             style: 'https://tiles.openfreemap.org/styles/liberty',
             center: [${initialCenterLng}, ${initialCenterLat}],
-            zoom: Math.max(1.45, ${initialZoom}),
+            zoom: initialZ,
             minZoom: 1.45,
             maxZoom: 19.0,
             pitch: ${initialZoom < 5.0 ? 0 : initialPitch},
             maxPitch: 60,
             bearing: ${initialBearing},
-            projection: { type: 'globe' },
+            projection: { type: initialProjType },
             antialias: false,
             fadeDuration: 0,
             trackResize: true,
@@ -1247,6 +1263,12 @@ export default function ExploreMapScreen() {
             cooperativeGestures: false,
             renderWorldCopies: true
           });
+
+          // Immediately sync atmosphere halo with initial zoom
+          var haloEl = document.querySelector('.globe-atmosphere-halo');
+          if (haloEl && initialZ > 5.5) {
+            haloEl.style.opacity = '0';
+          }
 
           // Decremental smooth zoom scale calculation (throttled for 60fps performance)
           var lastZoomScale = -1;
@@ -1321,9 +1343,11 @@ export default function ExploreMapScreen() {
 
           // Style load: Snapchat Dark Globe Aesthetics + Selective Labels
           map.on('style.load', function() {
-            currentProjection = 'globe';
+            var z = map.getZoom();
+            var targetProj = z >= 7.0 ? 'mercator' : 'globe';
+            currentProjection = targetProj;
             try {
-              map.setProjection({ type: 'globe' });
+              map.setProjection({ type: targetProj });
             } catch(e) {}
 
             // 1. Generate & register the Snapchat dark navy sinusoidal wave pattern for water
@@ -1540,6 +1564,19 @@ export default function ExploreMapScreen() {
             map.on('zoomend', updateAtmosphereHalo);
             updateAtmosphereHalo();
 
+            // Dynamically adapt projection when zooming between planet globe and street levels
+            function updateProjectionForZoom() {
+              var z = map.getZoom();
+              var targetProj = z >= 7.0 ? 'mercator' : 'globe';
+              if (currentProjection !== targetProj) {
+                currentProjection = targetProj;
+                try {
+                  map.setProjection({ type: targetProj });
+                } catch(e) {}
+              }
+            }
+            map.on('zoomend', updateProjectionForZoom);
+
             // 3D extruded buildings (at zoom >= 15.0)
             try {
               if (!map.getLayer('3d-buildings') && map.getSource('openmaptiles')) {
@@ -1576,6 +1613,7 @@ export default function ExploreMapScreen() {
           // Reset to 3D Globe
           window.resetToGlobe = function() {
             collapseExpanded();
+            currentProjection = 'globe';
             try {
               map.setProjection({ type: 'globe' });
             } catch(e) {}
@@ -1724,7 +1762,7 @@ export default function ExploreMapScreen() {
                 cropPart = trimmed.slice(hashIdx + 6).split('&')[0];
               } else if (queryMatch) {
                 cropPart = decodeURIComponent(queryMatch[1]);
-                clean = trimmed.replace(/[?&]crop=[^&#]+/, '').replace(/\?&/, '?').replace(/[?&]$/, '');
+                clean = trimmed.replace(/[?&]crop=[^&#]+/, '').split('?&').join('?').replace(/[?&]$/, '');
               }
               if (!cropPart) {
                 return '<img src="' + clean + '" />';
@@ -2493,6 +2531,7 @@ export default function ExploreMapScreen() {
         source={{ html: mapHtml }}
         style={styles.webView}
         onMessage={onWebViewMessage}
+        originWhitelist={['*']}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         renderToHardwareTextureAndroid={true}

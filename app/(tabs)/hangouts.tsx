@@ -996,7 +996,7 @@ export default function ExploreMapScreen() {
           .user-pin img { width: 100%; height: 100%; object-fit: cover; }
           .user-avatar-fallback {
             width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-            background: #38332d; color: #feba48; font-size: 14px; font-weight: 800;
+            background: #262320;
           }
           .user-label {
             margin-top: 3px;
@@ -1796,8 +1796,9 @@ export default function ExploreMapScreen() {
               pinClass = 'user-pin';
               labelClass = 'user-label';
               title = item.name || item.username || 'User';
-              var initial = (title || 'U').charAt(0).toUpperCase();
-              contentHtml = formatCroppedImgHtml(item.profilePictureUrl, '<div class="user-avatar-fallback">' + initial + '</div>');
+              var userPic = item.profilePictureUrl || item.profile_picture_url || item.avatarUrl || item.avatar_url;
+              var userFallback = '<div class="user-avatar-fallback"><svg viewBox="0 0 24 24" width="24" height="24" fill="#baa898"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>';
+              contentHtml = formatCroppedImgHtml(userPic, userFallback);
             }
 
             var pinWrapHtml = '<div class="pin-wrap' + (isOverlapping && count > 1 ? ' is-stacked' : '') + '">';

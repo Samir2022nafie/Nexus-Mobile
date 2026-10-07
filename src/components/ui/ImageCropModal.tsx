@@ -64,6 +64,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
   // Natural image dimensions
   const [origSize, setOrigSize] = useState<{ width: number; height: number } | null>(null);
+  const origSizeRef = useRef<{ width: number; height: number } | null>(null);
   const [loadingOrig, setLoadingOrig] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
 
@@ -103,6 +104,16 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     ? Math.min(windowWidth - 28, Math.round(windowHeight * 0.46), 360)
     : Math.max(280, windowWidth - 20);
 
+  const boxWidthRef = useRef<number>(boxWidth);
+  useEffect(() => {
+    boxWidthRef.current = boxWidth;
+  }, [boxWidth]);
+
+  const cropShapeRef = useRef(cropShape);
+  useEffect(() => {
+    cropShapeRef.current = cropShape;
+  }, [cropShape]);
+
   // User requirement: "the minimum height you can crop an image should be a 1:1 ratio"
   // For posts: min height is 1:1 (square = boxWidth), max height is 4:5 portrait (boxWidth * 1.25)
   const minPostHeight = boxWidth;
@@ -130,26 +141,40 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     return cropHeight;
   }, [cropShape, boxWidth, aspectRatio, cropHeight]);
 
+  const activeBoxHeightRef = useRef<number>(activeBoxHeight);
+  useEffect(() => {
+    activeBoxHeightRef.current = activeBoxHeight;
+  }, [activeBoxHeight]);
+
   // Base dimensions calculation: image always covers the box completely at baseScale
   const baseScale = origSize ? Math.max(boxWidth / origSize.width, activeBoxHeight / origSize.height) : 1;
   const baseW = origSize ? origSize.width * baseScale : boxWidth;
   const baseH = origSize ? origSize.height * baseScale : activeBoxHeight;
 
   // Strict clamping helper: guarantees image can NEVER detach from container borders
-  const clampPan = (rawX: number, rawY: number, z: number, bH: number = activeBoxHeight) => {
-    const scale = origSize ? Math.max(boxWidth / origSize.width, bH / origSize.height) : 1;
-    const currentBaseW = origSize ? origSize.width * scale : boxWidth;
-    const currentBaseH = origSize ? origSize.height * scale : bH;
+  const clampPan = (rawX: number, rawY: number, z: number, bH?: number) => {
+    const currentBoxW = boxWidthRef.current;
+    const currentBoxH = bH !== undefined ? bH : activeBoxHeightRef.current;
+    const orig = origSizeRef.current || origSize;
+
+    const scale = orig && orig.width > 0 && orig.height > 0
+      ? Math.max(currentBoxW / orig.width, currentBoxH / orig.height)
+      : 1;
+    const currentBaseW = orig && orig.width > 0 ? orig.width * scale : currentBoxW;
+    const currentBaseH = orig && orig.height > 0 ? orig.height * scale : currentBoxH;
 
     const scaledW = currentBaseW * z;
     const scaledH = currentBaseH * z;
-    const maxX = Math.max(0, (scaledW - boxWidth) / 2);
-    const maxY = Math.max(0, (scaledH - bH) / 2);
+    const maxX = Math.max(0, (scaledW - currentBoxW) / 2);
+    const maxY = Math.max(0, (scaledH - currentBoxH) / 2);
     return {
       x: Math.max(-maxX, Math.min(maxX, rawX)),
       y: Math.max(-maxY, Math.min(maxY, rawY)),
     };
   };
+
+  const clampPanRef = useRef(clampPan);
+  clampPanRef.current = clampPan;
 
   // Keep pan bounded when container dimensions or base size change
   useEffect(() => {
@@ -167,6 +192,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   // Initialize or reset state when modal opens
   useEffect(() => {
     if (!visible || !imageUri) {
+      origSizeRef.current = null;
       setOrigSize(null);
       zoomRef.current = 1.0;
       panRef.current = { x: 0, y: 0 };
@@ -187,7 +213,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     zoomAnim.setValue(initialZ);
 
     const initialX = (parsedImage.panX / 100) * boxWidth;
-    const initialY = (parsedImage.panY / 100) * boxWidth;
+    const initialY = (parsedImage.panY / 100) * activeBoxHeight;
     panRef.current = { x: initialX, y: initialY };
     panXAnim.setValue(initialX);
     panYAnim.setValue(initialY);
@@ -196,6 +222,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     Image.getSize(
       direct,
       (w, h) => {
+        origSizeRef.current = { width: w, height: h };
         setOrigSize({ width: w, height: h });
         setLoadingOrig(false);
 
@@ -206,14 +233,17 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           const initialH = Math.min(maxPostHeight, Math.max(minPostHeight, prevH));
           setCropHeight(initialH);
           cropHeightRef.current = initialH;
+          activeBoxHeightRef.current = initialH;
         }
       },
       () => {
+        origSizeRef.current = { width: 800, height: 800 };
         setOrigSize({ width: 800, height: 800 });
         setLoadingOrig(false);
         if (cropShape === 'rectangle') {
           setCropHeight(boxWidth);
           cropHeightRef.current = boxWidth;
+          activeBoxHeightRef.current = boxWidth;
         }
       }
     );
@@ -250,7 +280,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
         }
 
         // 2. Single finger: Check if touch is near top handle or bottom handle of crop box
-        if (cropShape === 'rectangle') {
+        if (cropShapeRef.current === 'rectangle') {
           const touchY = evt.nativeEvent.locationY;
           const currentBoxH = cropHeightRef.current;
           const vH = viewportLayout.current.height;
@@ -322,7 +352,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             const rawPanX = pinchStartPan.current.x + deltaMidX;
             const rawPanY = pinchStartPan.current.y + deltaMidY;
 
-            const clamped = clampPan(rawPanX, rawPanY, targetZoom, cropHeightRef.current);
+            const clamped = clampPanRef.current(rawPanX, rawPanY, targetZoom, activeBoxHeightRef.current);
 
             zoomRef.current = targetZoom;
             panRef.current = clamped;
@@ -353,8 +383,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           const nextH = Math.round(clampedH);
           setCropHeight(nextH);
           cropHeightRef.current = nextH;
+          activeBoxHeightRef.current = nextH;
 
-          const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
+          const clamped = clampPanRef.current(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
           panRef.current = clamped;
           panXAnim.setValue(clamped.x);
           panYAnim.setValue(clamped.y);
@@ -370,8 +401,9 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           const nextH = Math.round(clampedH);
           setCropHeight(nextH);
           cropHeightRef.current = nextH;
+          activeBoxHeightRef.current = nextH;
 
-          const clamped = clampPan(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
+          const clamped = clampPanRef.current(panRef.current.x, panRef.current.y, zoomRef.current, nextH);
           panRef.current = clamped;
           panXAnim.setValue(clamped.x);
           panYAnim.setValue(clamped.y);
@@ -386,7 +418,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           const rawPanX = dragStartPan.current.x + deltaX;
           const rawPanY = dragStartPan.current.y + deltaY;
 
-          const clamped = clampPan(rawPanX, rawPanY, zoomRef.current, cropHeightRef.current);
+          const clamped = clampPanRef.current(rawPanX, rawPanY, zoomRef.current, activeBoxHeightRef.current);
 
           panRef.current = clamped;
           panXAnim.setValue(clamped.x);
@@ -420,6 +452,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const defaultH = Math.min(maxPostHeight, Math.max(minPostHeight, natH));
       setCropHeight(defaultH);
       cropHeightRef.current = defaultH;
+      activeBoxHeightRef.current = defaultH;
     }
 
     Animated.parallel([

@@ -354,14 +354,16 @@ export default function CommunityDetailScreen() {
                   }
                   activeOpacity={cat.isPassed ? 0.38 : 0.85}
                 >
-                <Image
-                  source={{
-                    uri:
-                      (ev as any).cover_image_url ||
-                      ev.coverImageUrl ||
-                      'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                  }}
+                <CroppedImage
+                  uri={
+                    (ev as any).cover_image_url ||
+                    ev.coverImageUrl ||
+                    (ev as any).banner_url ||
+                    (ev as any).bannerUrl ||
+                    'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600'
+                  }
                   style={styles.verticalEventCover}
+                  fill
                 />
                 <View style={styles.verticalEventBody}>
                   <Text style={styles.verticalEventTitle} numberOfLines={1}>
@@ -713,14 +715,16 @@ export default function CommunityDetailScreen() {
                       }
                       activeOpacity={cat.isPassed ? 0.38 : 0.85}
                     >
-                    <Image
-                      source={{
-                        uri:
-                          (ev as any).cover_image_url ||
-                          ev.coverImageUrl ||
-                          'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                      }}
+                    <CroppedImage
+                      uri={
+                        (ev as any).cover_image_url ||
+                        ev.coverImageUrl ||
+                        (ev as any).banner_url ||
+                        (ev as any).bannerUrl ||
+                        'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600'
+                      }
                       style={styles.eventCover}
+                      fill
                     />
                     <View style={styles.eventBody}>
                       <Text style={styles.eventTitle} numberOfLines={1}>

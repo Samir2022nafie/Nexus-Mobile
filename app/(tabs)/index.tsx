@@ -31,6 +31,7 @@ import { useTheme, useThemedStyles } from '../../src/context/ThemeContext';
 import { AppHeader } from '../../src/components/ui/AppHeader';
 import { LoadingSpinner } from '../../src/components/ui/LoadingSpinner';
 import { Avatar } from '../../src/components/ui/Avatar';
+import { CroppedImage } from '../../src/components/ui/CroppedImage';
 import { useAuth } from '../../src/context/AuthContext';
 import { communitiesService } from '../../src/services/communities';
 import { usersService } from '../../src/services/users';
@@ -843,14 +844,16 @@ export default function HomeScreen() {
                     activeOpacity={cat.isPassed ? 0.38 : 0.85}
                   >
                     <View style={styles.eventCoverWrapper}>
-                      <Image
-                        source={{
-                          uri:
-                            (event as any).cover_image_url ||
-                            event.coverImageUrl ||
-                            'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600',
-                        }}
+                      <CroppedImage
+                        uri={
+                          (event as any).cover_image_url ||
+                          event.coverImageUrl ||
+                          (event as any).banner_url ||
+                          (event as any).bannerUrl ||
+                          'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=600'
+                        }
                         style={styles.eventCover}
+                        fill
                       />
                       <View style={styles.eventCategoryBadge}>
                         <Text style={styles.eventCategoryBadgeText} numberOfLines={1}>

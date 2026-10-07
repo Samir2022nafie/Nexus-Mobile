@@ -126,7 +126,7 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     post.community?.bannerUrl ||
     post.communityBanner ||
     post.communityBannerUrl;
-  const commPic = extractDirectImageUrl(rawCommPic);
+  const commPic = rawCommPic;
 
   const authorName =
     post.author?.name ||
@@ -146,7 +146,7 @@ export const FeedDiscussionCard: React.FC<FeedDiscussionCardProps> = ({
     post.author?.avatar_url ||
     post.author?.avatarUrl ||
     post.authorPic;
-  const authorPic = extractDirectImageUrl(rawAuthorPic);
+  const authorPic = rawAuthorPic;
 
   const rawCat =
     post.communityCategory ||

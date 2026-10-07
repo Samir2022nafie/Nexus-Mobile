@@ -73,15 +73,6 @@ function PickerColumn<T>({
     onSelect(clampedIndex);
   };
 
-  useEffect(() => {
-    if (selectedIndex >= 0 && selectedIndex < data.length) {
-      try {
-        flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
-      } catch (e) {
-        flatListRef.current?.scrollToOffset({ offset: selectedIndex * ITEM_HEIGHT, animated: true });
-      }
-    }
-  }, [selectedIndex, data.length]);
 
   return (
     <View style={pickerStyles.column}>
@@ -207,6 +198,7 @@ export default function NewHangoutScreen() {
   const [tempHour, setTempHour] = useState(now.getHours() % 12 || 12);
   const [tempMinute, setTempMinute] = useState(String(now.getMinutes()).padStart(2, '0'));
   const [tempPeriod, setTempPeriod] = useState(now.getHours() >= 12 ? 'PM' : 'AM');
+  const [pickerResetKey, setPickerResetKey] = useState(0);
 
   const updateField = (field: string, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -222,6 +214,7 @@ export default function NewHangoutScreen() {
     setTempHour(validD.getHours() % 12 || 12);
     setTempMinute(String(validD.getMinutes()).padStart(2, '0'));
     setTempPeriod(validD.getHours() >= 12 ? 'PM' : 'AM');
+    setPickerResetKey((k) => k + 1);
 
     setDatePickerRendered(true);
     dateFadeAnim.setValue(0);
@@ -708,6 +701,7 @@ export default function NewHangoutScreen() {
                   setTempHour(cur.getHours() % 12 || 12);
                   setTempMinute(String(cur.getMinutes()).padStart(2, '0'));
                   setTempPeriod(cur.getHours() >= 12 ? 'PM' : 'AM');
+                  setPickerResetKey((k) => k + 1);
                 }}
                 style={pickerStyles.todayBtn}
               >
@@ -719,7 +713,7 @@ export default function NewHangoutScreen() {
               {MONTHS[tempMonth - 1]} {Math.min(tempDay, daysInMonth)}, {tempYear} · {tempHour}:{tempMinute} {tempPeriod}
             </Text>
 
-            <View style={pickerStyles.columnsRow}>
+            <View key={pickerResetKey} style={pickerStyles.columnsRow}>
               {/* Month */}
               <PickerColumn
                 data={months}

@@ -44,7 +44,7 @@ export default function EditProfileScreen() {
     lastName: user?.last_name || '',
     bio: user?.bio || '',
     profilePictureUrl: user?.profile_picture_url || '',
-    locationName: user?.location?.placeName || user?.location?.name || '',
+    locationName: user?.location?.placeName || user?.location?.name || (user?.location as any)?.place_name || '',
     latitude: user?.location?.latitude ?? (null as number | null),
     longitude: user?.location?.longitude ?? (null as number | null),
     isLocationPrivate: Boolean(user?.isLocationPrivate ?? user?.is_location_private),
@@ -62,10 +62,9 @@ export default function EditProfileScreen() {
         lastName: form.lastName.trim(),
         bio: form.bio.trim(),
         profilePictureUrl: form.profilePictureUrl.trim() ? form.profilePictureUrl.trim() : (null as any),
-        locationId: user?.location?.id || (user as any)?.location_id || undefined,
-        locationName: form.locationName.trim() || undefined,
-        latitude: form.latitude ?? undefined,
-        longitude: form.longitude ?? undefined,
+        locationName: form.locationName.trim() ? form.locationName.trim() : null,
+        latitude: form.latitude ?? null,
+        longitude: form.longitude ?? null,
         isLocationPrivate: form.isLocationPrivate,
       });
       updateUser(updated);
@@ -81,6 +80,18 @@ export default function EditProfileScreen() {
           last_name: form.lastName.trim(),
           bio: form.bio.trim(),
           profile_picture_url: form.profilePictureUrl.trim() ? form.profilePictureUrl.trim() : null,
+          location: form.locationName.trim()
+            ? {
+                id: user?.location?.id || 'preview-loc',
+                name: form.locationName.trim(),
+                placeName: form.locationName.trim(),
+                place_name: form.locationName.trim(),
+                latitude: form.latitude ?? 0,
+                longitude: form.longitude ?? 0,
+              }
+            : null,
+          isLocationPrivate: form.isLocationPrivate,
+          is_location_private: form.isLocationPrivate,
         } as any);
         router.back();
       }

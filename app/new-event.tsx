@@ -79,15 +79,6 @@ function PickerColumn<T>({
     onSelect(clampedIndex);
   };
 
-  useEffect(() => {
-    if (selectedIndex >= 0 && selectedIndex < data.length) {
-      try {
-        flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
-      } catch (e) {
-        flatListRef.current?.scrollToOffset({ offset: selectedIndex * ITEM_HEIGHT, animated: true });
-      }
-    }
-  }, [selectedIndex, data.length]);
 
   return (
     <View style={pickerStyles.column}>
@@ -185,6 +176,7 @@ export default function NewEventScreen() {
   const [tempHour, setTempHour] = useState(now.getHours() % 12 || 12);
   const [tempMinute, setTempMinute] = useState(String(now.getMinutes()).padStart(2, '0'));
   const [tempPeriod, setTempPeriod] = useState(now.getHours() >= 12 ? 'PM' : 'AM');
+  const [pickerResetKey, setPickerResetKey] = useState(0);
 
   useEffect(() => {
     async function loadCommunities() {
@@ -312,6 +304,7 @@ export default function NewEventScreen() {
     setTempHour(validD.getHours() % 12 || 12);
     setTempMinute(String(validD.getMinutes()).padStart(2, '0'));
     setTempPeriod(validD.getHours() >= 12 ? 'PM' : 'AM');
+    setPickerResetKey((k) => k + 1);
 
     setPickerRendered(true);
     dateFadeAnim.setValue(0);
@@ -801,6 +794,7 @@ export default function NewEventScreen() {
                   setTempHour(cur.getHours() % 12 || 12);
                   setTempMinute(String(cur.getMinutes()).padStart(2, '0'));
                   setTempPeriod(cur.getHours() >= 12 ? 'PM' : 'AM');
+                  setPickerResetKey((k) => k + 1);
                 }}
                 style={pickerStyles.todayBtn}
               >
@@ -808,7 +802,7 @@ export default function NewEventScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={pickerStyles.pickersContainer}>
+            <View key={pickerResetKey} style={pickerStyles.pickersContainer}>
               {/* Month */}
               <PickerColumn
                 data={MONTHS}

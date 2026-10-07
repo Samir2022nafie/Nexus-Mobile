@@ -19,9 +19,10 @@ import {
   Image,
   TouchableOpacity,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -118,9 +119,11 @@ export default function EventDetailScreen() {
     }
   }, [id, communitySlug]);
 
-  useEffect(() => {
-    fetchEvent();
-  }, [fetchEvent]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchEvent();
+    }, [fetchEvent])
+  );
 
   const isEventOrganizer = Boolean(
     user?.id &&
@@ -147,6 +150,20 @@ export default function EventDetailScreen() {
     };
     checkNotifs();
   }, [event?.id, isJoined, isEventOrganizer]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        (router as any).navigate('/(tabs)');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [router]);
 
   const handleDeleteEvent = () => {
     Alert.alert(
@@ -353,7 +370,13 @@ export default function EventDetailScreen() {
           {/* Quick Nav Actions: Back Button & Author Controls */}
           <View style={[styles.heroNavRow, { top: insets.top + Spacing.xs }]}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  (router as any).navigate('/(tabs)');
+                }
+              }}
               style={styles.heroCircleBtn}
               activeOpacity={0.8}
             >

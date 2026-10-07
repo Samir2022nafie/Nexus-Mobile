@@ -53,6 +53,10 @@ import {
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
 import { FeedDiscussionCard } from '../../src/components/FeedDiscussionCard';
 
+// Module-level scroll preservation across screens/mounts
+let savedHomeScrollY = 0;
+let hasRestoredScroll = false;
+
 /**
  * Format relative date for post timestamps
  */
@@ -162,6 +166,7 @@ export default function HomeScreen() {
 
   const handleExpandLeadership = () => {
     setIsLeadershipStackExpanded(true);
+    leadershipAnim.stopAnimation();
     Animated.spring(leadershipAnim, {
       toValue: 1,
       tension: 65,
@@ -171,6 +176,7 @@ export default function HomeScreen() {
   };
 
   const handleCollapseLeadership = () => {
+    leadershipAnim.stopAnimation();
     Animated.timing(leadershipAnim, {
       toValue: 0,
       duration: 260,
@@ -240,6 +246,7 @@ export default function HomeScreen() {
 
   const handleScroll = (event: any) => {
     const currentY = event.nativeEvent.contentOffset.y;
+    savedHomeScrollY = currentY;
     const currentTime = Date.now();
     const dy = currentY - lastScrollY.current;
     const dt = Math.max(1, currentTime - lastScrollTime.current);
@@ -250,6 +257,11 @@ export default function HomeScreen() {
 
     // Synchronize bottom navigation bar hide/reveal
     handleTabBarScroll(dy, velocityY, currentY);
+
+    // Auto-collapse leadership deck when user scrolls down the feed
+    if (isLeadershipStackExpanded && Math.abs(dy) > 10) {
+      handleCollapseLeadership();
+    }
 
     if (currentY <= 15) {
       if (!headerVisible.current) {
@@ -284,6 +296,8 @@ export default function HomeScreen() {
   };
 
   const handleScrollToTop = () => {
+    savedHomeScrollY = 0;
+    hasRestoredScroll = true;
     scrollViewRef.current?.scrollTo({ y: 0, animated: true });
   };
 
@@ -414,6 +428,8 @@ export default function HomeScreen() {
     const unsubscribe = (navigation as any)?.addListener?.('tabPress', (e: any) => {
       if ((navigation as any)?.isFocused?.()) {
         e.preventDefault();
+        savedHomeScrollY = 0;
+        hasRestoredScroll = true;
         scrollViewRef.current?.scrollTo({ y: 0, animated: true });
         onRefresh();
       }
@@ -421,9 +437,15 @@ export default function HomeScreen() {
     return unsubscribe;
   }, [navigation, onRefresh]);
 
-  // Screen focus listener: sync data when returning from hangout detail or other tabs
+  // Screen focus listener: restore saved scroll offset when returning, then sync silently
   useEffect(() => {
     const unsubscribe = (navigation as any)?.addListener?.('focus', () => {
+      hasRestoredScroll = false;
+      if (savedHomeScrollY > 0) {
+        requestAnimationFrame(() => {
+          scrollViewRef.current?.scrollTo({ y: savedHomeScrollY, animated: false });
+        });
+      }
       fetchData();
     });
     return unsubscribe;
@@ -583,6 +605,17 @@ export default function HomeScreen() {
           { paddingTop: Math.max(insets.top, 10) + 54 },
         ]}
         onScroll={handleScroll}
+        onContentSizeChange={() => {
+          if (!hasRestoredScroll && savedHomeScrollY > 0) {
+            hasRestoredScroll = true;
+            scrollViewRef.current?.scrollTo({ y: savedHomeScrollY, animated: false });
+          }
+        }}
+        onScrollBeginDrag={() => {
+          if (isLeadershipStackExpanded) {
+            handleCollapseLeadership();
+          }
+        }}
         scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
@@ -617,8 +650,12 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.storiesCarousel}
+              onScrollBeginDrag={() => {
+                if (isLeadershipStackExpanded) {
+                  handleCollapseLeadership();
+                }
+              }}
             >
-              {/* If user manages communities (owner/admin/mod) */}
               {/* If user manages communities (owner/admin/mod) — Unified continuous sliding card deck */}
               {leadershipCommunities.length > 0 && (
                 <Animated.View
@@ -783,7 +820,12 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={comm.id}
                   style={styles.storyItem}
-                  onPress={() => router.push(`/community/${comm.slug}`)}
+                  onPress={() => {
+                    if (isLeadershipStackExpanded) {
+                      handleCollapseLeadership();
+                    }
+                    router.push(`/community/${comm.slug}`);
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={styles.storyRing}>
@@ -1005,18 +1047,11 @@ export default function HomeScreen() {
                       <View>
                         <View style={styles.hangoutHeader}>
                           <View style={styles.hangoutCreatorRow}>
-                            {hangout.creatorAvatar || hangout.creator?.profile_picture_url ? (
-                              <Image
-                                source={{
-                                  uri: hangout.creatorAvatar || hangout.creator?.profile_picture_url,
-                                }}
-                                style={styles.hangoutCreatorAvatar}
-                              />
-                            ) : (
-                              <View style={styles.hangoutAvatarFallback}>
-                                <MaterialIcons name="person" size={15} color={colors.tertiary} />
-                              </View>
-                            )}
+                            <Avatar
+                              uri={hangout.creatorAvatar || hangout.creator?.profile_picture_url}
+                              size={26}
+                              name={hangout.creatorName || hangout.creator?.first_name || 'Host'}
+                            />
                             <Text style={styles.hangoutCreatorName} numberOfLines={1}>
                               {hangout.creatorName || hangout.creator?.first_name || 'Host'}
                             </Text>

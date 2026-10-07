@@ -27,7 +27,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -311,10 +311,12 @@ export default function ProfileScreen() {
   }, [user?.id]);
 
 
-  useEffect(() => {
-    refreshUser();
-    fetchData();
-  }, [fetchData, refreshUser]);
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+      fetchData();
+    }, [fetchData, refreshUser])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

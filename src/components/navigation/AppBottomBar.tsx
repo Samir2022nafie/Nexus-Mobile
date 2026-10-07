@@ -47,7 +47,20 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
         {/* Tab 1: Home */}
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => router.push('/(tabs)')}
+          onPress={() => {
+            if (activeTab === 'home') {
+              return;
+            }
+            if (activeTab === null) {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                (router as any).navigate('/(tabs)');
+              }
+            } else {
+              (router as any).navigate('/(tabs)');
+            }
+          }}
           activeOpacity={0.7}
           accessibilityLabel="Home tab"
         >
@@ -58,7 +71,10 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
         {/* Tab 2: Search (formerly Explore) */}
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => router.push('/(tabs)/explore')}
+          onPress={() => {
+            if (activeTab === 'explore') return;
+            (router as any).navigate('/(tabs)/explore');
+          }}
           activeOpacity={0.7}
           accessibilityLabel="Search tab"
         >
@@ -81,7 +97,10 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
         {/* Tab 4: Explore (formerly Hangouts — opens 3D Globe Explore map) */}
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => router.push('/(tabs)/hangouts')}
+          onPress={() => {
+            if (activeTab === 'hangouts') return;
+            (router as any).navigate('/(tabs)/hangouts');
+          }}
           activeOpacity={0.7}
           accessibilityLabel="Explore tab"
         >
@@ -92,7 +111,10 @@ export function AppBottomBar({ activeTab = null, communityContext }: AppBottomBa
         {/* Tab 5: Profile */}
         <TouchableOpacity
           style={styles.tabItem}
-          onPress={() => router.push('/(tabs)/profile')}
+          onPress={() => {
+            if (activeTab === 'profile') return;
+            (router as any).navigate('/(tabs)/profile');
+          }}
           activeOpacity={0.7}
           accessibilityLabel="Profile tab"
         >

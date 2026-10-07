@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -66,9 +66,11 @@ export default function PublicUserProfileScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -749,7 +749,10 @@ export default function ExploreMapScreen() {
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+        <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+        <link rel="dns-prefetch" href="https://tiles.openfreemap.org" />
+        <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
         <script>
           window.onerror = function(msg, url, line, col, err) {
             if (window.ReactNativeWebView) {
@@ -775,6 +778,9 @@ export default function ExploreMapScreen() {
             top: 0;
             left: 0;
             z-index: 1;
+            transform: translate3d(0, 0, 0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
           }
 
           /* Hide MapLibre Attribution & Copyright Controls */
@@ -795,10 +801,16 @@ export default function ExploreMapScreen() {
             background: #02040a;
             overflow: hidden;
             pointer-events: none;
+            contain: strict;
           }
           .cosmos-stars {
             position: absolute;
             inset: -300px;
+            contain: strict;
+            will-change: transform;
+            transform: translate3d(0, 0, 0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
             background-image: 
               radial-gradient(1.8px 1.8px at 28px 36px, #ffffff, transparent),
               radial-gradient(2.2px 2.2px at 145px 78px, #ffffff, transparent),
@@ -1237,7 +1249,7 @@ export default function ExploreMapScreen() {
         <div class="cosmos-bg"><div class="cosmos-stars"></div><div class="globe-atmosphere-halo"></div></div>
         <div id="map"></div>
 
-        <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.js';"></script>
+        <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.min.js"></script>
         <script>
           // Initialize MapLibre GL v5 with adaptive projection (Mercator at street zoom, Globe at planet zoom)
           // minZoom lowered to 1.45 so the entire globe sphere fits comfortably on screen without clipping
@@ -1261,7 +1273,10 @@ export default function ExploreMapScreen() {
             trackResize: true,
             attributionControl: false,
             cooperativeGestures: false,
-            renderWorldCopies: true
+            renderWorldCopies: false,
+            maxParallelImageRequests: 16,
+            crossSourceCollisions: false,
+            refreshExpiredTiles: false
           });
 
           // Immediately sync atmosphere halo with initial zoom
@@ -1307,18 +1322,19 @@ export default function ExploreMapScreen() {
           map.on('zoomend', updateZoomScale);
           updateZoomScale();
 
-          // Starry background responsive to swiping / parallax (throttled)
+          // Starry background smoothly tracks swiping / sliding gestures in real time
+          var starEl = document.querySelector('.cosmos-stars');
           var lastParallaxX = -999;
           var lastParallaxY = -999;
           function updateCosmicParallax() {
-            var starEl = document.querySelector('.cosmos-stars');
+            if (!starEl) starEl = document.querySelector('.cosmos-stars');
             if (!starEl) return;
             var center = map.getCenter();
             var bearing = map.getBearing() || 0;
             var pitch = map.getPitch() || 0;
             var shiftX = Math.round((center.lng * 2.8 + bearing * 1.2) % 240);
             var shiftY = Math.round((center.lat * 2.8 + pitch * 0.8) % 240);
-            if (Math.abs(shiftX - lastParallaxX) >= 4 || Math.abs(shiftY - lastParallaxY) >= 4) {
+            if (shiftX !== lastParallaxX || shiftY !== lastParallaxY) {
               lastParallaxX = shiftX;
               lastParallaxY = shiftY;
               starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
@@ -1334,8 +1350,10 @@ export default function ExploreMapScreen() {
             });
           }
           map.on('move', scheduleCosmicParallax);
+          map.on('moveend', scheduleCosmicParallax);
           map.on('rotate', scheduleCosmicParallax);
           map.on('pitch', scheduleCosmicParallax);
+          updateCosmicParallax();
 
           map.on('error', function(err) {
             // Silently absorb individual tile network drops
@@ -1385,35 +1403,39 @@ export default function ExploreMapScreen() {
             } catch(e) {}
 
             // 2. Snapchat Continent & Landscape Dark Mode Styling
-            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
-            try {
-              map.getStyle().layers.forEach(function(l) {
-                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
-                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
-                }
-              });
-            } catch(e) {}
+            // Single-pass optimization over layers for rapid rendering
+            var hideLandIds = {
+              'park': 1, 'park_outline': 1, 'park_national': 1, 'park_nature_reserve': 1,
+              'landcover_wood': 1, 'landcover_grass': 1, 'landcover_wetland': 1,
+              'landcover_scrub': 1, 'landcover_cemetery': 1, 'landcover_glacier': 1,
+              'landuse_pitch': 1, 'landuse_track': 1, 'landuse_grass': 1,
+              'landuse_residential': 1, 'landcover_sand': 1, 'landcover_ice': 1,
+              'landuse_hospital': 1, 'landuse_school': 1, 'landuse_industrial': 1,
+              'landuse_commercial': 1, 'boundary_disputed': 1
+            };
 
-            // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
-            [
-              'park', 'park_outline', 'park_national', 'park_nature_reserve', 'landcover_wood', 'landcover_grass',
-              'landcover_wetland', 'landcover_scrub', 'landcover_cemetery', 'landcover_glacier',
-              'landuse_pitch', 'landuse_track', 'landuse_grass', 'landuse_residential',
-              'landcover_sand', 'landcover_ice', 'landuse_hospital', 'landuse_school',
-              'landuse_industrial', 'landuse_commercial'
-            ].forEach(function(id) {
-              if (map.getLayer(id)) {
-                try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
+            try {
+              var styleLayers = (map.getStyle && map.getStyle().layers) || [];
+              for (var i = 0; i < styleLayers.length; i++) {
+                var l = styleLayers[i];
+                var lid = l.id;
+                if (l.type === 'raster' || lid.indexOf('natural_earth') !== -1 || lid.indexOf('hillshade') !== -1 || hideLandIds[lid] || lid.indexOf('park') !== -1 || lid.indexOf('garden') !== -1 || lid.indexOf('grass') !== -1) {
+                  try { map.setLayoutProperty(lid, 'visibility', 'none'); } catch(e) {}
+                } else if (l.type === 'line' && (lid.indexOf('road') !== -1 || lid.indexOf('highway') !== -1 || lid.indexOf('bridge') !== -1 || lid.indexOf('tunnel') !== -1)) {
+                  try {
+                    if (lid.indexOf('case') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#12171e');
+                    } else if (lid.indexOf('motorway') !== -1 || lid.indexOf('trunk') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#2c3545');
+                    } else if (lid.indexOf('primary') !== -1 || lid.indexOf('secondary') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#222b37');
+                    } else {
+                      map.setPaintProperty(lid, 'line-color', '#1a222b');
+                    }
+                    map.setPaintProperty(lid, 'line-opacity', 0.85);
+                  } catch(e) {}
+                }
               }
-            });
-
-            // Sweep and remove any remaining park / garden line or fill layers
-            try {
-              map.getStyle().layers.forEach(function(l) {
-                if (l.id.indexOf('park') !== -1 || l.id.indexOf('garden') !== -1 || l.id.indexOf('grass') !== -1) {
-                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
-                }
-              });
             } catch(e) {}
 
             // Continents: Dark slate grey (#28323c) matching Snapchat
@@ -1439,26 +1461,6 @@ export default function ExploreMapScreen() {
                 try { map.setPaintProperty(id, 'line-color', '#18283e'); } catch(e) {}
               }
             });
-
-            // Tone down bright yellow and white road lines to dark charcoal / slate
-            try {
-              map.getStyle().layers.forEach(function(l) {
-                if (l.type === 'line' && (l.id.indexOf('road') !== -1 || l.id.indexOf('highway') !== -1 || l.id.indexOf('bridge') !== -1 || l.id.indexOf('tunnel') !== -1)) {
-                  try {
-                    if (l.id.indexOf('case') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#12171e');
-                    } else if (l.id.indexOf('motorway') !== -1 || l.id.indexOf('trunk') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#2c3545');
-                    } else if (l.id.indexOf('primary') !== -1 || l.id.indexOf('secondary') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#222b37');
-                    } else {
-                      map.setPaintProperty(l.id, 'line-color', '#1a222b');
-                    }
-                    map.setPaintProperty(l.id, 'line-opacity', 0.85);
-                  } catch(e) {}
-                }
-              });
-            } catch(e) {}
 
             if (map.getLayer('building')) {
               try { map.setPaintProperty('building', 'fill-color', '#1e242c'); } catch(e) {}
@@ -2535,6 +2537,8 @@ export default function ExploreMapScreen() {
         originWhitelist={['*']}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        cacheEnabled={true}
+        androidLayerType="hardware"
         renderToHardwareTextureAndroid={true}
         overScrollMode="never"
         scrollEnabled={false}

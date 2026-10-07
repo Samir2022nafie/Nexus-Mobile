@@ -3,7 +3,7 @@
  * Create discussion with community selector, title, body, image attachment, and tags.
  * Backend: POST /communities/:id/posts
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -64,6 +64,7 @@ export default function NewPostScreen() {
   const [cropModalVisible, setCropModalVisible] = useState(false);
   const [cropTargetUri, setCropTargetUri] = useState<string | null>(null);
   const [cropTargetIndex, setCropTargetIndex] = useState<number | null>(null);
+  const initialPostRef = useRef<any>(null);
 
   // Listen for community selection from the dedicated screen
   useEffect(() => {
@@ -95,6 +96,12 @@ export default function NewPostScreen() {
             if (post.tags && post.tags.length > 0) {
               setTags(post.tags);
             }
+            initialPostRef.current = {
+              title: post.title || '',
+              content: post.content || '',
+              mediaUrl: post.mediaUrl || null,
+              tags: post.tags || ['discussion'],
+            };
             const postCommunityId = (post as any).communityId || post.community?.id;
             const postCommunitySlug = (post as any).communitySlug || post.community?.slug;
             const match = list.find(
@@ -136,6 +143,20 @@ export default function NewPostScreen() {
     };
     loadData();
   }, [params.communityId, params.communitySlug, params.postId, isEditing]);
+
+  const hasChanges = useMemo(() => {
+    if (!isEditing) return true;
+    if (!initialPostRef.current) return false;
+    const init = initialPostRef.current;
+    if (title.trim() !== (init.title || '').trim()) return true;
+    if (content.trim() !== (init.content || '').trim()) return true;
+    const currentMedia = images.length > 0 ? images[0] : (imageUrlInput.trim() || null);
+    if ((currentMedia || null) !== (init.mediaUrl || null)) return true;
+    const initTags = (init.tags || []).join(',');
+    const curTags = tags.join(',');
+    if (initTags !== curTags) return true;
+    return false;
+  }, [isEditing, title, content, images, imageUrlInput, tags]);
 
   const handlePickImage = async () => {
     try {
@@ -183,6 +204,10 @@ export default function NewPostScreen() {
     }
     if (!content.trim()) {
       Alert.alert('Required', 'Please enter post content.');
+      return;
+    }
+    if (isEditing && !hasChanges) {
+      router.back();
       return;
     }
 
@@ -282,10 +307,10 @@ export default function NewPostScreen() {
         <Text style={styles.headerTitle}>{isEditing ? 'Edit Post' : 'New Post'}</Text>
         <TouchableOpacity
           onPress={handleSubmit}
-          disabled={submitting || !title.trim() || !content.trim()}
+          disabled={submitting || !title.trim() || !content.trim() || (isEditing && !hasChanges)}
           style={[
             styles.postBtn,
-            (!title.trim() || !content.trim() || submitting) && styles.postBtnDisabled,
+            (!title.trim() || !content.trim() || submitting || (isEditing && !hasChanges)) && styles.postBtnDisabled,
           ]}
         >
           <Text style={styles.postBtnText}>

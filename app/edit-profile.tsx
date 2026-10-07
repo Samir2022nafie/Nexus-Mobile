@@ -8,7 +8,7 @@
  * - Read-only Profile Picture URL with lock
  * - Delete Account trigger
  */
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -49,11 +49,38 @@ export default function EditProfileScreen() {
     longitude: user?.location?.longitude ?? (null as number | null),
     isLocationPrivate: Boolean(user?.isLocationPrivate ?? user?.is_location_private),
   });
+  const initialProfileRef = useRef({
+    firstName: user?.first_name || '',
+    lastName: user?.last_name || '',
+    bio: user?.bio || '',
+    profilePictureUrl: user?.profile_picture_url || '',
+    locationName: user?.location?.placeName || user?.location?.name || (user?.location as any)?.place_name || '',
+    latitude: user?.location?.latitude ?? (null as number | null),
+    longitude: user?.location?.longitude ?? (null as number | null),
+    isLocationPrivate: Boolean(user?.isLocationPrivate ?? user?.is_location_private),
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cropModalVisible, setCropModalVisible] = useState(false);
 
+  const hasChanges = useMemo(() => {
+    const init = initialProfileRef.current;
+    if (form.firstName.trim() !== (init.firstName || '').trim()) return true;
+    if (form.lastName.trim() !== (init.lastName || '').trim()) return true;
+    if (form.bio.trim() !== (init.bio || '').trim()) return true;
+    if (form.profilePictureUrl.trim() !== (init.profilePictureUrl || '').trim()) return true;
+    if (form.locationName.trim() !== (init.locationName || '').trim()) return true;
+    if (form.latitude !== init.latitude) return true;
+    if (form.longitude !== init.longitude) return true;
+    if (form.isLocationPrivate !== init.isLocationPrivate) return true;
+    return false;
+  }, [form]);
+
   const handleSave = async () => {
+    if (!hasChanges) {
+      router.back();
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -114,11 +141,13 @@ export default function EditProfileScreen() {
         <Text style={styles.topBarTitle}>Edit Profile</Text>
         <TouchableOpacity
           onPress={handleSave}
-          disabled={loading}
-          style={styles.saveButton}
+          disabled={loading || !hasChanges}
+          style={[styles.saveButton, (!hasChanges || loading) && { opacity: 0.4 }]}
           activeOpacity={0.7}
         >
-          <Text style={styles.saveText}>{loading ? 'Saving...' : 'Save'}</Text>
+          <Text style={[styles.saveText, (!hasChanges || loading) && { color: colors.tertiary }]}>
+            {loading ? 'Saving...' : 'Save'}
+          </Text>
         </TouchableOpacity>
       </View>
 

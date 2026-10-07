@@ -46,33 +46,32 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const [internalUnread, setInternalUnread] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(notificationsService.getCurrentUnreadCount());
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchUnread = () => {
-      notificationsService
-        .getUnreadCount()
-        .then((res) => {
-          if (isMounted) setInternalUnread(Boolean(res?.hasUnread));
-        })
-        .catch(() => {});
-    };
+    // Subscribe to live unread changes
+    const unsub = notificationsService.onUnreadChange((count) => {
+      setUnreadCount(count);
+    });
 
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 15000); // Check every 15s
+    // Also fetch fresh from server
+    notificationsService.getUnreadCount();
+    const interval = setInterval(() => {
+      notificationsService.getUnreadCount();
+    }, 15000);
+
     return () => {
-      isMounted = false;
+      unsub();
       clearInterval(interval);
     };
   }, []);
 
-  const showUnread =
-    hasUnreadNotification !== undefined
-      ? hasUnreadNotification
-      : hasUnreadNotifications !== undefined
-      ? hasUnreadNotifications
-      : internalUnread;
+  const displayCount =
+    unreadCount > 0
+      ? unreadCount
+      : hasUnreadNotification || hasUnreadNotifications
+      ? 1
+      : 0;
 
   const headerContent = (
     <View style={[styles.container, { backgroundColor: colors.surface }, style]}>
@@ -101,7 +100,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             accessibilityLabel="Notifications"
           >
             <MaterialIcons name="notifications-none" size={24} color={colors.onSurface} />
-            {showUnread && <View style={[styles.unreadDot, { borderColor: colors.surface }]} />}
+            {displayCount > 0 && (
+              <View style={[styles.unreadBadge, { borderColor: colors.surface }]}>
+                <Text style={styles.unreadBadgeText}>
+                  {displayCount > 99 ? '99+' : displayCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -199,15 +204,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  unreadDot: {
+  unreadBadge: {
     position: 'absolute',
-    top: 9,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.error,
+    top: 3,
+    right: 2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#ef4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: Colors.surface,
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 9.5,
+    fontWeight: '800',
+    lineHeight: 12,
+    textAlign: 'center',
   },
 });

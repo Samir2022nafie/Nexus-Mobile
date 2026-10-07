@@ -19,6 +19,7 @@ import {
   Image,
   TouchableOpacity,
   TextInput,
+  BackHandler,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
 import { useLocalSearchParams } from 'expo-router';
@@ -111,6 +112,24 @@ export default function CommunityDetailScreen() {
       })();
     }
   }, [community?.id, slug]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showAllEvents) {
+        setShowAllEvents(false);
+        return true;
+      }
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        (router as any).navigate('/(tabs)');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [showAllEvents, router]);
 
   const toggleCommunityNotifications = async () => {
     const nextVal = !communityNotificationsEnabled;
@@ -454,7 +473,13 @@ export default function CommunityDetailScreen() {
             {/* Top Actions Row: Back Button & Admin Edit */}
             <View style={[styles.coverNavRow, { top: insets.top + 6 }]}>
               <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    (router as any).navigate('/(tabs)');
+                  }
+                }}
                 style={styles.navCircleBtn}
                 activeOpacity={0.8}
               >

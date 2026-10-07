@@ -11,3 +11,4 @@ export * from './Toast';
 export * from './LocationInput';
 export * from './MapPickerModal';
 export * from './CroppedImage';
+export * from './InAppNotificationBanner';

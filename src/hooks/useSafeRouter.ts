@@ -53,7 +53,11 @@ export function useSafeRouter() {
       return;
     }
     globalLastNavTime = now;
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      (router as any).navigate('/(tabs)');
+    }
   }, [router]);
 
   return {

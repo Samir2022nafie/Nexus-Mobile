@@ -4,7 +4,7 @@
  * Backend: POST /hangouts
  * Enforces: dates validation, join type selection
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -148,6 +148,7 @@ export default function NewHangoutScreen() {
   const [initialLoading, setInitialLoading] = useState(isEditing);
   const [generalError, setGeneralError] = useState('');
   const [cropModalVisible, setCropModalVisible] = useState(false);
+  const initialFormRef = useRef<any>(null);
 
   useEffect(() => {
     if (!params.hangoutId) return;
@@ -159,7 +160,7 @@ export default function NewHangoutScreen() {
             typeof h.location === 'string'
               ? h.location
               : h.location?.place_name || h.location?.name || '';
-          setForm({
+          const initialData = {
             title: h.title || '',
             location: loc,
             locationName: loc,
@@ -173,10 +174,12 @@ export default function NewHangoutScreen() {
             joinType: String(h.joinType || h.join_type || 'open')
               .toLowerCase()
               .includes('open')
-              ? 'open'
-              : 'request_based',
+              ? ('open' as const)
+              : ('request_based' as const),
             categoryId: h.categoryId || h.category_id || h.category?.id || '3eb224da-e96f-44ad-a231-0d449e3ac69e',
-          });
+          };
+          initialFormRef.current = initialData;
+          setForm(initialData);
         }
       })
       .catch(() => {
@@ -186,6 +189,24 @@ export default function NewHangoutScreen() {
         setInitialLoading(false);
       });
   }, [params.hangoutId]);
+
+  const hasChanges = useMemo(() => {
+    if (!isEditing) return true;
+    if (!initialFormRef.current) return false;
+    const init = initialFormRef.current;
+    if (form.title.trim() !== (init.title || '').trim()) return true;
+    if (form.description.trim() !== (init.description || '').trim()) return true;
+    if ((form.locationName || form.location).trim() !== (init.locationName || init.location || '').trim()) return true;
+    if (form.latitude !== init.latitude) return true;
+    if (form.longitude !== init.longitude) return true;
+    if (form.coverImageUrl.trim() !== (init.coverImageUrl || '').trim()) return true;
+    if (form.startsAt !== init.startsAt) return true;
+    if (form.endsAt !== init.endsAt) return true;
+    if (form.maxParticipants.trim() !== (init.maxParticipants || '').trim()) return true;
+    if (form.joinType !== init.joinType) return true;
+    if (form.categoryId !== init.categoryId) return true;
+    return false;
+  }, [isEditing, form]);
 
   // Decoupled animated Date & Time picker state
   const [datePickerRendered, setDatePickerRendered] = useState(false);
@@ -307,6 +328,10 @@ export default function NewHangoutScreen() {
 
   const handleSubmit = async () => {
     if (!validate()) return;
+    if (isEditing && !hasChanges) {
+      router.back();
+      return;
+    }
     setLoading(true);
     setGeneralError('');
     try {
@@ -654,6 +679,7 @@ export default function NewHangoutScreen() {
           title={isEditing ? 'Save Changes' : 'Create Hangout'}
           onPress={handleSubmit}
           loading={loading}
+          disabled={loading || (isEditing && !hasChanges)}
           fullWidth
           size="lg"
           style={{ marginTop: Spacing.sm }}

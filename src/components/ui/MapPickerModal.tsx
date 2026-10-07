@@ -2,7 +2,7 @@
  * MapPickerModal — Interactive map modal to pick location with pin and search.
  * Uses OpenStreetMap tiles + Nominatim geocoding (100% free, zero billing).
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -267,14 +267,16 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
 
   const initialLat = initialLocation?.latitude ?? 40.7128;
   const initialLng = initialLocation?.longitude ?? -74.006;
-  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';
-
-  const mapHtml = `
+  const mapStyleUrl = 'https://tiles.openfreemap.org/styles/liberty';  const mapHtml = useMemo(() => {
+    return `
     <!DOCTYPE html>
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link href="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+        <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin />
+        <link rel="dns-prefetch" href="https://tiles.openfreemap.org" />
+        <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.css" rel="stylesheet" />
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body, html {
@@ -291,8 +293,20 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             left: 0;
             z-index: 1;
             background: transparent !important;
+            contain: strict;
+            transform: translate3d(0, 0, 0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
           }
-          .maplibregl-ctrl-bottom-right, .maplibregl-ctrl-bottom-left { display: none !important; }
+          .maplibregl-ctrl-attrib,
+          .maplibregl-ctrl-bottom-right,
+          .maplibregl-ctrl-bottom-left,
+          .maplibregl-ctrl {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
 
           /* Cosmic Deep Space Background */
           .cosmos-bg {
@@ -302,10 +316,15 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             background: #02040a;
             overflow: hidden;
             pointer-events: none;
+            contain: strict;
           }
           .cosmos-stars {
             position: absolute;
             inset: -300px;
+            contain: strict;
+            will-change: transform;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
             background-image: 
               radial-gradient(1.8px 1.8px at 28px 36px, #ffffff, transparent),
               radial-gradient(2.2px 2.2px at 145px 78px, #ffffff, transparent),
@@ -329,7 +348,9 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             left: 50%;
             width: 92vmin;
             height: 92vmin;
-            transform: translate(-50%, -50%);
+            contain: strict;
+            transform: translate3d(-50%, -50%, 0);
+            backface-visibility: hidden;
             border-radius: 50%;
             background: radial-gradient(circle, rgba(56, 189, 248, 0.40) 58%, rgba(14, 165, 233, 0.20) 72%, rgba(2, 132, 199, 0.05) 86%, transparent 100%);
             filter: blur(12px);
@@ -382,7 +403,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
           <div class="cosmos-stars"></div>
         </div>
         <div id="map"></div>
-        <script src="https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.1.0/dist/maplibre-gl.min.js"></script>
         <script>
           var map = new maplibregl.Map({
             container: 'map',
@@ -392,8 +413,21 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             minZoom: 1.45,
             maxZoom: 20,
             projection: { type: 'globe' },
-            antialias: true
+            antialias: false,
+            fadeDuration: 0,
+            trackResize: true,
+            attributionControl: false,
+            renderWorldCopies: false,
+            maxParallelImageRequests: 16,
+            crossSourceCollisions: false,
+            refreshExpiredTiles: false
           });
+
+          // Sync atmosphere halo on load
+          var haloEl = document.querySelector('.globe-atmosphere-halo');
+          if (haloEl && 14 > 5.5) {
+            haloEl.style.opacity = '0';
+          }
 
           function createOceanWavePattern() {
             var canvas = document.createElement('canvas');
@@ -430,29 +464,42 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
               }
             } catch(e) {}
 
-            // Continents: Dark slate grey (#28323c)
-            // Completely hide satellite/raster layers (including natural_earth which covered zoom < 7)
+            // Single-pass optimization over layers for rapid rendering
+            var hideLandIds = {
+              'park': 1, 'park_outline': 1, 'park_national': 1, 'park_nature_reserve': 1,
+              'landcover_wood': 1, 'landcover_grass': 1, 'landcover_wetland': 1,
+              'landcover_scrub': 1, 'landcover_cemetery': 1, 'landcover_glacier': 1,
+              'landuse_pitch': 1, 'landuse_track': 1, 'landuse_grass': 1,
+              'landuse_residential': 1, 'landcover_sand': 1, 'landcover_ice': 1,
+              'landuse_hospital': 1, 'landuse_school': 1, 'landuse_industrial': 1,
+              'landuse_commercial': 1, 'boundary_disputed': 1
+            };
+
             try {
-              map.getStyle().layers.forEach(function(l) {
-                if (l.type === 'raster' || l.id.indexOf('natural_earth') !== -1 || l.id.indexOf('hillshade') !== -1) {
-                  try { map.setLayoutProperty(l.id, 'visibility', 'none'); } catch(e) {}
+              var styleLayers = (map.getStyle && map.getStyle().layers) || [];
+              for (var i = 0; i < styleLayers.length; i++) {
+                var l = styleLayers[i];
+                var lid = l.id;
+                if (l.type === 'raster' || lid.indexOf('natural_earth') !== -1 || lid.indexOf('hillshade') !== -1 || hideLandIds[lid] || lid.indexOf('park') !== -1 || lid.indexOf('garden') !== -1 || lid.indexOf('grass') !== -1) {
+                  try { map.setLayoutProperty(lid, 'visibility', 'none'); } catch(e) {}
+                } else if (l.type === 'line' && (lid.indexOf('road') !== -1 || lid.indexOf('highway') !== -1 || lid.indexOf('bridge') !== -1 || lid.indexOf('tunnel') !== -1)) {
+                  try {
+                    if (lid.indexOf('case') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#12171e');
+                    } else if (lid.indexOf('motorway') !== -1 || lid.indexOf('trunk') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#2c3545');
+                    } else if (lid.indexOf('primary') !== -1 || lid.indexOf('secondary') !== -1) {
+                      map.setPaintProperty(lid, 'line-color', '#222b37');
+                    } else {
+                      map.setPaintProperty(lid, 'line-color', '#1a222b');
+                    }
+                    map.setPaintProperty(lid, 'line-opacity', 0.85);
+                  } catch(e) {}
                 }
-              });
+              }
             } catch(e) {}
 
-            // Hide green vegetation, park, and landcover polygons and dotted outlines for clean solid vector continents
-            [
-              'park', 'park_outline', 'park_national', 'park_nature_reserve', 'landcover_wood', 'landcover_grass',
-              'landcover_wetland', 'landcover_scrub', 'landcover_cemetery', 'landcover_glacier',
-              'landuse_pitch', 'landuse_track', 'landuse_grass', 'landuse_residential',
-              'landcover_sand', 'landcover_ice', 'landuse_hospital', 'landuse_school',
-              'landuse_industrial', 'landuse_commercial'
-            ].forEach(function(id) {
-              if (map.getLayer(id)) {
-                try { map.setLayoutProperty(id, 'visibility', 'none'); } catch(e) {}
-              }
-            });
-
+            // Continents: Dark slate grey (#28323c)
             if (map.getLayer('background')) {
               try { map.setPaintProperty('background', 'background-color', '#28323c'); } catch(e) {}
             }
@@ -476,26 +523,6 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
               }
             });
 
-            // Tone down bright yellow and white road lines to dark charcoal / slate
-            try {
-              map.getStyle().layers.forEach(function(l) {
-                if (l.type === 'line' && (l.id.indexOf('road') !== -1 || l.id.indexOf('highway') !== -1 || l.id.indexOf('bridge') !== -1 || l.id.indexOf('tunnel') !== -1)) {
-                  try {
-                    if (l.id.indexOf('case') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#12171e');
-                    } else if (l.id.indexOf('motorway') !== -1 || l.id.indexOf('trunk') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#2c3545');
-                    } else if (l.id.indexOf('primary') !== -1 || l.id.indexOf('secondary') !== -1) {
-                      map.setPaintProperty(l.id, 'line-color', '#222b37');
-                    } else {
-                      map.setPaintProperty(l.id, 'line-color', '#1a222b');
-                    }
-                    map.setPaintProperty(l.id, 'line-opacity', 0.85);
-                  } catch(e) {}
-                }
-              });
-            } catch(e) {}
-
             if (map.getLayer('building')) {
               try { map.setPaintProperty('building', 'fill-color', '#1e242c'); } catch(e) {}
             }
@@ -503,8 +530,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
               try { map.setPaintProperty('building-3d', 'fill-extrusion-color', '#232b35'); } catch(e) {}
             }
 
-            // Country & Region Boundaries:
-            // Crisp, solid, thin borders between countries (removes dotted clutter)
+            // Country & Region Boundaries
             if (map.getLayer('boundary_2')) {
               try {
                 map.setLayoutProperty('boundary_2', 'visibility', 'visible');
@@ -520,9 +546,6 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
                 map.setPaintProperty('boundary_3', 'line-width', 0.8);
                 map.setPaintProperty('boundary_3', 'line-dasharray', null);
               } catch(e) {}
-            }
-            if (map.getLayer('boundary_disputed')) {
-              try { map.setLayoutProperty('boundary_disputed', 'visibility', 'none'); } catch(e) {}
             }
 
             // High-Contrast English Text Labels with Dark Halo
@@ -552,7 +575,7 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
               }
             });
 
-            // Native WebGL Selective Label Zoom Ranges (60 FPS on GPU, zero JS overhead!)
+            // Native WebGL Selective Label Zoom Ranges (60 FPS on GPU)
             var labelRanges = {
               'label_country_1': [2.1, 24],
               'label_country_2': [3.0, 24],
@@ -599,6 +622,39 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             });
             map.on('zoomend', updateAtmosphereHalo);
             updateAtmosphereHalo();
+
+            // Starry background smoothly tracks swiping / sliding gestures in real time
+            var starEl = document.querySelector('.cosmos-stars');
+            var lastParallaxX = -999;
+            var lastParallaxY = -999;
+            function updateCosmicParallax() {
+              if (!starEl) starEl = document.querySelector('.cosmos-stars');
+              if (!starEl) return;
+              var center = map.getCenter();
+              var bearing = map.getBearing() || 0;
+              var pitch = map.getPitch() || 0;
+              var shiftX = Math.round((center.lng * 2.8 + bearing * 1.2) % 240);
+              var shiftY = Math.round((center.lat * 2.8 + pitch * 0.8) % 240);
+              if (shiftX !== lastParallaxX || shiftY !== lastParallaxY) {
+                lastParallaxX = shiftX;
+                lastParallaxY = shiftY;
+                starEl.style.transform = 'translate3d(' + shiftX + 'px, ' + shiftY + 'px, 0px)';
+              }
+            }
+
+            var parallaxRaf = null;
+            function scheduleCosmicParallax() {
+              if (parallaxRaf) return;
+              parallaxRaf = requestAnimationFrame(function() {
+                parallaxRaf = null;
+                updateCosmicParallax();
+              });
+            }
+            map.on('move', scheduleCosmicParallax);
+            map.on('moveend', scheduleCosmicParallax);
+            map.on('rotate', scheduleCosmicParallax);
+            map.on('pitch', scheduleCosmicParallax);
+            updateCosmicParallax();
 
             // 3D extruded buildings (at zoom >= 15.0)
             try {
@@ -679,7 +735,8 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
         </script>
       </body>
     </html>
-  `;
+    `;
+  }, [initialLat, initialLng]);
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
@@ -744,8 +801,17 @@ export const MapPickerModal: React.FC<MapPickerModalProps> = ({
             source={{ html: mapHtml }}
             style={styles.webView}
             onMessage={onWebViewMessage}
+            originWhitelist={['*']}
             javaScriptEnabled={true}
             domStorageEnabled={true}
+            cacheEnabled={true}
+            androidLayerType="hardware"
+            renderToHardwareTextureAndroid={true}
+            overScrollMode="never"
+            scrollEnabled={false}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
           />
 
           <View style={styles.instructionsBadge}>

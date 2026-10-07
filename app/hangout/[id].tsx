@@ -15,9 +15,10 @@ import {
   Alert,
   Modal,
   TextInput,
+  BackHandler,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -88,9 +89,11 @@ export default function HangoutDetailScreen() {
     }
   }, [id]);
 
-  useEffect(() => {
-    fetchHangout();
-  }, [fetchHangout]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchHangout();
+    }, [fetchHangout])
+  );
 
   useEffect(() => {
     if (!hangout?.id) return;
@@ -104,6 +107,20 @@ export default function HangoutDetailScreen() {
     };
     checkNotifs();
   }, [hangout?.id, isJoined, user?.id, hangout?.creator_id, hangout?.creatorId]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        (router as any).navigate('/(tabs)');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [router]);
 
   const isHangoutHost = Boolean(
     user?.id && (
@@ -385,7 +402,13 @@ export default function HangoutDetailScreen() {
           {/* Floating Top Nav: Back Button + Host Controls */}
           <View style={[styles.coverNavRow, { top: insets.top + Spacing.xs }]}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  (router as any).navigate('/(tabs)');
+                }
+              }}
               style={styles.navBtn}
               activeOpacity={0.8}
             >

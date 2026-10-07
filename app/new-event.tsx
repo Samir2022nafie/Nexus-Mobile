@@ -6,7 +6,7 @@
  * - Native iOS/wheel-style Date & Time picker for startsAt and endsAt
  * - Unlimited attendees support when maxParticipants is left empty
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -163,6 +163,8 @@ export default function NewEventScreen() {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(isEditing);
   const [generalError, setGeneralError] = useState('');
+  const initialFormRef = useRef<any>(null);
+  const initialCoverRef = useRef<string | null>(null);
 
   // Date & Time picker modal state
   const [pickerRendered, setPickerRendered] = useState(false);
@@ -248,8 +250,10 @@ export default function NewEventScreen() {
               ? ev.location
               : ev.location?.place_name || ev.location?.name || '';
           setSelectedSlug(ev.communitySlug || ev.community?.slug || targetSlug);
-          setCoverImage(ev.coverImageUrl || ev.cover_image_url || null);
-          setForm({
+          const initialCover = ev.coverImageUrl || ev.cover_image_url || null;
+          setCoverImage(initialCover);
+          initialCoverRef.current = initialCover;
+          const initialData = {
             title: ev.title || '',
             location: loc,
             locationName: loc,
@@ -259,7 +263,9 @@ export default function NewEventScreen() {
             startsAt: ev.startsAt || ev.starts_at || defaultStartsAt,
             endsAt: ev.endsAt || ev.ends_at || undefined,
             maxParticipants: ev.maxParticipants || ev.max_participants ? String(ev.maxParticipants || ev.max_participants) : '',
-          });
+          };
+          initialFormRef.current = initialData;
+          setForm(initialData);
         }
       })
       .catch(() => {
@@ -269,6 +275,22 @@ export default function NewEventScreen() {
         setInitialLoading(false);
       });
   }, [params.eventId, params.slug]);
+
+  const hasChanges = useMemo(() => {
+    if (!isEditing) return true;
+    if (!initialFormRef.current) return false;
+    const init = initialFormRef.current;
+    if (form.title.trim() !== (init.title || '').trim()) return true;
+    if (form.description.trim() !== (init.description || '').trim()) return true;
+    if ((form.locationName || form.location).trim() !== (init.locationName || init.location || '').trim()) return true;
+    if (form.latitude !== init.latitude) return true;
+    if (form.longitude !== init.longitude) return true;
+    if (form.startsAt !== init.startsAt) return true;
+    if (form.endsAt !== init.endsAt) return true;
+    if (form.maxParticipants.trim() !== (init.maxParticipants || '').trim()) return true;
+    if (coverImage !== initialCoverRef.current) return true;
+    return false;
+  }, [isEditing, form, coverImage]);
 
   const handlePickCoverImage = async () => {
     try {
@@ -430,6 +452,10 @@ export default function NewEventScreen() {
       };
 
       if (isEditing && params.eventId) {
+        if (!hasChanges) {
+          router.back();
+          return;
+        }
         await eventsService.update(selectedSlug, params.eventId, payload);
         Alert.alert('Event Updated', 'Your event changes have been saved.', [
           { text: 'OK', onPress: () => router.back() },
@@ -745,6 +771,7 @@ export default function NewEventScreen() {
           title={isEditing ? 'Save Changes' : isLeadership ? 'Publish Event' : 'Submit Event Proposal'}
           onPress={handleSubmit}
           loading={loading}
+          disabled={loading || (isEditing && !hasChanges)}
           fullWidth
           size="lg"
           style={{ marginTop: Spacing.sm }}

@@ -2,7 +2,7 @@
  * Hangouts Listing Page — Accessed via "more" in the Home feed Hangouts section.
  * Includes back navigation to return to Home.
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,9 +13,10 @@ import {
   Image,
   TextInput,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, Shadows, ThemeColors } from '../../src/constants/theme';
@@ -31,9 +32,12 @@ import {
   formatDistance,
   extractItemCoordinates,
   getDistanceInKm,
+  isItemPassed,
 } from '../../src/utils/distance';
 import { RaisingHandIcon } from '../../src/components/RaisingHandIcon';
-import { formatCategoryName } from '../../src/utils/categories';
+import { BACKEND_CATEGORIES, formatCategoryName } from '../../src/utils/categories';
+
+const CATEGORIES = ['All', ...BACKEND_CATEGORIES.map((c) => c.label)];
 
 export default function HangoutsPage() {
   const router = useSafeRouter();
@@ -48,6 +52,7 @@ export default function HangoutsPage() {
   const [hangouts, setHangouts] = useState<any[]>([]);
   const [joinedHangouts, setJoinedHangouts] = useState<Record<string, boolean>>({});
   const [requestedHangouts, setRequestedHangouts] = useState<Record<string, boolean>>({});
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,9 +77,25 @@ export default function HangoutsPage() {
     }
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchHangouts();
+    }, [fetchHangouts])
+  );
+
   useEffect(() => {
-    fetchHangouts();
-  }, [fetchHangouts]);
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        (router as any).navigate('/(tabs)');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [router]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -164,22 +185,101 @@ export default function HangoutsPage() {
     }
   };
 
+  const userCityName =
+    user?.location?.name ||
+    user?.location?.placeName ||
+    (user as any)?.locationName ||
+    null;
+
+  const isHangoutInUserCity = useCallback(
+    (h: any) => {
+      // 1. If user GPS coords are available, check distance <= 50 km (standard metropolitan radius)
+      const coords = extractItemCoordinates(h);
+      if (userLocation && coords) {
+        const distKm = getDistanceInKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          coords.latitude,
+          coords.longitude
+        );
+        if (distKm <= 50) return true;
+      }
+
+      // 2. Check textual city match
+      if (userCityName && typeof userCityName === 'string' && userCityName.trim()) {
+        const primaryCity = userCityName.toLowerCase().split(',')[0].trim();
+        if (primaryCity) {
+          const hLocStr = (
+            typeof h.location === 'string'
+              ? h.location
+              : (h.location?.name ||
+                 h.location?.place_name ||
+                 h.location?.placeName ||
+                 h.locationName ||
+                 '')
+          ).toLowerCase();
+          if (hLocStr.includes(primaryCity)) return true;
+        }
+      }
+
+      // 3. Fallback: if user has no location configured at all, count all
+      if (!userLocation && (!userCityName || !userCityName.trim())) {
+        return true;
+      }
+
+      return false;
+    },
+    [userLocation, userCityName]
+  );
+
   const filteredHangouts = hangouts.filter((h) => {
+    // Category filter
+    if (selectedCategory !== 'All') {
+      const catLabel = formatCategoryName(
+        h.category?.name ||
+          h.category ||
+          h.categoryName ||
+          (h as any).category_name ||
+          (h as any).categoryId ||
+          'Other',
+        true
+      );
+      if (catLabel.toLowerCase() !== selectedCategory.toLowerCase()) {
+        return false;
+      }
+    }
+
+    // Search query filter
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     const titleMatch = h.title?.toLowerCase().includes(q);
     const descMatch = h.description?.toLowerCase().includes(q);
     const hostMatch = (h.creatorName || h.creator?.first_name || '').toLowerCase().includes(q);
-    const placeMatch = (h.location?.place_name || '').toLowerCase().includes(q);
+    const placeMatch = (h.location?.place_name || h.location?.name || '').toLowerCase().includes(q);
     return Boolean(titleMatch || descMatch || hostMatch || placeMatch);
   });
+
+  const nearYouHangouts = useMemo(() => {
+    return filteredHangouts.filter((h) => {
+      if (isItemPassed(h)) return false;
+      return isHangoutInUserCity(h);
+    });
+  }, [filteredHangouts, isHangoutInUserCity]);
+
+  const nearYouCount = nearYouHangouts.length;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Top Header with Back Button */}
       <View style={styles.topNavRow}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              (router as any).navigate('/(tabs)');
+            }
+          }}
           style={styles.backButton}
           activeOpacity={0.7}
         >
@@ -195,7 +295,7 @@ export default function HangoutsPage() {
         </TouchableOpacity>
       </View>
 
-      {/* Persistent Header: Search Bar + Live Beacon */}
+      {/* Persistent Header: Search Bar + Category Chips + Live Beacon */}
       <View style={styles.persistentHeader}>
         <View style={styles.searchContainer}>
           <MaterialIcons name="search" size={20} color={colors.tertiary} />
@@ -215,13 +315,43 @@ export default function HangoutsPage() {
           ) : null}
         </View>
 
+        {/* Category Filter Chips */}
+        <View style={styles.categoryChipsWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScroll}
+          >
+            {CATEGORIES.map((cat) => {
+              const isCatActive = selectedCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.categoryChip, isCatActive && styles.categoryChipActive]}
+                  onPress={() => setSelectedCategory(cat)}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.categoryChipText,
+                      isCatActive && styles.categoryChipTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         <View style={styles.statusBar}>
           <View style={styles.beaconGroup}>
             <View style={styles.beaconRing}>
               <View style={styles.beaconDot} />
             </View>
             <Text style={styles.beaconText}>
-              {filteredHangouts.length} {filteredHangouts.length === 1 ? 'Hangout' : 'Hangouts'} Available
+              {nearYouCount} {nearYouCount === 1 ? 'Hangout' : 'Hangouts'} Near You
             </Text>
           </View>
         </View>
@@ -495,6 +625,37 @@ const getStyles = (colors: ThemeColors, isDark: boolean) =>
       borderWidth: 1,
       borderColor: colors.cardBorder,
       gap: 8,
+    },
+    categoryChipsWrapper: {
+      height: 40,
+      marginBottom: Spacing.xs,
+    },
+    categoryScroll: {
+      gap: 8,
+      alignItems: 'center',
+    },
+    categoryChip: {
+      height: 32,
+      paddingHorizontal: 14,
+      borderRadius: BorderRadius.full,
+      backgroundColor: colors.surfaceContainerLow,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.primaryContainer,
+      borderColor: colors.primaryContainer,
+    },
+    categoryChipText: {
+      ...Typography.captionMd,
+      color: colors.onSurface,
+      fontWeight: '500',
+    },
+    categoryChipTextActive: {
+      color: colors.onPrimaryContainer,
+      fontWeight: '700',
     },
     searchInput: {
       flex: 1,

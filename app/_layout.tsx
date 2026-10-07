@@ -17,6 +17,8 @@ import { PostStateProvider } from '../src/context/PostStateContext';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { TabBarVisibilityProvider } from '../src/context/TabBarVisibilityContext';
 import { LoadingSpinner } from '../src/components/ui/LoadingSpinner';
+import { InAppNotificationBanner } from '../src/components/ui';
+import { useSafeRouter } from '../src/hooks/useSafeRouter';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -25,6 +27,7 @@ import pushNotifications from '../src/services/pushNotifications';
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
+  const router = useSafeRouter();
   const { isLoading } = useAuth();
   const { colors, isDark } = useTheme();
 
@@ -61,6 +64,13 @@ function RootNavigator() {
       };
     }
   }, [isLoading, fontsLoaded]);
+
+  useEffect(() => {
+    const unsub = pushNotifications.setupResponseListener(router);
+    return () => {
+      unsub?.();
+    };
+  }, [router]);
 
   if (isLoading || !fontsLoaded) {
     return <LoadingSpinner fullScreen message="Loading Nexus..." />;
@@ -108,6 +118,7 @@ function RootNavigator() {
         <Stack.Screen name="followers" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="user/[id]/communities" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
+      <InAppNotificationBanner />
     </View>
   );
 }

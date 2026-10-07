@@ -23,9 +23,10 @@ import {
   Modal,
   Animated,
   Pressable,
+  BackHandler,
 } from 'react-native';
 import { useSafeRouter } from '../../src/hooks/useSafeRouter';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Typography, Spacing, BorderRadius, ThemeColors } from '../../src/constants/theme';
@@ -237,9 +238,25 @@ export default function ThreadDetailScreen() {
     }
   }, [id, setPostCommentCount]);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        (router as any).navigate('/(tabs)');
+      }
+      return true;
+    };
+
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [router]);
 
   const handleReaction = async () => {
     const nextLiked = !hasLiked;
@@ -320,7 +337,13 @@ export default function ThreadDetailScreen() {
         </Text>
         <TouchableOpacity
           style={styles.backBtnPill}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              (router as any).navigate('/(tabs)');
+            }
+          }}
           activeOpacity={0.85}
         >
           <MaterialIcons name="arrow-back" size={18} color={colors.onPrimaryContainer} />
@@ -363,7 +386,13 @@ export default function ThreadDetailScreen() {
         {/* Top Header Bar — Back button, Clickable Community Pill, and Author Edit/Delete */}
         <View style={styles.topBar}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                (router as any).navigate('/(tabs)');
+              }
+            }}
             style={styles.backButton}
             activeOpacity={0.7}
           >

@@ -109,6 +109,7 @@ export default function ExploreMapScreen() {
   useFocusEffect(
     useCallback(() => {
       showTabBar();
+      webViewRef.current?.injectJavaScript(`if (window.map) { window.map.resize(); } true;`);
     }, [showTabBar])
   );
 
@@ -764,6 +765,16 @@ export default function ExploreMapScreen() {
             z-index: 1;
           }
 
+          /* Hide MapLibre Attribution & Copyright Controls */
+          .maplibregl-ctrl-attrib,
+          .maplibregl-ctrl-bottom-right,
+          .maplibregl-ctrl {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+
           /* Cosmic Deep Space Background */
           .cosmos-bg {
             position: absolute;
@@ -1231,7 +1242,8 @@ export default function ExploreMapScreen() {
             projection: { type: 'globe' },
             antialias: false,
             fadeDuration: 0,
-            trackResize: false,
+            trackResize: true,
+            attributionControl: false,
             cooperativeGestures: false,
             renderWorldCopies: true
           });
@@ -1711,11 +1723,7 @@ export default function ExploreMapScreen() {
                 clean = trimmed.slice(0, hashIdx);
                 cropPart = trimmed.slice(hashIdx + 6).split('&')[0];
               } else if (queryMatch) {
-                try {
-                  cropPart = decodeURIComponent(queryMatch[1]);
-                } catch(e) {
-                  cropPart = queryMatch[1];
-                }
+                cropPart = decodeURIComponent(queryMatch[1]);
                 clean = trimmed.replace(/[?&]crop=[^&#]+/, '').replace(/\?&/, '?').replace(/[?&]$/, '');
               }
               if (!cropPart) {
@@ -1733,29 +1741,25 @@ export default function ExploreMapScreen() {
               labelClass = 'hangout-label';
               title = item.title || 'Hangout';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              var hangoutFallback = '<div class="hangout-placeholder"><svg viewBox="0 0 24 24" width="28" height="28" fill="#34d399"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM4 19h16v2H4z"/></svg></div>';
-              contentHtml = formatCroppedImgHtml(banner, hangoutFallback);
+              contentHtml = formatCroppedImgHtml(banner, '<div class="hangout-placeholder">☕</div>');
             } else if (type === 'event') {
               pinClass = 'event-pin';
               labelClass = 'event-label';
               title = item.title || 'Event';
               var banner = item.coverImageUrl || item.bannerUrl || item.cover_image_url;
-              var eventFallback = '<div class="event-placeholder"><svg viewBox="0 0 24 24" width="28" height="28" fill="#feba48"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg></div>';
-              contentHtml = formatCroppedImgHtml(banner, eventFallback);
+              contentHtml = formatCroppedImgHtml(banner, '<div class="event-placeholder">🎟️</div>');
             } else if (type === 'community') {
               pinClass = 'community-pin';
               labelClass = 'community-label';
               title = item.name || 'Community';
-              var pic = item.profilePictureUrl || item.profile_picture_url || item.bannerUrl || item.banner_url;
-              var commFallback = '<div class="community-placeholder"><svg viewBox="0 0 24 24" width="26" height="26" fill="#60a5fa"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>';
-              contentHtml = formatCroppedImgHtml(pic, commFallback);
+              var pic = item.profilePictureUrl || item.bannerUrl;
+              contentHtml = formatCroppedImgHtml(pic, '<div class="community-placeholder">🌐</div>');
             } else {
               pinClass = 'user-pin';
               labelClass = 'user-label';
               title = item.name || item.username || 'User';
-              var userPic = item.profilePictureUrl || item.profile_picture_url || item.avatarUrl || item.avatar_url;
-              var userFallback = '<div class="user-avatar-fallback"><svg viewBox="0 0 24 24" width="20" height="20" fill="#d5c4b4"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>';
-              contentHtml = formatCroppedImgHtml(userPic, userFallback);
+              var initial = (title || 'U').charAt(0).toUpperCase();
+              contentHtml = formatCroppedImgHtml(item.profilePictureUrl, '<div class="user-avatar-fallback">' + initial + '</div>');
             }
 
             var pinWrapHtml = '<div class="pin-wrap' + (isOverlapping && count > 1 ? ' is-stacked' : '') + '">';
@@ -2463,9 +2467,17 @@ export default function ExploreMapScreen() {
           });
 
           map.on('load', function() {
+            setTimeout(function() { if (map) map.resize(); }, 60);
+            setTimeout(function() { if (map) map.resize(); }, 300);
             if (window.ReactNativeWebView) {
               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
             }
+          });
+          map.on('style.load', function() {
+            if (map) map.resize();
+          });
+          window.addEventListener('resize', function() {
+            if (map) map.resize();
           });
         </script>
       </body>
@@ -3233,30 +3245,16 @@ export default function ExploreMapScreen() {
             <View style={styles.entityImageWrap}>
               {selectedEntity.type === 'user' ? (
                 <Avatar
-                  uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.avatar_url || selectedEntity.data.avatarUrl}
+                  uri={selectedEntity.data.profilePictureUrl}
                   size={56}
                   name={selectedEntity.data.name || selectedEntity.data.username || 'User'}
-                  type="user"
                 />
               ) : selectedEntity.type === 'community' ? (
-                (selectedEntity.data.profilePictureUrl || selectedEntity.data.profile_picture_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
+                selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl ? (
                   <CroppedImage
-                    uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.profile_picture_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
+                    uri={selectedEntity.data.profilePictureUrl || selectedEntity.data.bannerUrl}
                     style={styles.entityImageSquare}
-                    fallback={
-                      <View
-                        style={[
-                          styles.entityImageSquare,
-                          {
-                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          },
-                        ]}
-                      >
-                        <MaterialIcons name="groups" size={28} color={colors.primary} />
-                      </View>
-                    }
+                    fill
                   />
                 ) : (
                   <View
@@ -3273,24 +3271,11 @@ export default function ExploreMapScreen() {
                   </View>
                 )
               ) : selectedEntity.type === 'event' ? (
-                (selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
+                selectedEntity.data.coverImageUrl ? (
                   <CroppedImage
-                    uri={selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
+                    uri={selectedEntity.data.coverImageUrl}
                     style={styles.entityImageRect}
-                    fallback={
-                      <View
-                        style={[
-                          styles.entityImageRect,
-                          {
-                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          },
-                        ]}
-                      >
-                        <MaterialIcons name="event" size={28} color={colors.primary} />
-                      </View>
-                    }
+                    fill
                   />
                 ) : (
                   <View
@@ -3307,24 +3292,11 @@ export default function ExploreMapScreen() {
                   </View>
                 )
               ) : (
-                (selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url) ? (
+                selectedEntity.data.coverImageUrl ? (
                   <CroppedImage
-                    uri={selectedEntity.data.coverImageUrl || selectedEntity.data.cover_image_url || selectedEntity.data.bannerUrl || selectedEntity.data.banner_url}
+                    uri={selectedEntity.data.coverImageUrl}
                     style={styles.entityImageSquare}
-                    fallback={
-                      <View
-                        style={[
-                          styles.entityImageSquare,
-                          {
-                            backgroundColor: isDark ? '#2a2622' : colors.surfaceContainerHigh,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          },
-                        ]}
-                      >
-                        <MaterialIcons name="local-cafe" size={28} color={colors.primary} />
-                      </View>
-                    }
+                    fill
                   />
                 ) : (
                   <View
